@@ -3,14 +3,20 @@
  * InfraOps MCP Server
  *
  * A Model Context Protocol server for infrastructure operations.
- * Currently supports Coolify management, with future extensibility
- * for VPS (SSH), Namecheap (DNS), and Cloudflare (tunnels/DNS).
+ *
+ * Providers:
+ *   - Coolify: Full Coolify management (projects, apps, databases, services, deployments)
+ *   - Hetzner Cloud: Server lifecycle, firewalls, SSH keys, volumes, snapshots, networks
+ *   - VPS (SSH): Direct shell access, health monitoring, file ops, Docker inspection
  *
  * Environment variables:
- *   COOLIFY_BASE_URL   - Your Coolify instance URL (e.g. https://coolify.devonwatkins.com)
- *   COOLIFY_API_TOKEN  - Bearer token from Coolify UI → Settings → API Tokens
- *   TRANSPORT          - "stdio" (default) or "http"
- *   PORT               - HTTP port when TRANSPORT=http (default: 3000)
+ *   COOLIFY_BASE_URL            - Coolify instance URL
+ *   COOLIFY_API_TOKEN           - Coolify Bearer token (from BWS via start.sh)
+ *   HETZNER_API_TOKEN           - Hetzner Cloud API token (optional, from BWS via start.sh)
+ *   VPS_HOST                    - VPS IP address (default: 178.156.247.239)
+ *   VPS_USER                    - SSH user (default: root)
+ *   VPS_SSH_KEY_PATH            - SSH private key path (default: ~/.ssh/hetzner_ed25519)
+ *   VPS_SSH_PASSPHRASE          - SSH key passphrase (optional, from BWS via start.sh)
  */
 export {};
 //# sourceMappingURL=index.d.ts.map
