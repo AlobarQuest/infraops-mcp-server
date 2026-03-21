@@ -8,6 +8,7 @@
  *   - Coolify: Full Coolify management (projects, apps, databases, services, deployments)
  *   - Hetzner Cloud: Server lifecycle, firewalls, SSH keys, volumes, snapshots, networks
  *   - VPS (SSH): Direct shell access, health monitoring, file ops, Docker inspection
+ *   - Namecheap: Domain lifecycle + DNS record management (sandbox/production)
  *
  * Environment variables:
  *   COOLIFY_BASE_URL            - Coolify instance URL
@@ -17,6 +18,10 @@
  *   VPS_USER                    - SSH user (default: root)
  *   VPS_SSH_KEY_PATH            - SSH private key path (default: ~/.ssh/hetzner_ed25519)
  *   VPS_SSH_PASSPHRASE          - SSH key passphrase (optional, from BWS via start.sh)
+ *   NAMECHEAP_API_USER          - Namecheap API username (optional, from BWS via start.sh)
+ *   NAMECHEAP_API_KEY           - Namecheap API key (optional, from BWS via start.sh)
+ *   NAMECHEAP_CLIENT_IP         - Whitelisted IP for Namecheap API (default: VPS IP)
+ *   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
  */
 export {};
 //# sourceMappingURL=index.d.ts.map

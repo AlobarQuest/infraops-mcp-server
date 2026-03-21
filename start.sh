@@ -12,6 +12,10 @@
 #   VPS_HOST                    - VPS IP address (default: 178.156.247.239)
 #   VPS_USER                    - SSH user (default: root)
 #   VPS_SSH_KEY_PATH            - Path to SSH private key (default: ~/.ssh/hetzner_ed25519)
+#   BWS_NAMECHEAP_API_USER_SECRET_ID - BWS secret ID for Namecheap API username
+#   BWS_NAMECHEAP_API_KEY_SECRET_ID  - BWS secret ID for Namecheap API key
+#   NAMECHEAP_CLIENT_IP         - Whitelisted IP for Namecheap API (default: VPS IP / 178.156.247.239)
+#   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
 
 set -euo pipefail
 
@@ -53,6 +57,35 @@ if [ -n "${BWS_SSH_PASSPHRASE_SECRET_ID:-}" ]; then
   else
     echo "WARN: BWS_SSH_PASSPHRASE_SECRET_ID set but failed to fetch passphrase" >&2
   fi
+fi
+
+# ── Namecheap API (optional) ───────────────────────────────────────
+if [ -n "${BWS_NAMECHEAP_API_USER_SECRET_ID:-}" ]; then
+  export NAMECHEAP_API_USER=$(fetch_bws_secret "$BWS_NAMECHEAP_API_USER_SECRET_ID")
+  if [ -n "$NAMECHEAP_API_USER" ]; then
+    echo "Namecheap API user loaded from BWS" >&2
+  else
+    echo "WARN: BWS_NAMECHEAP_API_USER_SECRET_ID set but failed to fetch" >&2
+  fi
+fi
+
+if [ -n "${BWS_NAMECHEAP_API_KEY_SECRET_ID:-}" ]; then
+  export NAMECHEAP_API_KEY=$(fetch_bws_secret "$BWS_NAMECHEAP_API_KEY_SECRET_ID")
+  if [ -n "$NAMECHEAP_API_KEY" ]; then
+    echo "Namecheap API key loaded from BWS" >&2
+  else
+    echo "WARN: BWS_NAMECHEAP_API_KEY_SECRET_ID set but failed to fetch" >&2
+  fi
+fi
+
+# Default Namecheap client IP to VPS IP if not explicitly set
+export NAMECHEAP_CLIENT_IP="${NAMECHEAP_CLIENT_IP:-${VPS_HOST:-178.156.247.239}}"
+
+# Default to sandbox mode for safety
+export NAMECHEAP_USE_SANDBOX="${NAMECHEAP_USE_SANDBOX:-true}"
+
+if [ -n "${NAMECHEAP_API_USER:-}" ] && [ -n "${NAMECHEAP_API_KEY:-}" ]; then
+  echo "Namecheap tools enabled (env: ${NAMECHEAP_USE_SANDBOX}=sandbox)" >&2
 fi
 
 exec node "$SCRIPT_DIR/dist/index.js"

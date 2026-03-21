@@ -8,6 +8,7 @@
  *   - Coolify: Full Coolify management (projects, apps, databases, services, deployments)
  *   - Hetzner Cloud: Server lifecycle, firewalls, SSH keys, volumes, snapshots, networks
  *   - VPS (SSH): Direct shell access, health monitoring, file ops, Docker inspection
+ *   - Namecheap: Domain lifecycle + DNS record management (sandbox/production)
  *
  * Environment variables:
  *   COOLIFY_BASE_URL            - Coolify instance URL
@@ -17,6 +18,10 @@
  *   VPS_USER                    - SSH user (default: root)
  *   VPS_SSH_KEY_PATH            - SSH private key path (default: ~/.ssh/hetzner_ed25519)
  *   VPS_SSH_PASSPHRASE          - SSH key passphrase (optional, from BWS via start.sh)
+ *   NAMECHEAP_API_USER          - Namecheap API username (optional, from BWS via start.sh)
+ *   NAMECHEAP_API_KEY           - Namecheap API key (optional, from BWS via start.sh)
+ *   NAMECHEAP_CLIENT_IP         - Whitelisted IP for Namecheap API (default: VPS IP)
+ *   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -38,6 +43,11 @@ import { registerHetznerNetworkingTools } from "./tools/hetzner-networking.js";
 
 // VPS SSH tools
 import { registerVPSTools } from "./tools/vps.js";
+
+// Namecheap tools
+import { registerNamecheapDNSTools } from "./tools/namecheap-dns.js";
+import { registerNamecheapDomainTools } from "./tools/namecheap-domains.js";
+import { isNamecheapConfigured, getNamecheapEnvironment } from "./services/namecheap-client.js";
 
 // ── Create server ────────────────────────────────────────────────────
 
@@ -72,6 +82,16 @@ if (process.env.HETZNER_API_TOKEN) {
 registerVPSTools(server);
 console.error(`VPS SSH tools registered (host: ${process.env.VPS_HOST || "178.156.247.239"})`);
 
+// ── Register Namecheap tools ────────────────────────────────────────
+
+if (isNamecheapConfigured()) {
+  registerNamecheapDomainTools(server);
+  registerNamecheapDNSTools(server);
+  console.error(`Namecheap tools registered (env: ${getNamecheapEnvironment()})`);
+} else {
+  console.error("NAMECHEAP_API_USER/KEY/IP not set — Namecheap tools disabled");
+}
+
 // ── Transport ────────────────────────────────────────────────────────
 
 async function runStdio(): Promise<void> {
@@ -86,6 +106,9 @@ async function runStdio(): Promise<void> {
   );
   console.error(
     `  VPS SSH: ${process.env.VPS_HOST || "178.156.247.239"}`
+  );
+  console.error(
+    `  Namecheap: ${isNamecheapConfigured() ? getNamecheapEnvironment() : "not configured"}`
   );
 }
 
