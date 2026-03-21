@@ -24,14 +24,18 @@ The integration defaults to **sandbox mode** for safe testing, with a single env
 
 ## BWS Secrets Required
 
+Store **both** sandbox and production credentials. `start.sh` picks the right pair based on `NAMECHEAP_USE_SANDBOX`.
+
 | Secret | BWS ID Env Var | Description |
 |---|---|---|
-| API Username | `BWS_NAMECHEAP_API_USER_SECRET_ID` | Your Namecheap API username |
-| API Key | `BWS_NAMECHEAP_API_KEY_SECRET_ID` | Your Namecheap API key |
+| Sandbox API Username | `BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID` | Sandbox API username |
+| Sandbox API Key | `BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID` | Sandbox API key |
+| Production API Username | `BWS_NAMECHEAP_PROD_API_USER_SECRET_ID` | Production API username |
+| Production API Key | `BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID` | Production API key |
 
 Additional env vars (set directly, not via BWS):
 - `NAMECHEAP_CLIENT_IP` — Whitelisted IP (defaults to VPS IP `178.156.247.239`)
-- `NAMECHEAP_USE_SANDBOX` — `"true"` (default) or `"false"`
+- `NAMECHEAP_USE_SANDBOX` — `"true"` (default) or `"false"` — controls which credential pair is loaded
 
 ---
 
@@ -43,11 +47,15 @@ Create two BWS secrets for your sandbox API user and key. Note their secret IDs.
 
 ### 2. Configure in `.claude.json` (or your MCP config)
 
+Set all four BWS secret IDs once. Only `NAMECHEAP_USE_SANDBOX` changes between environments.
+
 ```json
 {
   "env": {
-    "BWS_NAMECHEAP_API_USER_SECRET_ID": "<sandbox-user-secret-id>",
-    "BWS_NAMECHEAP_API_KEY_SECRET_ID": "<sandbox-key-secret-id>",
+    "BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID": "<sandbox-user-secret-id>",
+    "BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID": "<sandbox-key-secret-id>",
+    "BWS_NAMECHEAP_PROD_API_USER_SECRET_ID": "<prod-user-secret-id>",
+    "BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID": "<prod-key-secret-id>",
     "NAMECHEAP_CLIENT_IP": "178.156.247.239",
     "NAMECHEAP_USE_SANDBOX": "true"
   }
@@ -58,9 +66,9 @@ Create two BWS secrets for your sandbox API user and key. Note their secret IDs.
 
 You should see in stderr:
 ```
-Namecheap API user loaded from BWS
-Namecheap API key loaded from BWS
-Namecheap tools enabled (env: true=sandbox)
+Namecheap API user loaded from BWS (sandbox)
+Namecheap API key loaded from BWS (sandbox)
+Namecheap tools enabled (env: sandbox)
 Namecheap tools registered (env: sandbox)
 ```
 
@@ -80,26 +88,15 @@ Use `namecheap_domains_get_env` to confirm sandbox mode is active.
 
 ## Switching to Production
 
-### 1. Store production credentials in BWS
+Since both credential sets are already in your config, switching is a single env var change.
 
-Create two new BWS secrets for your **production** API user and key.
-
-### 2. Update env vars
-
-Change the BWS secret IDs to point to production credentials, and flip the sandbox flag:
+### 1. Flip the flag
 
 ```json
-{
-  "env": {
-    "BWS_NAMECHEAP_API_USER_SECRET_ID": "<production-user-secret-id>",
-    "BWS_NAMECHEAP_API_KEY_SECRET_ID": "<production-key-secret-id>",
-    "NAMECHEAP_CLIENT_IP": "178.156.247.239",
-    "NAMECHEAP_USE_SANDBOX": "false"
-  }
-}
+"NAMECHEAP_USE_SANDBOX": "false"
 ```
 
-### 3. Restart InfraOps MCP server
+### 2. Restart InfraOps MCP server
 
 Verify with `namecheap_domains_get_env` — should show `"environment": "production"`.
 
