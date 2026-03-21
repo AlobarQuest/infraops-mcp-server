@@ -28,9 +28,8 @@ const xmlParser = new XMLParser({
   textNodeName: "_text",
   parseAttributeValue: true,
   isArray: (name) => {
-    // These elements should always be arrays even when there's only one
+    // These elements should always be arrays even when there's only one result
     const arrayNodes = [
-      "Domain",
       "DomainDNSGetHostsResult.host",
       "host",
       "Tld",
