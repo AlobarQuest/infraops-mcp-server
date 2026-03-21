@@ -17,8 +17,8 @@ import { REQUEST_TIMEOUT } from "../constants.js";
 
 // ── API base URLs ────────────────────────────────────────────────────
 
-const NAMECHEAP_SANDBOX_URL = "https://api.sandbox.namecheap.com/xml.response";
-const NAMECHEAP_PRODUCTION_URL = "https://api.namecheap.com/xml.response";
+const NAMECHEAP_SANDBOX_URL = "https://namecheap-proxy.devonwatkins.com/sandbox/xml.response";
+const NAMECHEAP_PRODUCTION_URL = "https://namecheap-proxy.devonwatkins.com/prod/xml.response";
 
 // ── XML parser (shared instance) ─────────────────────────────────────
 
@@ -46,20 +46,21 @@ interface NamecheapConfig {
   apiUser: string;
   apiKey: string;
   userName: string;
-  clientIp: string;
   useSandbox: boolean;
+  proxyToken: string;
 }
+
+const VPS_IP = "178.156.247.239";
 
 function getConfig(): NamecheapConfig {
   const apiUser = process.env.NAMECHEAP_API_USER;
   const apiKey = process.env.NAMECHEAP_API_KEY;
-  const clientIp = process.env.NAMECHEAP_CLIENT_IP;
+  const proxyToken = process.env.NAMECHEAP_PROXY_TOKEN;
 
-  if (!apiUser || !apiKey || !clientIp) {
+  if (!apiUser || !apiKey || !proxyToken) {
     throw new Error(
-      "Namecheap API requires NAMECHEAP_API_USER, NAMECHEAP_API_KEY, and NAMECHEAP_CLIENT_IP. " +
-        "Store credentials in BWS and set BWS_NAMECHEAP_API_USER_SECRET_ID, " +
-        "BWS_NAMECHEAP_API_KEY_SECRET_ID in your MCP config."
+      "Namecheap API requires NAMECHEAP_API_USER, NAMECHEAP_API_KEY, and NAMECHEAP_PROXY_TOKEN. " +
+        "Store credentials in BWS."
     );
   }
 
@@ -69,8 +70,8 @@ function getConfig(): NamecheapConfig {
     apiUser,
     apiKey,
     userName: process.env.NAMECHEAP_USERNAME ?? apiUser,
-    clientIp,
     useSandbox,
+    proxyToken,
   };
 }
 
@@ -88,8 +89,10 @@ function getClient(): { client: AxiosInstance; config: NamecheapConfig } {
   _client = axios.create({
     baseURL,
     timeout: REQUEST_TIMEOUT,
-    // Namecheap returns XML, not JSON
-    headers: { Accept: "application/xml" },
+    headers: {
+      Accept: "application/xml",
+      Authorization: `Bearer ${_config.proxyToken}`,
+    },
     // Don't throw on non-2xx — we parse errors from XML
     validateStatus: () => true,
   });
@@ -153,7 +156,7 @@ export async function namecheapCommand(
     ApiUser: config.apiUser,
     ApiKey: config.apiKey,
     UserName: config.userName,
-    ClientIp: config.clientIp,
+    ClientIp: VPS_IP,
     Command: command,
     ...params,
   };
@@ -214,7 +217,7 @@ export function handleNamecheapError(error: unknown): string {
     if (code === 2016166) return `Error: Namecheap domain unavailable for registration. ${error.message}`;
     if (code === 2030166) return `Error: Namecheap edit lock is on. Unlock the domain first. ${error.message}`;
     if (code === 2011166) return `Error: Namecheap authentication failed. Check your API credentials. ${error.message}`;
-    if (code === 2011170) return `Error: Namecheap IP not whitelisted. Add ${process.env.NAMECHEAP_CLIENT_IP} to your API access list.`;
+    if (code === 2011170) return `Error: Namecheap IP not whitelisted. Add ${VPS_IP} to your API access list.`;
     if (code && code >= 5000000) return `Error: Namecheap server error. Try again in a moment. ${error.message}`;
 
     return `Error: Namecheap API — ${error.message}`;
@@ -244,7 +247,7 @@ export function isNamecheapConfigured(): boolean {
   return !!(
     process.env.NAMECHEAP_API_USER &&
     process.env.NAMECHEAP_API_KEY &&
-    process.env.NAMECHEAP_CLIENT_IP
+    process.env.NAMECHEAP_PROXY_TOKEN
   );
 }
 
