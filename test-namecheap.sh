@@ -39,17 +39,17 @@ fi
 echo "  API User: $NAMECHEAP_API_USER"
 echo "  Environment: sandbox"
 
-# ── Detect public IP ─────────────────────────────────────────────────
+# ── Proxy token ──────────────────────────────────────────────────────
 
-echo "Detecting public IP..."
-export NAMECHEAP_CLIENT_IP=$(curl -s https://api.ipify.org 2>/dev/null || curl -s https://checkip.amazonaws.com 2>/dev/null || echo "")
+echo "Fetching proxy token from BWS..."
+export NAMECHEAP_PROXY_TOKEN=$(fetch_bws_secret_by_name "NAMECHEAP_PROXY_BEARER_TOKEN")
 
-if [ -z "$NAMECHEAP_CLIENT_IP" ]; then
-  echo "ERROR: Could not detect public IP. Set NAMECHEAP_CLIENT_IP manually." >&2
+if [ -z "$NAMECHEAP_PROXY_TOKEN" ]; then
+  echo "ERROR: Could not fetch NAMECHEAP_PROXY_BEARER_TOKEN from BWS." >&2
   exit 1
 fi
 
-echo "  Client IP: $NAMECHEAP_CLIENT_IP"
+echo "  Proxy token: loaded"
 echo ""
 
 # ── Build if needed ──────────────────────────────────────────────────
