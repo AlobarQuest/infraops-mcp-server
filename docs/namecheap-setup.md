@@ -34,7 +34,7 @@ Store **both** sandbox and production credentials. `start.sh` picks the right pa
 | Production API Key | `BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID` | Production API key |
 
 Additional env vars (set directly, not via BWS):
-- `NAMECHEAP_CLIENT_IP` — Whitelisted IP (defaults to VPS IP `178.156.247.239`)
+- `NAMECHEAP_CLIENT_IP` — Your machine's public IP (must be whitelisted in Namecheap API settings)
 - `NAMECHEAP_USE_SANDBOX` — `"true"` (default) or `"false"` — controls which credential pair is loaded
 
 ---
@@ -56,7 +56,7 @@ Set all four BWS secret IDs once. Only `NAMECHEAP_USE_SANDBOX` changes between e
     "BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID": "<sandbox-key-secret-id>",
     "BWS_NAMECHEAP_PROD_API_USER_SECRET_ID": "<prod-user-secret-id>",
     "BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID": "<prod-key-secret-id>",
-    "NAMECHEAP_CLIENT_IP": "178.156.247.239",
+    "NAMECHEAP_CLIENT_IP": "<your-public-ip>",
     "NAMECHEAP_USE_SANDBOX": "true"
   }
 }

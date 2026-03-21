@@ -16,7 +16,7 @@
 #   BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID  - BWS secret ID for Namecheap sandbox API key
 #   BWS_NAMECHEAP_PROD_API_USER_SECRET_ID    - BWS secret ID for Namecheap production API username
 #   BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID     - BWS secret ID for Namecheap production API key
-#   NAMECHEAP_CLIENT_IP         - Whitelisted IP for Namecheap API (default: VPS IP / 178.156.247.239)
+#   NAMECHEAP_CLIENT_IP         - Your machine's public IP (must be whitelisted in Namecheap)
 #   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
 
 set -euo pipefail
@@ -94,11 +94,13 @@ if [ -n "$NC_KEY_SECRET_ID" ]; then
   fi
 fi
 
-# Default Namecheap client IP to VPS IP if not explicitly set
-export NAMECHEAP_CLIENT_IP="${NAMECHEAP_CLIENT_IP:-${VPS_HOST:-178.156.247.239}}"
-
+# NAMECHEAP_CLIENT_IP must be set explicitly — it's the IP whitelisted in your
+# Namecheap API settings, which is your local machine's public IP (not the VPS).
 if [ -n "${NAMECHEAP_API_USER:-}" ] && [ -n "${NAMECHEAP_API_KEY:-}" ]; then
-  echo "Namecheap tools enabled (env: ${NC_ENV_LABEL})" >&2
+  if [ -z "${NAMECHEAP_CLIENT_IP:-}" ]; then
+    echo "WARN: NAMECHEAP_CLIENT_IP not set. Namecheap API calls will fail unless your IP is whitelisted." >&2
+  fi
+  echo "Namecheap tools enabled (env: ${NC_ENV_LABEL}, clientIp: ${NAMECHEAP_CLIENT_IP:-not set})" >&2
 fi
 
 exec node "$SCRIPT_DIR/dist/index.js"
