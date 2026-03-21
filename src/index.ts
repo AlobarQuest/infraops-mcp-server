@@ -20,7 +20,7 @@
  *   VPS_SSH_PASSPHRASE          - SSH key passphrase (optional, from BWS via start.sh)
  *   NAMECHEAP_API_USER          - Namecheap API username (optional, from BWS via start.sh)
  *   NAMECHEAP_API_KEY           - Namecheap API key (optional, from BWS via start.sh)
- *   NAMECHEAP_CLIENT_IP         - Your machine's public IP (must be whitelisted in Namecheap)
+ *   NAMECHEAP_PROXY_TOKEN       - Bearer token for namecheap-proxy (from BWS via start.sh)
  *   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
  */
 
@@ -89,7 +89,7 @@ if (isNamecheapConfigured()) {
   registerNamecheapDNSTools(server);
   console.error(`Namecheap tools registered (env: ${getNamecheapEnvironment()})`);
 } else {
-  console.error("NAMECHEAP_API_USER/KEY/IP not set — Namecheap tools disabled");
+  console.error("NAMECHEAP_API_USER/KEY/PROXY_TOKEN not set — Namecheap tools disabled");
 }
 
 // ── Transport ────────────────────────────────────────────────────────
