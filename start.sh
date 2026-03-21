@@ -12,7 +12,6 @@
 #   VPS_HOST                    - VPS IP address (default: 178.156.247.239)
 #   VPS_USER                    - SSH user (default: root)
 #   VPS_SSH_KEY_PATH            - Path to SSH private key (default: ~/.ssh/hetzner_ed25519)
-#   NAMECHEAP_CLIENT_IP         - Your machine's public IP (must be whitelisted in Namecheap)
 #   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
 #
 # Namecheap credentials are fetched from BWS by name (no env vars needed):
@@ -104,13 +103,14 @@ if [ -n "$NAMECHEAP_API_KEY" ]; then
   echo "Namecheap API key loaded from BWS (${NC_ENV_LABEL})" >&2
 fi
 
-# NAMECHEAP_CLIENT_IP must be set explicitly — it's the IP whitelisted in your
-# Namecheap API settings, which is your local machine's public IP (not the VPS).
-if [ -n "${NAMECHEAP_API_USER:-}" ] && [ -n "${NAMECHEAP_API_KEY:-}" ]; then
-  if [ -z "${NAMECHEAP_CLIENT_IP:-}" ]; then
-    echo "WARN: NAMECHEAP_CLIENT_IP not set. Namecheap API calls will fail unless your IP is whitelisted." >&2
-  fi
-  echo "Namecheap tools enabled (env: ${NC_ENV_LABEL}, clientIp: ${NAMECHEAP_CLIENT_IP:-not set})" >&2
+# Proxy bearer token for namecheap-proxy.devonwatkins.com
+export NAMECHEAP_PROXY_TOKEN=$(fetch_bws_secret_by_name "NAMECHEAP_PROXY_BEARER_TOKEN")
+if [ -n "$NAMECHEAP_PROXY_TOKEN" ]; then
+  echo "Namecheap proxy token loaded from BWS" >&2
+fi
+
+if [ -n "${NAMECHEAP_API_USER:-}" ] && [ -n "${NAMECHEAP_API_KEY:-}" ] && [ -n "${NAMECHEAP_PROXY_TOKEN:-}" ]; then
+  echo "Namecheap tools enabled (env: ${NC_ENV_LABEL}, via VPS proxy)" >&2
 fi
 
 exec node "$SCRIPT_DIR/dist/index.js"
