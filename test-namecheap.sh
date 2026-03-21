@@ -1,12 +1,20 @@
 #!/bin/bash
-# Namecheap sandbox integration test.
-# Pulls credentials from BWS and your public IP automatically — just run it.
+# Namecheap integration test — sandbox or production.
+# Pulls credentials from BWS automatically.
 #
-# Usage: ./test-namecheap.sh
+# Usage: ./test-namecheap.sh              # defaults to sandbox
+#        ./test-namecheap.sh sandbox
+#        ./test-namecheap.sh production
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV="${1:-sandbox}"
+
+if [ "$ENV" != "sandbox" ] && [ "$ENV" != "production" ]; then
+  echo "Usage: $0 [sandbox|production]" >&2
+  exit 1
+fi
 
 # ── Resolve credentials from BWS ─────────────────────────────────────
 
@@ -23,21 +31,30 @@ print('')
 " 2>/dev/null || echo ""
 }
 
-echo "Fetching sandbox credentials from BWS..."
-export NAMECHEAP_API_USER=$(fetch_bws_secret_by_name "BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID")
-export NAMECHEAP_API_KEY=$(fetch_bws_secret_by_name "BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID")
-export NAMECHEAP_USE_SANDBOX="true"
+if [ "$ENV" = "sandbox" ]; then
+  export NAMECHEAP_USE_SANDBOX="true"
+  NC_USER_KEY="BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID"
+  NC_API_KEY="BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID"
+else
+  export NAMECHEAP_USE_SANDBOX="false"
+  NC_USER_KEY="BWS_NAMECHEAP_PROD_API_USER_SECRET_ID"
+  NC_API_KEY="BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID"
+fi
+
+echo "Fetching ${ENV} credentials from BWS..."
+export NAMECHEAP_API_USER=$(fetch_bws_secret_by_name "$NC_USER_KEY")
+export NAMECHEAP_API_KEY=$(fetch_bws_secret_by_name "$NC_API_KEY")
 
 if [ -z "$NAMECHEAP_API_USER" ] || [ -z "$NAMECHEAP_API_KEY" ]; then
-  echo "ERROR: Could not fetch Namecheap sandbox credentials from BWS." >&2
+  echo "ERROR: Could not fetch Namecheap ${ENV} credentials from BWS." >&2
   echo "Make sure these secrets exist:" >&2
-  echo "  BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID" >&2
-  echo "  BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID" >&2
+  echo "  $NC_USER_KEY" >&2
+  echo "  $NC_API_KEY" >&2
   exit 1
 fi
 
 echo "  API User: $NAMECHEAP_API_USER"
-echo "  Environment: sandbox"
+echo "  Environment: $ENV"
 
 # ── Proxy token ──────────────────────────────────────────────────────
 
@@ -89,19 +106,24 @@ run_test() {
 }
 
 # Test 1: Environment check
-run_test "get_env" "Verify sandbox environment is active" \
+run_test "get_env" "Verify ${ENV} environment is active" \
   node -e "
     import('./dist/services/namecheap-client.js').then(m => {
+      const expected = '${ENV}';
+      const actual = m.getNamecheapEnvironment();
       console.log(JSON.stringify({
-        environment: m.getNamecheapEnvironment(),
+        environment: actual,
         configured: m.isNamecheapConfigured(),
       }, null, 2));
-      if (m.getNamecheapEnvironment() !== 'sandbox') process.exit(1);
+      if (actual !== expected) {
+        console.error('Expected ' + expected + ' but got ' + actual);
+        process.exit(1);
+      }
     });
   "
 
 # Test 2: List domains
-run_test "domains.getList" "List all domains in the sandbox account" \
+run_test "domains.getList" "List all domains in the ${ENV} account" \
   node -e "
     import('./dist/services/namecheap-client.js').then(async m => {
       const result = await m.namecheapCommand('namecheap.domains.getList', { PageSize: 100 });
@@ -162,6 +184,7 @@ run_test "splitDomain" "Verify domain splitting logic" \
 # ── Summary ───────────────────────────────────────────────────────────
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Environment: $ENV"
 echo "  Results: $PASS passed, $FAIL failed"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
