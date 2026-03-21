@@ -24,16 +24,16 @@ The integration defaults to **sandbox mode** for safe testing, with a single env
 
 ## BWS Secrets Required
 
-Store **both** sandbox and production credentials. `start.sh` picks the right pair based on `NAMECHEAP_USE_SANDBOX`.
+Store **both** sandbox and production credentials in BWS with these exact names. `start.sh` looks them up by name automatically — no env vars needed for the secrets themselves.
 
-| Secret | BWS ID Env Var | Description |
-|---|---|---|
-| Sandbox API Username | `BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID` | Sandbox API username |
-| Sandbox API Key | `BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID` | Sandbox API key |
-| Production API Username | `BWS_NAMECHEAP_PROD_API_USER_SECRET_ID` | Production API username |
-| Production API Key | `BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID` | Production API key |
+| BWS Secret Name | Value |
+|---|---|
+| `BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID` | Your sandbox API username |
+| `BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID` | Your sandbox API key |
+| `BWS_NAMECHEAP_PROD_API_USER_SECRET_ID` | Your production API username |
+| `BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID` | Your production API key |
 
-Additional env vars (set directly, not via BWS):
+Only two env vars needed in your MCP config:
 - `NAMECHEAP_CLIENT_IP` — Your machine's public IP (must be whitelisted in Namecheap API settings)
 - `NAMECHEAP_USE_SANDBOX` — `"true"` (default) or `"false"` — controls which credential pair is loaded
 
@@ -41,21 +41,17 @@ Additional env vars (set directly, not via BWS):
 
 ## Sandbox Testing
 
-### 1. Store sandbox credentials in BWS
+### 1. Store credentials in BWS
 
-Create two BWS secrets for your sandbox API user and key. Note their secret IDs.
+Create four BWS secrets with the exact names above. Store sandbox and production API user/key values.
 
 ### 2. Configure in `.claude.json` (or your MCP config)
 
-Set all four BWS secret IDs once. Only `NAMECHEAP_USE_SANDBOX` changes between environments.
+Only two env vars — credentials are fetched from BWS by name at startup.
 
 ```json
 {
   "env": {
-    "BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID": "<sandbox-user-secret-id>",
-    "BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID": "<sandbox-key-secret-id>",
-    "BWS_NAMECHEAP_PROD_API_USER_SECRET_ID": "<prod-user-secret-id>",
-    "BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID": "<prod-key-secret-id>",
     "NAMECHEAP_CLIENT_IP": "<your-public-ip>",
     "NAMECHEAP_USE_SANDBOX": "true"
   }
