@@ -85,9 +85,11 @@ Both providers use bearer token auth fetched from BWS at startup. No new npm dep
 | `cloudflare_list_pages_projects` | List all Pages projects | readOnly |
 | `cloudflare_get_pages_project` | Get project details (domains, build config, env vars) | readOnly |
 | `cloudflare_create_pages_project` | Create a new project | — |
+| `cloudflare_update_pages_project` | Update project build config, env vars, deployment settings | — |
 | `cloudflare_delete_pages_project` | Delete a project | destructive |
 | `cloudflare_list_pages_deployments` | List deployments for a project | readOnly |
 | `cloudflare_get_pages_deployment` | Get deployment details/status | readOnly |
+| `cloudflare_create_pages_deployment` | Trigger a new deployment for a project | — |
 
 ### `src/tools/cloudflare-workers.ts` — Worker Scripts, KV & D1
 
@@ -97,12 +99,14 @@ Both providers use bearer token auth fetched from BWS at startup. No new npm dep
 | `cloudflare_get_worker` | Get worker details (routes, bindings) | readOnly |
 | `cloudflare_delete_worker` | Delete a worker script | destructive |
 | `cloudflare_list_kv_namespaces` | List KV namespaces | readOnly |
+| `cloudflare_create_kv_namespace` | Create a KV namespace | — |
+| `cloudflare_delete_kv_namespace` | Delete a KV namespace | destructive |
 | `cloudflare_list_kv_keys` | List keys in a namespace | readOnly |
 | `cloudflare_get_kv_value` | Read a KV value | readOnly |
 | `cloudflare_put_kv_value` | Write a KV value | — |
 | `cloudflare_delete_kv_value` | Delete a KV key | destructive |
 | `cloudflare_list_d1_databases` | List D1 databases | readOnly |
-| `cloudflare_query_d1` | Execute SQL against a D1 database | — |
+| `cloudflare_query_d1` | Execute SQL against a D1 database | destructive |
 
 ### `src/tools/cloudflare-r2.ts` — R2 Storage Buckets
 
@@ -124,19 +128,22 @@ Both providers use bearer token auth fetched from BWS at startup. No new npm dep
 | `cloudflare_get_tunnel_config` | Get tunnel ingress configuration | readOnly |
 | `cloudflare_update_tunnel_config` | Update tunnel ingress rules | — |
 
-### `src/tools/cloudflare-security.ts` — WAF, Firewall & SSL/TLS
+### `src/tools/cloudflare-security.ts` — WAF Rulesets, Cache & SSL/TLS
+
+Uses the Rulesets API (not the deprecated Firewall Rules API).
 
 | Tool | Description | Annotations |
 |------|-------------|-------------|
 | `cloudflare_get_ssl_setting` | Get zone SSL mode (off/flexible/full/strict) | readOnly |
 | `cloudflare_update_ssl_setting` | Change SSL mode | — |
-| `cloudflare_list_firewall_rules` | List zone firewall rules | readOnly |
-| `cloudflare_create_firewall_rule` | Create a firewall rule | — |
-| `cloudflare_update_firewall_rule` | Update a firewall rule | — |
-| `cloudflare_delete_firewall_rule` | Delete a firewall rule | destructive |
-| `cloudflare_list_rulesets` | List WAF rulesets for a zone | readOnly |
+| `cloudflare_list_rulesets` | List rulesets for a zone (WAF, custom rules, rate limiting) | readOnly |
+| `cloudflare_get_ruleset` | Get ruleset details and rules | readOnly |
+| `cloudflare_create_ruleset_rule` | Add a custom rule to a zone ruleset | — |
+| `cloudflare_update_ruleset_rule` | Update a custom rule | — |
+| `cloudflare_delete_ruleset_rule` | Delete a custom rule | destructive |
+| `cloudflare_purge_cache` | Purge zone cache (all, by URL, or by tag) | — |
 
-**Cloudflare total: 37 tools across 6 files.**
+**Cloudflare total: 44 tools across 6 files.**
 
 ## Supabase Tool Files
 
@@ -152,12 +159,13 @@ Both providers use bearer token auth fetched from BWS at startup. No new npm dep
 | `supabase_restore_project` | Resume a paused project | — |
 | `supabase_list_organizations` | List organizations (needed for project creation) | readOnly |
 | `supabase_get_api_keys` | Get a project's API keys (anon, service_role) | readOnly |
+| `supabase_get_project_health` | Get project service health status | readOnly |
 
 ### `src/tools/supabase-database.ts` — SQL & Postgres Config
 
 | Tool | Description | Annotations |
 |------|-------------|-------------|
-| `supabase_run_sql` | Execute arbitrary SQL against a project's database | — |
+| `supabase_run_sql` | Execute arbitrary SQL against a project's database | destructive |
 | `supabase_list_extensions` | List available/enabled Postgres extensions | readOnly |
 | `supabase_get_postgres_config` | Get Postgres configuration | readOnly |
 | `supabase_update_postgres_config` | Update Postgres settings | — |
@@ -187,7 +195,7 @@ Both providers use bearer token auth fetched from BWS at startup. No new npm dep
 | `supabase_update_storage_bucket` | Update bucket settings (public/private, file size limits) | — |
 | `supabase_delete_storage_bucket` | Delete a storage bucket | destructive |
 
-**Supabase total: 26 tools across 4 files.**
+**Supabase total: 28 tools across 4 files.**
 
 ## Registration — `src/index.ts`
 
@@ -265,14 +273,14 @@ Add to the `env` block:
 |------|-------|-------|
 | **New client services** | `cloudflare-client.ts`, `supabase-client.ts` | 2 |
 | **New tool files** | `cloudflare-dns.ts`, `cloudflare-pages.ts`, `cloudflare-workers.ts`, `cloudflare-r2.ts`, `cloudflare-tunnels.ts`, `cloudflare-security.ts`, `supabase-projects.ts`, `supabase-database.ts`, `supabase-functions.ts`, `supabase-config.ts` | 10 |
-| **Modified** | `index.ts`, `start.sh`, `package.json` | 3 |
-| **Total new tools** | 37 Cloudflare + 26 Supabase | 63 |
+| **Modified** | `index.ts` (registration, version string, provider list in header), `start.sh`, `package.json` | 3 |
+| **Total new tools** | 44 Cloudflare + 28 Supabase | 72 |
 | **New dependencies** | None | 0 |
 
 ## Out of Scope
 
 - Supabase data-plane operations (user admin, storage objects) requiring `service_role` key
-- Cloudflare Worker script upload (multipart form upload — complex, low priority for v1)
+- Cloudflare Worker script upload/create/update (multipart form upload — complex, low priority for v1). This means Workers tools are observation + delete only; deploying workers requires Wrangler CLI or the dashboard.
 - Cloudflare Zero Trust / Access (large API surface, add later if needed)
 - R2 object operations (uses S3-compatible API, not the v4 REST API)
 - Cross-provider workflows (e.g., "deploy to Coolify and update Cloudflare DNS") — the tools enable this through sequential LLM calls, but no single compound tool
