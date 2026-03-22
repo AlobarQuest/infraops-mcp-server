@@ -113,4 +113,24 @@ if [ -n "${NAMECHEAP_API_USER:-}" ] && [ -n "${NAMECHEAP_API_KEY:-}" ] && [ -n "
   echo "Namecheap tools enabled (env: ${NC_ENV_LABEL}, via VPS proxy)" >&2
 fi
 
+# ── Cloudflare API (optional) ────────────────────────────────────
+if [ -n "${BWS_CLOUDFLARE_SECRET_ID:-}" ]; then
+  export CLOUDFLARE_API_TOKEN=$(fetch_bws_secret "$BWS_CLOUDFLARE_SECRET_ID")
+  if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+    echo "Cloudflare API token loaded from BWS" >&2
+  else
+    echo "WARN: BWS_CLOUDFLARE_SECRET_ID set but failed to fetch token" >&2
+  fi
+fi
+
+# ── Supabase Management API (optional) ───────────────────────────
+if [ -n "${BWS_SUPABASE_SECRET_ID:-}" ]; then
+  export SUPABASE_ACCESS_TOKEN=$(fetch_bws_secret "$BWS_SUPABASE_SECRET_ID")
+  if [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+    echo "Supabase access token loaded from BWS" >&2
+  else
+    echo "WARN: BWS_SUPABASE_SECRET_ID set but failed to fetch token" >&2
+  fi
+fi
+
 exec node "$SCRIPT_DIR/dist/index.js"
