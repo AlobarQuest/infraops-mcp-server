@@ -95,6 +95,18 @@ export async function cloudflareDelete<T>(endpoint: string): Promise<T> {
   return response.data;
 }
 
+/** PUT with raw text body (for KV value writes) */
+export async function cloudflarePutRaw<T>(
+  endpoint: string,
+  body: string
+): Promise<T> {
+  const client = getClient();
+  const response = await client.put<T>(endpoint, body, {
+    headers: { "Content-Type": "text/plain" },
+  });
+  return response.data;
+}
+
 // ── Error handler ────────────────────────────────────────────────────
 
 interface CloudflareErrorBody {

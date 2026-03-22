@@ -47,7 +47,7 @@ export function registerCloudflareSecurityTools(server) {
         annotations: {
             readOnlyHint: false,
             destructiveHint: false,
-            idempotentHint: false,
+            idempotentHint: true,
             openWorldHint: true,
         },
     }, async ({ zone_id, value }) => {

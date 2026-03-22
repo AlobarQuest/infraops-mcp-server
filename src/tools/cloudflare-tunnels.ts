@@ -240,7 +240,7 @@ export function registerCloudflareTunnelTools(server: McpServer): void {
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
-        idempotentHint: false,
+        idempotentHint: true,
         openWorldHint: true,
       },
     },

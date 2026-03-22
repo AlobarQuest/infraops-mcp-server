@@ -180,7 +180,7 @@ export function registerCloudflareDNSTools(server) {
         annotations: {
             readOnlyHint: false,
             destructiveHint: false,
-            idempotentHint: false,
+            idempotentHint: true,
             openWorldHint: true,
         },
     }, async (params) => {

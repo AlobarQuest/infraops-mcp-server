@@ -181,7 +181,7 @@ export function registerCloudflareTunnelTools(server) {
         annotations: {
             readOnlyHint: false,
             destructiveHint: false,
-            idempotentHint: false,
+            idempotentHint: true,
             openWorldHint: true,
         },
     }, async (params) => {

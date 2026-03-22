@@ -166,7 +166,7 @@ export function registerSupabaseConfigTools(server: McpServer): void {
       try {
         const result = await supabasePost<Record<string, unknown>>(
           `/projects/${ref}/secrets`,
-          secrets as unknown as Record<string, unknown>
+          secrets
         );
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -205,7 +205,7 @@ export function registerSupabaseConfigTools(server: McpServer): void {
       try {
         const result = await supabaseDelete<Record<string, unknown>>(
           `/projects/${ref}/secrets`,
-          secrets as unknown as Record<string, unknown>
+          secrets
         );
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

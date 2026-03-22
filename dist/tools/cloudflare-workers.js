@@ -5,7 +5,7 @@
  * and D1 database listing and querying.
  */
 import { z } from "zod";
-import { cloudflareGet, cloudflarePost, cloudflarePut, cloudflareDelete, handleCloudflareError, getAccountId, } from "../services/cloudflare-client.js";
+import { cloudflareGet, cloudflarePost, cloudflarePutRaw, cloudflareDelete, handleCloudflareError, getAccountId, } from "../services/cloudflare-client.js";
 export function registerCloudflareWorkersTools(server) {
     // ── List Workers ─────────────────────────────────────────────────
     server.registerTool("cloudflare_list_workers", {
@@ -275,7 +275,7 @@ export function registerCloudflareWorkersTools(server) {
     }, async ({ namespace_id, key_name, value, }) => {
         try {
             const accountId = getAccountId();
-            const result = await cloudflarePut(`/accounts/${accountId}/storage/kv/namespaces/${namespace_id}/values/${key_name}`, value);
+            const result = await cloudflarePutRaw(`/accounts/${accountId}/storage/kv/namespaces/${namespace_id}/values/${key_name}`, value);
             return {
                 content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
             };

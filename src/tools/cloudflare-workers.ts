@@ -10,7 +10,7 @@ import { z } from "zod";
 import {
   cloudflareGet,
   cloudflarePost,
-  cloudflarePut,
+  cloudflarePutRaw,
   cloudflareDelete,
   handleCloudflareError,
   getAccountId,
@@ -376,9 +376,9 @@ export function registerCloudflareWorkersTools(server: McpServer): void {
     }) => {
       try {
         const accountId = getAccountId();
-        const result = await cloudflarePut<Record<string, unknown>>(
+        const result = await cloudflarePutRaw<Record<string, unknown>>(
           `/accounts/${accountId}/storage/kv/namespaces/${namespace_id}/values/${key_name}`,
-          value as unknown as Record<string, unknown>
+          value
         );
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],

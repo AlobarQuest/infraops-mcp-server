@@ -11,6 +11,8 @@ export declare function cloudflarePost<T>(endpoint: string, data?: Record<string
 export declare function cloudflarePut<T>(endpoint: string, data?: Record<string, unknown>): Promise<T>;
 export declare function cloudflarePatch<T>(endpoint: string, data?: Record<string, unknown>): Promise<T>;
 export declare function cloudflareDelete<T>(endpoint: string): Promise<T>;
+/** PUT with raw text body (for KV value writes) */
+export declare function cloudflarePutRaw<T>(endpoint: string, body: string): Promise<T>;
 export declare function handleCloudflareError(error: unknown): string;
 /** Check if Cloudflare API is configured */
 export declare function isCloudflareConfigured(): boolean;

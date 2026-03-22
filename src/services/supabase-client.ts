@@ -53,7 +53,7 @@ export async function supabaseGet<T>(
 
 export async function supabasePost<T>(
   endpoint: string,
-  data?: Record<string, unknown>
+  data?: unknown
 ): Promise<T> {
   const client = getClient();
   const response = await client.post<T>(endpoint, data);
@@ -80,7 +80,7 @@ export async function supabasePatch<T>(
 
 export async function supabaseDelete<T>(
   endpoint: string,
-  data?: Record<string, unknown>
+  data?: unknown
 ): Promise<T> {
   const client = getClient();
   const response = await client.delete<T>(endpoint, { data });

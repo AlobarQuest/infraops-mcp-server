@@ -64,6 +64,14 @@ export async function cloudflareDelete(endpoint) {
     const response = await client.delete(endpoint);
     return response.data;
 }
+/** PUT with raw text body (for KV value writes) */
+export async function cloudflarePutRaw(endpoint, body) {
+    const client = getClient();
+    const response = await client.put(endpoint, body, {
+        headers: { "Content-Type": "text/plain" },
+    });
+    return response.data;
+}
 export function handleCloudflareError(error) {
     if (axios.isAxiosError(error)) {
         const axErr = error;

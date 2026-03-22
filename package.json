@@ -1,7 +1,7 @@
 {
   "name": "infraops-mcp-server",
   "version": "3.0.0",
-  "description": "MCP server for infrastructure operations — Coolify management, with future support for VPS, Namecheap, and Cloudflare",
+  "description": "MCP server for infrastructure operations — Coolify, Hetzner, VPS, Namecheap, Cloudflare, and Supabase",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

@@ -13,7 +13,6 @@ import {
   cloudflarePatch,
   cloudflarePut,
   handleCloudflareError,
-  getAccountId,
 } from "../services/cloudflare-client.js";
 
 export function registerCloudflareSecurityTools(server: McpServer): void {
@@ -71,7 +70,7 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
-        idempotentHint: false,
+        idempotentHint: true,
         openWorldHint: true,
       },
     },
