@@ -9,6 +9,8 @@
  *   - Hetzner Cloud: Server lifecycle, firewalls, SSH keys, volumes, snapshots, networks
  *   - VPS (SSH): Direct shell access, health monitoring, file ops, Docker inspection
  *   - Namecheap: Domain lifecycle + DNS record management (sandbox/production)
+ *   - Cloudflare: DNS, Pages, Workers, R2, Tunnels, Security (WAF/rate limiting)
+ *   - Supabase: Project management, database, edge functions, configuration
  *
  * Environment variables:
  *   COOLIFY_BASE_URL            - Coolify instance URL
@@ -22,6 +24,9 @@
  *   NAMECHEAP_API_KEY           - Namecheap API key (optional, from BWS via start.sh)
  *   NAMECHEAP_PROXY_TOKEN       - Bearer token for namecheap-proxy (from BWS via start.sh)
  *   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
+ *   CLOUDFLARE_API_TOKEN        - Cloudflare API token (optional, from BWS via start.sh)
+ *   CLOUDFLARE_ACCOUNT_ID       - Cloudflare account ID (optional, from BWS via start.sh)
+ *   SUPABASE_ACCESS_TOKEN       - Supabase management API token (optional, from BWS via start.sh)
  */
 export {};
 //# sourceMappingURL=index.d.ts.map
