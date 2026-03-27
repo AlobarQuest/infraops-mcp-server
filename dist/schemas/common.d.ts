@@ -3,6 +3,7 @@
  */
 import { z } from "zod";
 import { ResponseFormat } from "../constants.js";
+export declare const CoolifyInstanceSchema: z.ZodDefault<z.ZodEnum<["prod", "dev"]>>;
 export declare const ResponseFormatSchema: z.ZodDefault<z.ZodNativeEnum<typeof ResponseFormat>>;
 export declare const UuidSchema: z.ZodString;
 export declare const PaginationSchema: z.ZodObject<{

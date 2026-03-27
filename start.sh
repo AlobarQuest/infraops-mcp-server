@@ -3,10 +3,12 @@
 # Fetches secrets from BWS at startup so they never live in config files.
 #
 # Required env vars (set in .claude.json):
-#   COOLIFY_BASE_URL            - Your Coolify instance URL
-#   BWS_COOLIFY_SECRET_ID       - BWS secret ID for the Coolify API token
+#   COOLIFY_BASE_URL            - Prod Coolify instance URL (or COOLIFY_PROD_BASE_URL)
+#   BWS_COOLIFY_SECRET_ID       - BWS secret ID for the prod Coolify API token
 #
 # Optional env vars:
+#   COOLIFY_DEV_BASE_URL        - Dev Coolify instance URL (e.g. http://192.168.139.217:8000)
+#   BWS_COOLIFY_DEV_SECRET_ID   - BWS secret ID for the dev Coolify API token
 #   BWS_HETZNER_SECRET_ID       - BWS secret ID for the Hetzner Cloud API token
 #   BWS_SSH_PASSPHRASE_SECRET_ID - BWS secret ID for the SSH key passphrase
 #   VPS_HOST                    - VPS IP address (default: 178.156.247.239)
@@ -56,6 +58,16 @@ export COOLIFY_API_TOKEN=$(fetch_bws_secret "${BWS_COOLIFY_SECRET_ID:-}")
 if [ -z "$COOLIFY_API_TOKEN" ]; then
   echo "ERROR: Failed to fetch Coolify API token from BWS (secret ID: ${BWS_COOLIFY_SECRET_ID:-not set})" >&2
   exit 1
+fi
+
+# ── Coolify Dev (optional) ─────────────────────────────────────────
+if [ -n "${BWS_COOLIFY_DEV_SECRET_ID:-}" ]; then
+  export COOLIFY_DEV_API_TOKEN=$(fetch_bws_secret "$BWS_COOLIFY_DEV_SECRET_ID")
+  if [ -n "$COOLIFY_DEV_API_TOKEN" ]; then
+    echo "Coolify dev API token loaded from BWS" >&2
+  else
+    echo "WARN: BWS_COOLIFY_DEV_SECRET_ID set but failed to fetch token" >&2
+  fi
 fi
 
 # ── Hetzner Cloud API (optional) ────────────────────────────────────

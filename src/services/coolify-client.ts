@@ -1,29 +1,51 @@
 /**
- * Coolify API client.
+ * Coolify API client — multi-instance support.
  *
- * Centralises all HTTP communication with the Coolify REST API.
- * Every tool delegates to this client — no tool should import axios directly.
+ * Supports multiple Coolify instances (e.g. "prod" and "dev") via
+ * environment variables. Every public helper accepts an optional
+ * `instance` parameter that defaults to "prod".
+ *
+ * Env vars:
+ *   COOLIFY_PROD_BASE_URL / COOLIFY_PROD_API_TOKEN  (or legacy COOLIFY_BASE_URL / COOLIFY_API_TOKEN)
+ *   COOLIFY_DEV_BASE_URL  / COOLIFY_DEV_API_TOKEN   (optional)
  */
 
 import axios, { AxiosError, AxiosInstance } from "axios";
 import { REQUEST_TIMEOUT } from "../constants.js";
 
+// ── Types ────────────────────────────────────────────────────────────
+
+export type CoolifyInstance = "prod" | "dev";
+
 // ── Configuration ────────────────────────────────────────────────────
 
-function getConfig(): { baseUrl: string; token: string } {
-  const baseUrl = process.env.COOLIFY_BASE_URL;
-  const token = process.env.COOLIFY_API_TOKEN;
+interface InstanceConfig {
+  baseUrl: string;
+  token: string;
+}
+
+function getInstanceConfig(instance: CoolifyInstance): InstanceConfig {
+  const upper = instance.toUpperCase(); // "PROD" | "DEV"
+
+  // Try prefixed vars first, fall back to legacy unprefixed for prod
+  let baseUrl =
+    process.env[`COOLIFY_${upper}_BASE_URL`] ??
+    (instance === "prod" ? process.env.COOLIFY_BASE_URL : undefined);
+
+  let token =
+    process.env[`COOLIFY_${upper}_API_TOKEN`] ??
+    (instance === "prod" ? process.env.COOLIFY_API_TOKEN : undefined);
 
   if (!baseUrl) {
     throw new Error(
-      "COOLIFY_BASE_URL environment variable is required. " +
-        "Set it to your Coolify instance URL, e.g. https://coolify.devonwatkins.com"
+      `COOLIFY_${upper}_BASE_URL environment variable is required. ` +
+        `Set it to your ${instance} Coolify instance URL.`
     );
   }
   if (!token) {
     throw new Error(
-      "COOLIFY_API_TOKEN environment variable is required. " +
-        "Generate a Bearer token in Coolify UI → Settings → API Tokens."
+      `COOLIFY_${upper}_API_TOKEN environment variable is required. ` +
+        `Generate a Bearer token in the ${instance} Coolify UI → Settings → API Tokens.`
     );
   }
 
@@ -36,16 +58,17 @@ function getConfig(): { baseUrl: string; token: string } {
   return { baseUrl: url, token };
 }
 
-// ── Singleton client ─────────────────────────────────────────────────
+// ── Instance clients ─────────────────────────────────────────────────
 
-let _client: AxiosInstance | null = null;
+const _clients = new Map<CoolifyInstance, AxiosInstance>();
 
-function getClient(): AxiosInstance {
-  if (_client) return _client;
+function getClient(instance: CoolifyInstance = "prod"): AxiosInstance {
+  const existing = _clients.get(instance);
+  if (existing) return existing;
 
-  const { baseUrl, token } = getConfig();
+  const { baseUrl, token } = getInstanceConfig(instance);
 
-  _client = axios.create({
+  const client = axios.create({
     baseURL: baseUrl,
     timeout: REQUEST_TIMEOUT,
     headers: {
@@ -55,40 +78,75 @@ function getClient(): AxiosInstance {
     },
   });
 
-  return _client;
+  _clients.set(instance, client);
+  return client;
+}
+
+// ── Configuration checks ─────────────────────────────────────────────
+
+export function isCoolifyInstanceConfigured(instance: CoolifyInstance): boolean {
+  const upper = instance.toUpperCase();
+  const baseUrl =
+    process.env[`COOLIFY_${upper}_BASE_URL`] ??
+    (instance === "prod" ? process.env.COOLIFY_BASE_URL : undefined);
+  const token =
+    process.env[`COOLIFY_${upper}_API_TOKEN`] ??
+    (instance === "prod" ? process.env.COOLIFY_API_TOKEN : undefined);
+  return !!(baseUrl && token);
+}
+
+export function getConfiguredInstances(): CoolifyInstance[] {
+  const instances: CoolifyInstance[] = [];
+  if (isCoolifyInstanceConfigured("prod")) instances.push("prod");
+  if (isCoolifyInstanceConfigured("dev")) instances.push("dev");
+  return instances;
+}
+
+export function getCoolifyInstanceUrl(instance: CoolifyInstance): string | undefined {
+  const upper = instance.toUpperCase();
+  return (
+    process.env[`COOLIFY_${upper}_BASE_URL`] ??
+    (instance === "prod" ? process.env.COOLIFY_BASE_URL : undefined)
+  );
 }
 
 // ── Public helpers ───────────────────────────────────────────────────
 
 export async function coolifyGet<T>(
   endpoint: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
+  instance: CoolifyInstance = "prod"
 ): Promise<T> {
-  const client = getClient();
+  const client = getClient(instance);
   const response = await client.get<T>(endpoint, { params });
   return response.data;
 }
 
 export async function coolifyPost<T>(
   endpoint: string,
-  data?: Record<string, unknown>
+  data?: Record<string, unknown>,
+  instance: CoolifyInstance = "prod"
 ): Promise<T> {
-  const client = getClient();
+  const client = getClient(instance);
   const response = await client.post<T>(endpoint, data);
   return response.data;
 }
 
 export async function coolifyPatch<T>(
   endpoint: string,
-  data?: Record<string, unknown>
+  data?: Record<string, unknown>,
+  instance: CoolifyInstance = "prod"
 ): Promise<T> {
-  const client = getClient();
+  const client = getClient(instance);
   const response = await client.patch<T>(endpoint, data);
   return response.data;
 }
 
-export async function coolifyDelete<T>(endpoint: string): Promise<T> {
-  const client = getClient();
+export async function coolifyDelete<T>(
+  endpoint: string,
+  instance: CoolifyInstance = "prod"
+): Promise<T> {
+  const client = getClient(instance);
   const response = await client.delete<T>(endpoint);
   return response.data;
 }

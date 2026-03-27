@@ -13,8 +13,10 @@
  *   - Supabase: Project management, database, edge functions, configuration
  *
  * Environment variables:
- *   COOLIFY_BASE_URL            - Coolify instance URL
- *   COOLIFY_API_TOKEN           - Coolify Bearer token (from BWS via start.sh)
+ *   COOLIFY_PROD_BASE_URL       - Production Coolify instance URL (or legacy COOLIFY_BASE_URL)
+ *   COOLIFY_PROD_API_TOKEN      - Production Coolify Bearer token (or legacy COOLIFY_API_TOKEN)
+ *   COOLIFY_DEV_BASE_URL        - Dev Coolify instance URL (optional)
+ *   COOLIFY_DEV_API_TOKEN       - Dev Coolify Bearer token (optional)
  *   HETZNER_API_TOKEN           - Hetzner Cloud API token (optional, from BWS via start.sh)
  *   VPS_HOST                    - VPS IP address (default: 178.156.247.239)
  *   VPS_USER                    - SSH user (default: root)
@@ -32,15 +34,23 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
+// Coolify client
+import { getConfiguredInstances, getCoolifyInstanceUrl, isCoolifyInstanceConfigured } from "./services/coolify-client.js";
+
 // Coolify tools
 import { registerProjectTools } from "./tools/projects.js";
 import { registerApplicationTools } from "./tools/applications.js";
+import { registerPrivateKeyTools } from "./tools/private-keys.js";
 import { registerDeploymentTools } from "./tools/deployments.js";
 import { registerEnvVarTools } from "./tools/env-vars.js";
 import { registerDatabaseTools } from "./tools/databases.js";
 import { registerServerTools } from "./tools/servers.js";
 import { registerServiceTools } from "./tools/services.js";
 import { registerControlTools } from "./tools/control.js";
+
+// GitHub tools
+import { registerGithubTools } from "./tools/github.js";
+import { isGithubConfigured } from "./services/github-client.js";
 
 // Hetzner Cloud tools
 import { registerHetznerServerTools } from "./tools/hetzner-servers.js";
@@ -75,19 +85,35 @@ import { isSupabaseConfigured } from "./services/supabase-client.js";
 
 const server = new McpServer({
   name: "infraops-mcp-server",
-  version: "3.0.0",
+  version: "3.2.0",
 });
 
 // ── Register Coolify tools ───────────────────────────────────────────
+// Tools are always registered — instance selection happens at call time via the `instance` parameter.
+// At least one instance (prod) must be configured.
+
+const coolifyInstances = getConfiguredInstances();
+if (coolifyInstances.length === 0) {
+  console.error("WARNING: No Coolify instances configured. Set COOLIFY_PROD_BASE_URL/TOKEN (or COOLIFY_BASE_URL/TOKEN).");
+}
 
 registerProjectTools(server);
 registerApplicationTools(server);
+registerPrivateKeyTools(server);
 registerDeploymentTools(server);
 registerEnvVarTools(server);
 registerDatabaseTools(server);
 registerServerTools(server);
 registerServiceTools(server);
 registerControlTools(server);
+
+// ── Register GitHub tools ──────────────────────────────────────────
+if (isGithubConfigured()) {
+  registerGithubTools(server);
+  console.error("GitHub tools registered");
+} else {
+  console.error("GITHUB_TOKEN not set — GitHub tools disabled");
+}
 
 // ── Register Hetzner Cloud tools ─────────────────────────────────────
 
@@ -143,9 +169,12 @@ if (isSupabaseConfigured()) {
 async function runStdio(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("InfraOps MCP server v3.0.0 running via stdio");
+  console.error("InfraOps MCP server v3.2.0 running via stdio");
   console.error(
-    `  Coolify: ${process.env.COOLIFY_BASE_URL ?? "(not set)"}`
+    `  Coolify prod: ${isCoolifyInstanceConfigured("prod") ? getCoolifyInstanceUrl("prod") : "not configured"}`
+  );
+  console.error(
+    `  Coolify dev:  ${isCoolifyInstanceConfigured("dev") ? getCoolifyInstanceUrl("dev") : "not configured"}`
   );
   console.error(
     `  Hetzner: ${isHetznerConfigured() ? "configured" : "not configured"}`
@@ -158,6 +187,7 @@ async function runStdio(): Promise<void> {
   );
   console.error(`  Cloudflare: ${isCloudflareConfigured() ? "configured" : "not configured"}`);
   console.error(`  Supabase: ${isSupabaseConfigured() ? "configured" : "not configured"}`);
+  console.error(`  GitHub: ${isGithubConfigured() ? "configured" : "not configured"}`);
 }
 
 runStdio().catch((error) => {

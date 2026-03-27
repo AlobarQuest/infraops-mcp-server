@@ -131,6 +131,20 @@ export interface CoolifyEnvVar {
   updated_at?: string;
 }
 
+// ── Private Keys ────────────────────────────────────────────────────
+
+export interface CoolifyPrivateKey {
+  id: number;
+  uuid: string;
+  name: string;
+  description?: string;
+  private_key?: string;
+  public_key?: string;
+  fingerprint?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // ── Pagination ───────────────────────────────────────────────────────
 
 export interface PaginatedResponse<T> {

@@ -6,6 +6,7 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
+import { CoolifyInstanceSchema } from "../schemas/common.js";
 export function registerEnvVarTools(server) {
     // ── List Env Vars (Application) ──────────────────────────────────
     server.registerTool("coolify_list_app_envs", {
@@ -13,6 +14,7 @@ export function registerEnvVarTools(server) {
         description: "List all environment variables for an application. Values of secrets may be masked by Coolify.",
         inputSchema: {
             uuid: z.string().min(1).describe("Application UUID"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: true,
@@ -20,9 +22,9 @@ export function registerEnvVarTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ uuid }) => {
+    }, async ({ uuid, instance }) => {
         try {
-            const envs = await coolifyGet(`/applications/${uuid}/envs`);
+            const envs = await coolifyGet(`/applications/${uuid}/envs`, undefined, instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(envs, null, 2) }],
             };
@@ -51,6 +53,7 @@ export function registerEnvVarTools(server) {
                 .boolean()
                 .default(false)
                 .describe("Only for preview deployments (default: false)"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -65,7 +68,7 @@ export function registerEnvVarTools(server) {
                 value: params.value,
                 is_build_time: params.is_build_time,
                 is_preview: params.is_preview,
-            });
+            }, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(env, null, 2) }],
             };
@@ -88,6 +91,7 @@ export function registerEnvVarTools(server) {
             value: z.string().optional().describe("New variable value"),
             is_build_time: z.boolean().optional().describe("Build-time availability"),
             is_preview: z.boolean().optional().describe("Preview-only flag"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -106,7 +110,7 @@ export function registerEnvVarTools(server) {
                 body.is_build_time = params.is_build_time;
             if (params.is_preview !== undefined)
                 body.is_preview = params.is_preview;
-            const env = await coolifyPatch(`/applications/${params.uuid}/envs/${params.env_uuid}`, body);
+            const env = await coolifyPatch(`/applications/${params.uuid}/envs/${params.env_uuid}`, body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(env, null, 2) }],
             };
@@ -125,6 +129,7 @@ export function registerEnvVarTools(server) {
         inputSchema: {
             uuid: z.string().min(1).describe("Application UUID"),
             env_uuid: z.string().min(1).describe("Environment variable UUID"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -132,9 +137,9 @@ export function registerEnvVarTools(server) {
             idempotentHint: false,
             openWorldHint: true,
         },
-    }, async ({ uuid, env_uuid }) => {
+    }, async ({ uuid, env_uuid, instance }) => {
         try {
-            await coolifyDelete(`/applications/${uuid}/envs/${env_uuid}`);
+            await coolifyDelete(`/applications/${uuid}/envs/${env_uuid}`, instance);
             return {
                 content: [
                     {
@@ -167,6 +172,7 @@ export function registerEnvVarTools(server) {
             }))
                 .min(1)
                 .describe("Array of env vars to create"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -174,7 +180,7 @@ export function registerEnvVarTools(server) {
             idempotentHint: false,
             openWorldHint: true,
         },
-    }, async ({ uuid, variables, }) => {
+    }, async ({ uuid, variables, instance, }) => {
         try {
             const results = [];
             for (const v of variables) {
@@ -184,7 +190,7 @@ export function registerEnvVarTools(server) {
                         value: v.value,
                         is_build_time: v.is_build_time,
                         is_preview: v.is_preview,
-                    });
+                    }, instance);
                     results.push({ key: v.key, status: "created" });
                 }
                 catch (err) {

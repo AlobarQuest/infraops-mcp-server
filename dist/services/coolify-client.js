@@ -1,22 +1,30 @@
 /**
- * Coolify API client.
+ * Coolify API client — multi-instance support.
  *
- * Centralises all HTTP communication with the Coolify REST API.
- * Every tool delegates to this client — no tool should import axios directly.
+ * Supports multiple Coolify instances (e.g. "prod" and "dev") via
+ * environment variables. Every public helper accepts an optional
+ * `instance` parameter that defaults to "prod".
+ *
+ * Env vars:
+ *   COOLIFY_PROD_BASE_URL / COOLIFY_PROD_API_TOKEN  (or legacy COOLIFY_BASE_URL / COOLIFY_API_TOKEN)
+ *   COOLIFY_DEV_BASE_URL  / COOLIFY_DEV_API_TOKEN   (optional)
  */
 import axios from "axios";
 import { REQUEST_TIMEOUT } from "../constants.js";
-// ── Configuration ────────────────────────────────────────────────────
-function getConfig() {
-    const baseUrl = process.env.COOLIFY_BASE_URL;
-    const token = process.env.COOLIFY_API_TOKEN;
+function getInstanceConfig(instance) {
+    const upper = instance.toUpperCase(); // "PROD" | "DEV"
+    // Try prefixed vars first, fall back to legacy unprefixed for prod
+    let baseUrl = process.env[`COOLIFY_${upper}_BASE_URL`] ??
+        (instance === "prod" ? process.env.COOLIFY_BASE_URL : undefined);
+    let token = process.env[`COOLIFY_${upper}_API_TOKEN`] ??
+        (instance === "prod" ? process.env.COOLIFY_API_TOKEN : undefined);
     if (!baseUrl) {
-        throw new Error("COOLIFY_BASE_URL environment variable is required. " +
-            "Set it to your Coolify instance URL, e.g. https://coolify.devonwatkins.com");
+        throw new Error(`COOLIFY_${upper}_BASE_URL environment variable is required. ` +
+            `Set it to your ${instance} Coolify instance URL.`);
     }
     if (!token) {
-        throw new Error("COOLIFY_API_TOKEN environment variable is required. " +
-            "Generate a Bearer token in Coolify UI → Settings → API Tokens.");
+        throw new Error(`COOLIFY_${upper}_API_TOKEN environment variable is required. ` +
+            `Generate a Bearer token in the ${instance} Coolify UI → Settings → API Tokens.`);
     }
     // Normalise: strip trailing slash, ensure /api/v1 suffix
     let url = baseUrl.replace(/\/+$/, "");
@@ -25,13 +33,14 @@ function getConfig() {
     }
     return { baseUrl: url, token };
 }
-// ── Singleton client ─────────────────────────────────────────────────
-let _client = null;
-function getClient() {
-    if (_client)
-        return _client;
-    const { baseUrl, token } = getConfig();
-    _client = axios.create({
+// ── Instance clients ─────────────────────────────────────────────────
+const _clients = new Map();
+function getClient(instance = "prod") {
+    const existing = _clients.get(instance);
+    if (existing)
+        return existing;
+    const { baseUrl, token } = getInstanceConfig(instance);
+    const client = axios.create({
         baseURL: baseUrl,
         timeout: REQUEST_TIMEOUT,
         headers: {
@@ -40,26 +49,49 @@ function getClient() {
             Authorization: `Bearer ${token}`,
         },
     });
-    return _client;
+    _clients.set(instance, client);
+    return client;
+}
+// ── Configuration checks ─────────────────────────────────────────────
+export function isCoolifyInstanceConfigured(instance) {
+    const upper = instance.toUpperCase();
+    const baseUrl = process.env[`COOLIFY_${upper}_BASE_URL`] ??
+        (instance === "prod" ? process.env.COOLIFY_BASE_URL : undefined);
+    const token = process.env[`COOLIFY_${upper}_API_TOKEN`] ??
+        (instance === "prod" ? process.env.COOLIFY_API_TOKEN : undefined);
+    return !!(baseUrl && token);
+}
+export function getConfiguredInstances() {
+    const instances = [];
+    if (isCoolifyInstanceConfigured("prod"))
+        instances.push("prod");
+    if (isCoolifyInstanceConfigured("dev"))
+        instances.push("dev");
+    return instances;
+}
+export function getCoolifyInstanceUrl(instance) {
+    const upper = instance.toUpperCase();
+    return (process.env[`COOLIFY_${upper}_BASE_URL`] ??
+        (instance === "prod" ? process.env.COOLIFY_BASE_URL : undefined));
 }
 // ── Public helpers ───────────────────────────────────────────────────
-export async function coolifyGet(endpoint, params) {
-    const client = getClient();
+export async function coolifyGet(endpoint, params, instance = "prod") {
+    const client = getClient(instance);
     const response = await client.get(endpoint, { params });
     return response.data;
 }
-export async function coolifyPost(endpoint, data) {
-    const client = getClient();
+export async function coolifyPost(endpoint, data, instance = "prod") {
+    const client = getClient(instance);
     const response = await client.post(endpoint, data);
     return response.data;
 }
-export async function coolifyPatch(endpoint, data) {
-    const client = getClient();
+export async function coolifyPatch(endpoint, data, instance = "prod") {
+    const client = getClient(instance);
     const response = await client.patch(endpoint, data);
     return response.data;
 }
-export async function coolifyDelete(endpoint) {
-    const client = getClient();
+export async function coolifyDelete(endpoint, instance = "prod") {
+    const client = getClient(instance);
     const response = await client.delete(endpoint);
     return response.data;
 }

@@ -11,7 +11,8 @@ import {
   coolifyPost,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema } from "../schemas/common.js";
+import type { CoolifyInstance } from "../services/coolify-client.js";
+import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
 import type { CoolifyDeployment } from "../types.js";
 
 export function registerDeploymentTools(server: McpServer): void {
@@ -37,6 +38,7 @@ export function registerDeploymentTools(server: McpServer): void {
           .boolean()
           .default(false)
           .describe("Force rebuild even if no changes detected (default: false)"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -49,10 +51,12 @@ export function registerDeploymentTools(server: McpServer): void {
       uuid,
       tag,
       force,
+      instance,
     }: {
       uuid?: string;
       tag?: string;
       force: boolean;
+      instance: CoolifyInstance;
     }) => {
       try {
         if (!uuid && !tag) {
@@ -74,7 +78,8 @@ export function registerDeploymentTools(server: McpServer): void {
 
         const result = await coolifyPost<Record<string, unknown>>(
           "/deploy",
-          params
+          params,
+          instance
         );
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -98,6 +103,7 @@ export function registerDeploymentTools(server: McpServer): void {
         "List deployment history for a specific application. Returns status, commit, timestamps, and deployment UUIDs.",
       inputSchema: {
         uuid: z.string().min(1).describe("Application UUID"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: true,
@@ -106,10 +112,12 @@ export function registerDeploymentTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const deployments = await coolifyGet<CoolifyDeployment[]>(
-          `/applications/${uuid}/deployments`
+          `/applications/${uuid}/deployments`,
+          undefined,
+          instance
         );
         return {
           content: [
@@ -138,6 +146,7 @@ export function registerDeploymentTools(server: McpServer): void {
           .string()
           .min(1)
           .describe("The deployment UUID (not the application UUID)"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: true,
@@ -146,10 +155,12 @@ export function registerDeploymentTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ deployment_uuid }: { deployment_uuid: string }) => {
+    async ({ deployment_uuid, instance }: { deployment_uuid: string; instance: CoolifyInstance }) => {
       try {
         const deployment = await coolifyGet<CoolifyDeployment>(
-          `/deployments/${deployment_uuid}`
+          `/deployments/${deployment_uuid}`,
+          undefined,
+          instance
         );
         return {
           content: [

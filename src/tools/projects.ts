@@ -14,7 +14,8 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { CoolifyProject, CoolifyEnvironment } from "../types.js";
 
 export function registerProjectTools(server: McpServer): void {
@@ -26,7 +27,7 @@ export function registerProjectTools(server: McpServer): void {
       title: "List Coolify Projects",
       description:
         "List all projects in the Coolify instance. Projects are the top-level organisational unit — each contains environments which in turn contain applications, databases, and services.",
-      inputSchema: {},
+      inputSchema: { instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -34,9 +35,9 @@ export function registerProjectTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async () => {
+    async ({ instance }: { instance: CoolifyInstance }) => {
       try {
-        const projects = await coolifyGet<CoolifyProject[]>("/projects");
+        const projects = await coolifyGet<CoolifyProject[]>("/projects", undefined, instance);
         return {
           content: [
             { type: "text", text: JSON.stringify(projects, null, 2) },
@@ -59,7 +60,7 @@ export function registerProjectTools(server: McpServer): void {
       title: "Get Coolify Project",
       description:
         "Get full details for a single project by UUID, including its environments and the resources within them.",
-      inputSchema: { uuid: UuidSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -67,10 +68,10 @@ export function registerProjectTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const project = await coolifyGet<CoolifyProject>(
-          `/projects/${uuid}`
+          `/projects/${uuid}`, undefined, instance
         );
         return {
           content: [
@@ -100,6 +101,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .optional()
           .describe("Optional project description"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -111,15 +113,17 @@ export function registerProjectTools(server: McpServer): void {
     async ({
       name,
       description,
+      instance,
     }: {
       name: string;
       description?: string;
+      instance: CoolifyInstance;
     }) => {
       try {
         const project = await coolifyPost<CoolifyProject>("/projects", {
           name,
           ...(description ? { description } : {}),
-        });
+        }, instance);
         return {
           content: [
             { type: "text", text: JSON.stringify(project, null, 2) },
@@ -148,6 +152,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .optional()
           .describe("New project description"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -160,10 +165,12 @@ export function registerProjectTools(server: McpServer): void {
       uuid,
       name,
       description,
+      instance,
     }: {
       uuid: string;
       name?: string;
       description?: string;
+      instance: CoolifyInstance;
     }) => {
       try {
         const data: Record<string, unknown> = {};
@@ -172,7 +179,8 @@ export function registerProjectTools(server: McpServer): void {
 
         const project = await coolifyPatch<CoolifyProject>(
           `/projects/${uuid}`,
-          data
+          data,
+          instance
         );
         return {
           content: [
@@ -196,7 +204,7 @@ export function registerProjectTools(server: McpServer): void {
       title: "Delete Coolify Project",
       description:
         "Delete a project by UUID. WARNING: This will delete all environments and resources within the project.",
-      inputSchema: { uuid: UuidSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -204,9 +212,9 @@ export function registerProjectTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
-        await coolifyDelete(`/projects/${uuid}`);
+        await coolifyDelete(`/projects/${uuid}`, instance);
         return {
           content: [
             {
@@ -237,6 +245,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .min(1)
           .describe("UUID of the parent project"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: true,
@@ -245,11 +254,11 @@ export function registerProjectTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ project_uuid }: { project_uuid: string }) => {
+    async ({ project_uuid, instance }: { project_uuid: string; instance: CoolifyInstance }) => {
       try {
         // Environments are typically nested in the project response
         const project = await coolifyGet<CoolifyProject>(
-          `/projects/${project_uuid}`
+          `/projects/${project_uuid}`, undefined, instance
         );
         const environments = project.environments ?? [];
         return {
@@ -283,6 +292,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .min(1)
           .describe("Environment name (e.g. production, staging)"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -294,14 +304,17 @@ export function registerProjectTools(server: McpServer): void {
     async ({
       project_uuid,
       name,
+      instance,
     }: {
       project_uuid: string;
       name: string;
+      instance: CoolifyInstance;
     }) => {
       try {
         const env = await coolifyPost<CoolifyEnvironment>(
           `/projects/${project_uuid}/environments`,
-          { name }
+          { name },
+          instance
         );
         return {
           content: [{ type: "text", text: JSON.stringify(env, null, 2) }],
@@ -332,6 +345,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .min(1)
           .describe("Name of the environment to delete"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -343,13 +357,16 @@ export function registerProjectTools(server: McpServer): void {
     async ({
       project_uuid,
       environment_name,
+      instance,
     }: {
       project_uuid: string;
       environment_name: string;
+      instance: CoolifyInstance;
     }) => {
       try {
         await coolifyDelete(
-          `/projects/${project_uuid}/${environment_name}`
+          `/projects/${project_uuid}/${environment_name}`,
+          instance
         );
         return {
           content: [

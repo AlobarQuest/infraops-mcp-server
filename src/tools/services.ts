@@ -15,7 +15,8 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { CoolifyService } from "../types.js";
 
 export function registerServiceTools(server: McpServer): void {
@@ -27,7 +28,7 @@ export function registerServiceTools(server: McpServer): void {
       title: "List Coolify Services",
       description:
         "List all services (Docker Compose workloads) managed by Coolify.",
-      inputSchema: {},
+      inputSchema: { instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -35,9 +36,9 @@ export function registerServiceTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async () => {
+    async ({ instance }: { instance: CoolifyInstance }) => {
       try {
-        const services = await coolifyGet<CoolifyService[]>("/services");
+        const services = await coolifyGet<CoolifyService[]>("/services", undefined, instance);
         return {
           content: [
             { type: "text", text: JSON.stringify(services, null, 2) },
@@ -60,7 +61,7 @@ export function registerServiceTools(server: McpServer): void {
       title: "Get Coolify Service",
       description:
         "Get full details for a service by UUID — includes compose config, status, and resource mapping.",
-      inputSchema: { uuid: UuidSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -68,9 +69,9 @@ export function registerServiceTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
-        const svc = await coolifyGet<CoolifyService>(`/services/${uuid}`);
+        const svc = await coolifyGet<CoolifyService>(`/services/${uuid}`, undefined, instance);
         return {
           content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
         };
@@ -114,6 +115,7 @@ export function registerServiceTools(server: McpServer): void {
             "Raw docker-compose.yml content (required if type is docker-compose)"
           ),
         domains: z.string().optional().describe("FQDN for the service"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -132,6 +134,7 @@ export function registerServiceTools(server: McpServer): void {
       description?: string;
       docker_compose_raw?: string;
       domains?: string;
+      instance: CoolifyInstance;
     }) => {
       try {
         const body: Record<string, unknown> = {
@@ -147,7 +150,7 @@ export function registerServiceTools(server: McpServer): void {
           body.docker_compose_raw = params.docker_compose_raw;
         if (params.domains) body.domains = params.domains;
 
-        const svc = await coolifyPost<CoolifyService>("/services", body);
+        const svc = await coolifyPost<CoolifyService>("/services", body, params.instance);
         return {
           content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
         };
@@ -176,6 +179,7 @@ export function registerServiceTools(server: McpServer): void {
           .optional()
           .describe("Updated docker-compose.yml content"),
         domains: z.string().optional().describe("New FQDN"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -187,6 +191,7 @@ export function registerServiceTools(server: McpServer): void {
     async (params: Record<string, unknown>) => {
       try {
         const uuid = params.uuid as string;
+        const instance = params.instance as CoolifyInstance;
         const body: Record<string, unknown> = {};
         for (const field of [
           "name",
@@ -198,7 +203,8 @@ export function registerServiceTools(server: McpServer): void {
         }
         const svc = await coolifyPatch<CoolifyService>(
           `/services/${uuid}`,
-          body
+          body,
+          instance
         );
         return {
           content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
@@ -220,7 +226,7 @@ export function registerServiceTools(server: McpServer): void {
       title: "Delete Coolify Service",
       description:
         "Delete a service. WARNING: Stops all containers and removes the service definition.",
-      inputSchema: { uuid: UuidSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -228,9 +234,9 @@ export function registerServiceTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
-        await coolifyDelete(`/services/${uuid}`);
+        await coolifyDelete(`/services/${uuid}`, instance);
         return {
           content: [
             { type: "text", text: `Service ${uuid} deleted successfully.` },

@@ -7,22 +7,22 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
 export function registerServiceTools(server) {
     // ── List Services ────────────────────────────────────────────────
     server.registerTool("coolify_list_services", {
         title: "List Coolify Services",
         description: "List all services (Docker Compose workloads) managed by Coolify.",
-        inputSchema: {},
+        inputSchema: { instance: CoolifyInstanceSchema },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async () => {
+    }, async ({ instance }) => {
         try {
-            const services = await coolifyGet("/services");
+            const services = await coolifyGet("/services", undefined, instance);
             return {
                 content: [
                     { type: "text", text: JSON.stringify(services, null, 2) },
@@ -40,16 +40,16 @@ export function registerServiceTools(server) {
     server.registerTool("coolify_get_service", {
         title: "Get Coolify Service",
         description: "Get full details for a service by UUID — includes compose config, status, and resource mapping.",
-        inputSchema: { uuid: UuidSchema },
+        inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ uuid }) => {
+    }, async ({ uuid, instance }) => {
         try {
-            const svc = await coolifyGet(`/services/${uuid}`);
+            const svc = await coolifyGet(`/services/${uuid}`, undefined, instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
             };
@@ -84,6 +84,7 @@ export function registerServiceTools(server) {
                 .optional()
                 .describe("Raw docker-compose.yml content (required if type is docker-compose)"),
             domains: z.string().optional().describe("FQDN for the service"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -108,7 +109,7 @@ export function registerServiceTools(server) {
                 body.docker_compose_raw = params.docker_compose_raw;
             if (params.domains)
                 body.domains = params.domains;
-            const svc = await coolifyPost("/services", body);
+            const svc = await coolifyPost("/services", body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
             };
@@ -133,6 +134,7 @@ export function registerServiceTools(server) {
                 .optional()
                 .describe("Updated docker-compose.yml content"),
             domains: z.string().optional().describe("New FQDN"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -143,6 +145,7 @@ export function registerServiceTools(server) {
     }, async (params) => {
         try {
             const uuid = params.uuid;
+            const instance = params.instance;
             const body = {};
             for (const field of [
                 "name",
@@ -153,7 +156,7 @@ export function registerServiceTools(server) {
                 if (params[field] !== undefined)
                     body[field] = params[field];
             }
-            const svc = await coolifyPatch(`/services/${uuid}`, body);
+            const svc = await coolifyPatch(`/services/${uuid}`, body, instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
             };
@@ -169,16 +172,16 @@ export function registerServiceTools(server) {
     server.registerTool("coolify_delete_service", {
         title: "Delete Coolify Service",
         description: "Delete a service. WARNING: Stops all containers and removes the service definition.",
-        inputSchema: { uuid: UuidSchema },
+        inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
         annotations: {
             readOnlyHint: false,
             destructiveHint: true,
             idempotentHint: false,
             openWorldHint: true,
         },
-    }, async ({ uuid }) => {
+    }, async ({ uuid, instance }) => {
         try {
-            await coolifyDelete(`/services/${uuid}`);
+            await coolifyDelete(`/services/${uuid}`, instance);
             return {
                 content: [
                     { type: "text", text: `Service ${uuid} deleted successfully.` },

@@ -108,6 +108,17 @@ export interface CoolifyEnvVar {
     created_at?: string;
     updated_at?: string;
 }
+export interface CoolifyPrivateKey {
+    id: number;
+    uuid: string;
+    name: string;
+    description?: string;
+    private_key?: string;
+    public_key?: string;
+    fingerprint?: string;
+    created_at?: string;
+    updated_at?: string;
+}
 export interface PaginatedResponse<T> {
     total: number;
     count: number;

@@ -13,8 +13,10 @@
  *   - Supabase: Project management, database, edge functions, configuration
  *
  * Environment variables:
- *   COOLIFY_BASE_URL            - Coolify instance URL
- *   COOLIFY_API_TOKEN           - Coolify Bearer token (from BWS via start.sh)
+ *   COOLIFY_PROD_BASE_URL       - Production Coolify instance URL (or legacy COOLIFY_BASE_URL)
+ *   COOLIFY_PROD_API_TOKEN      - Production Coolify Bearer token (or legacy COOLIFY_API_TOKEN)
+ *   COOLIFY_DEV_BASE_URL        - Dev Coolify instance URL (optional)
+ *   COOLIFY_DEV_API_TOKEN       - Dev Coolify Bearer token (optional)
  *   HETZNER_API_TOKEN           - Hetzner Cloud API token (optional, from BWS via start.sh)
  *   VPS_HOST                    - VPS IP address (default: 178.156.247.239)
  *   VPS_USER                    - SSH user (default: root)

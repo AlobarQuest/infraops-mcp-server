@@ -6,22 +6,22 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
 export function registerApplicationTools(server) {
     // ── List Applications ────────────────────────────────────────────
     server.registerTool("coolify_list_applications", {
         title: "List Coolify Applications",
         description: "List all applications across the Coolify instance. Returns UUID, name, FQDN, status, and build pack for each app.",
-        inputSchema: {},
+        inputSchema: { instance: CoolifyInstanceSchema },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async () => {
+    }, async ({ instance }) => {
         try {
-            const apps = await coolifyGet("/applications");
+            const apps = await coolifyGet("/applications", undefined, instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(apps, null, 2) }],
             };
@@ -37,16 +37,16 @@ export function registerApplicationTools(server) {
     server.registerTool("coolify_get_application", {
         title: "Get Coolify Application",
         description: "Get full details for a single application by UUID, including build config, health check settings, Git info, and deployment status.",
-        inputSchema: { uuid: UuidSchema },
+        inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ uuid }) => {
+    }, async ({ uuid, instance }) => {
         try {
-            const app = await coolifyGet(`/applications/${uuid}`);
+            const app = await coolifyGet(`/applications/${uuid}`, undefined, instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
             };
@@ -99,6 +99,7 @@ export function registerApplicationTools(server) {
                 .string()
                 .optional()
                 .describe("FQDN for the app (e.g. https://myapp.devonwatkins.com)"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -124,7 +125,7 @@ export function registerApplicationTools(server) {
                 body.description = params.description;
             if (params.domains)
                 body.domains = params.domains;
-            const app = await coolifyPost("/applications/public", body);
+            const app = await coolifyPost("/applications/public", body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
             };
@@ -170,6 +171,7 @@ export function registerApplicationTools(server) {
                 .default("8000")
                 .describe("Ports to expose (default: 8000)"),
             domains: z.string().optional().describe("FQDN for the app"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -194,7 +196,7 @@ export function registerApplicationTools(server) {
                 body.description = params.description;
             if (params.domains)
                 body.domains = params.domains;
-            const app = await coolifyPost("/applications/dockerimage", body);
+            const app = await coolifyPost("/applications/dockerimage", body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
             };
@@ -227,6 +229,7 @@ export function registerApplicationTools(server) {
             description: z.string().optional().describe("Application description"),
             ports_exposes: z.string().default("8080").describe("Ports to expose"),
             domains: z.string().optional().describe("FQDN for the app"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -250,7 +253,146 @@ export function registerApplicationTools(server) {
                 body.description = params.description;
             if (params.domains)
                 body.domains = params.domains;
-            const app = await coolifyPost("/applications/dockerfile", body);
+            const app = await coolifyPost("/applications/dockerfile", body, params.instance);
+            return {
+                content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
+            };
+        }
+        catch (error) {
+            return {
+                isError: true,
+                content: [{ type: "text", text: handleCoolifyError(error) }],
+            };
+        }
+    });
+    // ── Create Application (Private Repo via Deploy Key) ─────────────
+    server.registerTool("coolify_create_application_deploykey", {
+        title: "Create Application from Private Repo (Deploy Key)",
+        description: "Create an application from a private Git repository using an SSH deploy key. " +
+            "Requires a private key already stored in Coolify (via coolify_create_private_key). " +
+            "The key's public counterpart must be added to GitHub (via github_add_deploy_key) before deploying.",
+        inputSchema: {
+            project_uuid: z.string().min(1).describe("UUID of the target project"),
+            environment_name: z
+                .string()
+                .default("production")
+                .describe("Environment name (default: production)"),
+            server_uuid: z
+                .string()
+                .min(1)
+                .describe("UUID of the destination server"),
+            destination_uuid: z
+                .string()
+                .min(1)
+                .describe("UUID of the Docker network/destination on the server"),
+            private_key_uuid: z
+                .string()
+                .min(1)
+                .describe("UUID of the Coolify private key (from coolify_create_private_key)"),
+            git_repository: z
+                .string()
+                .min(1)
+                .describe("Git SSH URL (e.g. 'git@github.com:AlobarQuest/my-app.git') — must be SSH format for deploy key auth"),
+            git_branch: z
+                .string()
+                .default("main")
+                .describe("Git branch to deploy (default: main)"),
+            build_pack: z
+                .enum(["nixpacks", "static", "dockerfile", "dockercompose"])
+                .default("nixpacks")
+                .describe("Build strategy"),
+            name: z.string().optional().describe("Application display name"),
+            description: z.string().optional().describe("Application description"),
+            ports_exposes: z
+                .string()
+                .default("8000")
+                .describe("Comma-separated ports to expose (default: 8000)"),
+            domains: z
+                .string()
+                .optional()
+                .describe("FQDN for single-container apps (not for dockercompose — use coolify_set_compose_config instead)"),
+            instance: CoolifyInstanceSchema,
+        },
+        annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true,
+        },
+    }, async (params) => {
+        try {
+            const body = {
+                project_uuid: params.project_uuid,
+                environment_name: params.environment_name,
+                server_uuid: params.server_uuid,
+                destination_uuid: params.destination_uuid,
+                private_key_uuid: params.private_key_uuid,
+                git_repository: params.git_repository,
+                git_branch: params.git_branch,
+                build_pack: params.build_pack,
+                ports_exposes: params.ports_exposes,
+            };
+            if (params.name)
+                body.name = params.name;
+            if (params.description)
+                body.description = params.description;
+            if (params.domains)
+                body.domains = params.domains;
+            const app = await coolifyPost("/applications/private-deploy-key", body, params.instance);
+            return {
+                content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
+            };
+        }
+        catch (error) {
+            return {
+                isError: true,
+                content: [{ type: "text", text: handleCoolifyError(error) }],
+            };
+        }
+    });
+    // ── Set Compose Config ────────────────────────────────────────────
+    server.registerTool("coolify_set_compose_config", {
+        title: "Set Docker Compose Configuration",
+        description: "Configure compose-specific fields for a dockercompose application: domain-to-service mapping, " +
+            "compose file location, and optionally clear stale custom_labels. " +
+            "This is required after creating a compose app to set up Traefik routing.",
+        inputSchema: {
+            uuid: UuidSchema,
+            docker_compose_domains: z
+                .array(z.object({
+                name: z.string().describe("Compose service name (e.g. 'api')"),
+                domain: z.string().describe("Domain URL(s), comma-separated (e.g. 'https://app.devonwatkins.com')"),
+            }))
+                .optional()
+                .describe("Service-to-domain mapping for Traefik routing"),
+            docker_compose_location: z
+                .string()
+                .default("/docker-compose.yml")
+                .describe("Path to compose file in the repo (default: /docker-compose.yml)"),
+            reset_labels: z
+                .boolean()
+                .default(true)
+                .describe("Clear custom_labels so Coolify auto-generates from domain config (default: true)"),
+            instance: CoolifyInstanceSchema,
+        },
+        annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+        },
+    }, async (params) => {
+        try {
+            const body = {
+                docker_compose_location: params.docker_compose_location,
+            };
+            if (params.docker_compose_domains) {
+                body.docker_compose_domains = params.docker_compose_domains;
+            }
+            if (params.reset_labels) {
+                body.custom_labels = "";
+            }
+            const app = await coolifyPatch(`/applications/${params.uuid}`, body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
             };
@@ -302,6 +444,32 @@ export function registerApplicationTools(server) {
                 .string()
                 .optional()
                 .describe("Health check port"),
+            health_check_start_period: z
+                .number()
+                .int()
+                .optional()
+                .describe("Health check start period in seconds (e.g. 15)"),
+            docker_compose_location: z
+                .string()
+                .optional()
+                .describe("Path to compose file in the repo (e.g. /docker-compose.yml)"),
+            docker_compose_domains: z
+                .array(z.object({
+                name: z.string().describe("Compose service name"),
+                domain: z.string().describe("Domain URL(s), comma-separated"),
+            }))
+                .optional()
+                .describe("Service-to-domain mapping for compose apps"),
+            custom_labels: z
+                .string()
+                .nullable()
+                .optional()
+                .describe("Custom Traefik labels (set to empty string to reset/auto-generate)"),
+            private_key_uuid: z
+                .string()
+                .optional()
+                .describe("UUID of Coolify private key to link for Git access"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -326,12 +494,17 @@ export function registerApplicationTools(server) {
                 "health_check_enabled",
                 "health_check_path",
                 "health_check_port",
+                "health_check_start_period",
+                "docker_compose_location",
+                "docker_compose_domains",
+                "custom_labels",
+                "private_key_uuid",
             ];
             for (const field of fields) {
                 if (params[field] !== undefined)
                     body[field] = params[field];
             }
-            const app = await coolifyPatch(`/applications/${uuid}`, body);
+            const app = await coolifyPatch(`/applications/${uuid}`, body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
             };
@@ -357,6 +530,7 @@ export function registerApplicationTools(server) {
                 .boolean()
                 .default(true)
                 .describe("Also delete Docker volumes (default: true)"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -364,9 +538,9 @@ export function registerApplicationTools(server) {
             idempotentHint: false,
             openWorldHint: true,
         },
-    }, async ({ uuid, delete_configurations, delete_volumes, }) => {
+    }, async ({ uuid, delete_configurations, delete_volumes, instance, }) => {
         try {
-            await coolifyDelete(`/applications/${uuid}?delete_configurations=${delete_configurations}&delete_volumes=${delete_volumes}`);
+            await coolifyDelete(`/applications/${uuid}?delete_configurations=${delete_configurations}&delete_volumes=${delete_volumes}`, instance);
             return {
                 content: [
                     {
@@ -396,6 +570,7 @@ export function registerApplicationTools(server) {
                 .max(1000)
                 .default(100)
                 .describe("Number of log lines to retrieve (default: 100)"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: true,
@@ -403,9 +578,9 @@ export function registerApplicationTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ uuid, lines }) => {
+    }, async ({ uuid, lines, instance }) => {
         try {
-            const logs = await coolifyGet(`/applications/${uuid}/logs`, { lines });
+            const logs = await coolifyGet(`/applications/${uuid}/logs`, { lines }, instance);
             return {
                 content: [
                     {

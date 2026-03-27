@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, handleCoolifyError, } from "../services/coolify-client.js";
+import { CoolifyInstanceSchema } from "../schemas/common.js";
 export function registerDeploymentTools(server) {
     // ── Deploy Application ───────────────────────────────────────────
     server.registerTool("coolify_deploy", {
@@ -24,6 +25,7 @@ export function registerDeploymentTools(server) {
                 .boolean()
                 .default(false)
                 .describe("Force rebuild even if no changes detected (default: false)"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -31,7 +33,7 @@ export function registerDeploymentTools(server) {
             idempotentHint: false,
             openWorldHint: true,
         },
-    }, async ({ uuid, tag, force, }) => {
+    }, async ({ uuid, tag, force, instance, }) => {
         try {
             if (!uuid && !tag) {
                 return {
@@ -51,7 +53,7 @@ export function registerDeploymentTools(server) {
                 params.tag = tag;
             if (force)
                 params.force = true;
-            const result = await coolifyPost("/deploy", params);
+            const result = await coolifyPost("/deploy", params, instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
             };
@@ -69,6 +71,7 @@ export function registerDeploymentTools(server) {
         description: "List deployment history for a specific application. Returns status, commit, timestamps, and deployment UUIDs.",
         inputSchema: {
             uuid: z.string().min(1).describe("Application UUID"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: true,
@@ -76,9 +79,9 @@ export function registerDeploymentTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ uuid }) => {
+    }, async ({ uuid, instance }) => {
         try {
-            const deployments = await coolifyGet(`/applications/${uuid}/deployments`);
+            const deployments = await coolifyGet(`/applications/${uuid}/deployments`, undefined, instance);
             return {
                 content: [
                     { type: "text", text: JSON.stringify(deployments, null, 2) },
@@ -101,6 +104,7 @@ export function registerDeploymentTools(server) {
                 .string()
                 .min(1)
                 .describe("The deployment UUID (not the application UUID)"),
+            instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: true,
@@ -108,9 +112,9 @@ export function registerDeploymentTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ deployment_uuid }) => {
+    }, async ({ deployment_uuid, instance }) => {
         try {
-            const deployment = await coolifyGet(`/deployments/${deployment_uuid}`);
+            const deployment = await coolifyGet(`/deployments/${deployment_uuid}`, undefined, instance);
             return {
                 content: [
                     { type: "text", text: JSON.stringify(deployment, null, 2) },

@@ -12,8 +12,9 @@ import {
   coolifyPost,
   coolifyDelete,
   handleCoolifyError,
+  CoolifyInstance,
 } from "../services/coolify-client.js";
-import { UuidSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
 import type { CoolifyServer } from "../types.js";
 
 export function registerServerTools(server: McpServer): void {
@@ -25,7 +26,7 @@ export function registerServerTools(server: McpServer): void {
       title: "List Coolify Servers",
       description:
         "List all servers registered with Coolify. Returns name, IP, reachability status, and UUID for each.",
-      inputSchema: {},
+      inputSchema: { instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -33,9 +34,9 @@ export function registerServerTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async () => {
+    async ({ instance }: { instance: CoolifyInstance }) => {
       try {
-        const servers = await coolifyGet<CoolifyServer[]>("/servers");
+        const servers = await coolifyGet<CoolifyServer[]>("/servers", undefined, instance);
         return {
           content: [
             { type: "text", text: JSON.stringify(servers, null, 2) },
@@ -58,7 +59,7 @@ export function registerServerTools(server: McpServer): void {
       title: "Get Coolify Server",
       description:
         "Get full details for a server by UUID — IP, settings, connectivity status, and validation logs.",
-      inputSchema: { uuid: UuidSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -66,9 +67,9 @@ export function registerServerTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
-        const srv = await coolifyGet<CoolifyServer>(`/servers/${uuid}`);
+        const srv = await coolifyGet<CoolifyServer>(`/servers/${uuid}`, undefined, instance);
         return {
           content: [{ type: "text", text: JSON.stringify(srv, null, 2) }],
         };
@@ -90,7 +91,7 @@ export function registerServerTools(server: McpServer): void {
       description:
         "Test SSH connectivity and Docker prerequisites for a server. " +
         "Use this to verify a server is properly connected before deploying resources.",
-      inputSchema: { uuid: UuidSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -98,10 +99,10 @@ export function registerServerTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const result = await coolifyGet<Record<string, unknown>>(
-          `/servers/${uuid}/validate`
+          `/servers/${uuid}/validate`, undefined, instance
         );
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -124,7 +125,7 @@ export function registerServerTools(server: McpServer): void {
       description:
         "List all applications, databases, and services deployed on a specific server. " +
         "Great for getting a full inventory of what's running on your VPS.",
-      inputSchema: { uuid: UuidSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -132,10 +133,10 @@ export function registerServerTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const resources = await coolifyGet<Record<string, unknown>>(
-          `/servers/${uuid}/resources`
+          `/servers/${uuid}/resources`, undefined, instance
         );
         return {
           content: [
@@ -160,7 +161,7 @@ export function registerServerTools(server: McpServer): void {
       description:
         "Retrieve all domain-to-resource mappings configured on a server. " +
         "Shows which apps are reachable at which FQDNs.",
-      inputSchema: { uuid: UuidSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -168,10 +169,10 @@ export function registerServerTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const domains = await coolifyGet<Record<string, unknown>>(
-          `/servers/${uuid}/domains`
+          `/servers/${uuid}/domains`, undefined, instance
         );
         return {
           content: [

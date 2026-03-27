@@ -14,7 +14,8 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { CoolifyEnvVar } from "../types.js";
 
 export function registerEnvVarTools(server: McpServer): void {
@@ -28,6 +29,7 @@ export function registerEnvVarTools(server: McpServer): void {
         "List all environment variables for an application. Values of secrets may be masked by Coolify.",
       inputSchema: {
         uuid: z.string().min(1).describe("Application UUID"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: true,
@@ -36,10 +38,12 @@ export function registerEnvVarTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid }: { uuid: string }) => {
+    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const envs = await coolifyGet<CoolifyEnvVar[]>(
-          `/applications/${uuid}/envs`
+          `/applications/${uuid}/envs`,
+          undefined,
+          instance
         );
         return {
           content: [{ type: "text", text: JSON.stringify(envs, null, 2) }],
@@ -74,6 +78,7 @@ export function registerEnvVarTools(server: McpServer): void {
           .boolean()
           .default(false)
           .describe("Only for preview deployments (default: false)"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -88,6 +93,7 @@ export function registerEnvVarTools(server: McpServer): void {
       value: string;
       is_build_time: boolean;
       is_preview: boolean;
+      instance: CoolifyInstance;
     }) => {
       try {
         const env = await coolifyPost<CoolifyEnvVar>(
@@ -97,7 +103,8 @@ export function registerEnvVarTools(server: McpServer): void {
             value: params.value,
             is_build_time: params.is_build_time,
             is_preview: params.is_preview,
-          }
+          },
+          params.instance
         );
         return {
           content: [{ type: "text", text: JSON.stringify(env, null, 2) }],
@@ -126,6 +133,7 @@ export function registerEnvVarTools(server: McpServer): void {
         value: z.string().optional().describe("New variable value"),
         is_build_time: z.boolean().optional().describe("Build-time availability"),
         is_preview: z.boolean().optional().describe("Preview-only flag"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -141,6 +149,7 @@ export function registerEnvVarTools(server: McpServer): void {
       value?: string;
       is_build_time?: boolean;
       is_preview?: boolean;
+      instance: CoolifyInstance;
     }) => {
       try {
         const body: Record<string, unknown> = {};
@@ -153,7 +162,8 @@ export function registerEnvVarTools(server: McpServer): void {
 
         const env = await coolifyPatch<CoolifyEnvVar>(
           `/applications/${params.uuid}/envs/${params.env_uuid}`,
-          body
+          body,
+          params.instance
         );
         return {
           content: [{ type: "text", text: JSON.stringify(env, null, 2) }],
@@ -178,6 +188,7 @@ export function registerEnvVarTools(server: McpServer): void {
       inputSchema: {
         uuid: z.string().min(1).describe("Application UUID"),
         env_uuid: z.string().min(1).describe("Environment variable UUID"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -186,9 +197,9 @@ export function registerEnvVarTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid, env_uuid }: { uuid: string; env_uuid: string }) => {
+    async ({ uuid, env_uuid, instance }: { uuid: string; env_uuid: string; instance: CoolifyInstance }) => {
       try {
-        await coolifyDelete(`/applications/${uuid}/envs/${env_uuid}`);
+        await coolifyDelete(`/applications/${uuid}/envs/${env_uuid}`, instance);
         return {
           content: [
             {
@@ -228,6 +239,7 @@ export function registerEnvVarTools(server: McpServer): void {
           )
           .min(1)
           .describe("Array of env vars to create"),
+        instance: CoolifyInstanceSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -239,6 +251,7 @@ export function registerEnvVarTools(server: McpServer): void {
     async ({
       uuid,
       variables,
+      instance,
     }: {
       uuid: string;
       variables: Array<{
@@ -247,6 +260,7 @@ export function registerEnvVarTools(server: McpServer): void {
         is_build_time: boolean;
         is_preview: boolean;
       }>;
+      instance: CoolifyInstance;
     }) => {
       try {
         const results: Array<{ key: string; status: string; error?: string }> = [];
@@ -258,7 +272,7 @@ export function registerEnvVarTools(server: McpServer): void {
               value: v.value,
               is_build_time: v.is_build_time,
               is_preview: v.is_preview,
-            });
+            }, instance);
             results.push({ key: v.key, status: "created" });
           } catch (err) {
             results.push({

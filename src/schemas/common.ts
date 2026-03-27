@@ -5,6 +5,13 @@
 import { z } from "zod";
 import { ResponseFormat } from "../constants.js";
 
+export const CoolifyInstanceSchema = z
+  .enum(["prod", "dev"])
+  .default("prod")
+  .describe(
+    "Coolify instance to target: 'prod' (Hetzner VPS) or 'dev' (local OrbStack VM). Defaults to prod."
+  );
+
 export const ResponseFormatSchema = z
   .nativeEnum(ResponseFormat)
   .default(ResponseFormat.JSON)
