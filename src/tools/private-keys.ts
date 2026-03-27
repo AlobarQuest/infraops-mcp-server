@@ -7,7 +7,8 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { utils } from "ssh2";
+import ssh2 from "ssh2";
+const { utils } = ssh2;
 import {
   coolifyGet,
   coolifyPost,

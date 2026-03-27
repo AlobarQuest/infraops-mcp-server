@@ -5,7 +5,8 @@
  * Keys are used for Git deploy key authentication and server access.
  */
 import { z } from "zod";
-import { utils } from "ssh2";
+import ssh2 from "ssh2";
+const { utils } = ssh2;
 import { coolifyGet, coolifyPost, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
 export function registerPrivateKeyTools(server) {
