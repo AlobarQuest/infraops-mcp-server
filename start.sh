@@ -53,10 +53,10 @@ print('')
 }
 
 # ── Coolify (required) ──────────────────────────────────────────────
-export COOLIFY_API_TOKEN=$(fetch_bws_secret "${BWS_COOLIFY_SECRET_ID:-}")
+export COOLIFY_API_TOKEN=$(fetch_bws_secret "${BWS_COOLIFY_PROD_SECRET_ID:-${BWS_COOLIFY_SECRET_ID:-}}")
 
 if [ -z "$COOLIFY_API_TOKEN" ]; then
-  echo "ERROR: Failed to fetch Coolify API token from BWS (secret ID: ${BWS_COOLIFY_SECRET_ID:-not set})" >&2
+  echo "ERROR: Failed to fetch Coolify API token from BWS (secret ID: ${BWS_COOLIFY_PROD_SECRET_ID:-${BWS_COOLIFY_SECRET_ID:-not set}})" >&2
   exit 1
 fi
 
