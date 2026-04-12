@@ -136,8 +136,10 @@ export async function sshWriteFile(
   path: string,
   content: string
 ): Promise<void> {
-  // Use heredoc to handle special characters
-  const escapedContent = content.replace(/'/g, "'\\''");
+  // Single-quoted heredoc delimiter disables shell expansion, so content
+  // is passed through verbatim — no escaping of $, `, ", ' is needed.
+  // Known edge case tracked in BACKLOG.md: content containing a line that
+  // is literally "INFRAOPS_EOF" will terminate the heredoc early.
   const result = await sshExec(
     `cat > ${escapeShell(path)} << 'INFRAOPS_EOF'\n${content}\nINFRAOPS_EOF`
   );
