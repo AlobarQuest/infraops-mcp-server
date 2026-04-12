@@ -158,3 +158,99 @@ asymmetric but targeted.
       "Argument list too long" shell error.
 - [ ] `tests/vps-dispatch.test.ts` gains coverage for the delimiter
       collision case via mocked backends.
+
+---
+
+## 2. Fix compose env var tools
+
+**Filed:** 2026-04-12 (originally identified 2026-03-27 in `INFRAOPS_IMPROVEMENTS.md` Tier 1 Tool 3)
+**Severity:** High — forces manual UI/DB workarounds for every compose app env var change, breaking the "infraops is the only way to change Coolify" rule in `CLAUDE.md`
+**Component:** `src/tools/env-vars.ts` — tools `coolify_create_app_env`, `coolify_bulk_create_app_envs`, `coolify_update_app_env`
+
+### Problem
+
+Both `coolify_create_app_env` and `coolify_bulk_create_app_envs` return the
+generic error `"Validation failed"` when targeting Docker Compose build pack
+apps. The underlying Coolify API endpoints (`POST`/`PATCH`
+`/applications/{uuid}/envs`) reject compose apps at the validation layer —
+confirmed reproducible across Coolify v4.0.0-beta.463 (prod) and
+v4.0.0-beta.470 (dev) as of 2026-04-12.
+
+Every other env var tool works correctly for non-compose apps. This is a
+compose-specific failure at the API layer, not a tool-level bug.
+
+### Current workaround
+
+Manual Eloquent updates via `php artisan tinker` inside the Coolify
+container (handles Laravel's app-layer encryption transparently). Raw SQL
+inserts into the `environment_variables` table fail because the `value`
+column is encrypted at the application layer, not the database layer.
+
+### Options
+
+#### A. Wait for Coolify to fix it upstream
+- **Pros:** zero work on our side, clean solution.
+- **Cons:** unknown timeline; the bug has been reproducible for at least
+  3 weeks and no upstream issue filed yet. Blocks real work in the
+  meantime. File an upstream issue first either way.
+
+#### B. Discover a compose-specific API endpoint
+- **Pros:** if one exists, it's the right answer — use Coolify's intended
+  interface.
+- **Cons:** the API docs don't mention one; a code spelunk through
+  `routes/api.php` in the Coolify repo may reveal an undocumented route.
+  Worth ~30 minutes of investigation before committing to option C.
+
+#### C. Implement via `vps_exec` + `php artisan tinker` Eloquent (preferred fallback)
+- **Pros:** known-good pattern — it's exactly what we do manually today.
+  Handles encryption correctly. Zero dependency on Coolify API changes.
+- **Cons:** tightly couples the tool to Coolify's internal data model
+  (`EnvironmentVariable` Eloquent class, `environment_variables` table
+  schema). Needs re-verification on every Coolify upgrade. Runs shell
+  inside the Coolify container, which means `vps_exec` into the right
+  instance + `docker exec` into the Coolify container + `php artisan tinker`
+  with a heredoc or inline expression. Feels fragile but actually works.
+- **Implementation sketch:**
+  ```ts
+  // Per-instance: vps_exec({instance}, "sudo docker exec coolify php artisan tinker --execute=\"...\"")
+  // The tinker expression uses App\Models\EnvironmentVariable::create([...])
+  // which runs the encryption cast automatically.
+  ```
+
+#### D. Hybrid: probe for the compose endpoint at runtime, fall back to tinker
+- **Pros:** upgrade-friendly — if Coolify ever fixes the validation at the
+  API, the tool transparently starts using the canonical path.
+- **Cons:** more code to maintain, more test surface.
+
+### Recommendation
+
+**Do B first (spelunk for an endpoint, ~30 min), then C if B turns up
+nothing.** File the Coolify upstream issue (option A background work)
+regardless of which implementation path wins, so the workaround can be
+removed later.
+
+### Non-goals
+
+- Changing behavior for non-compose apps (they work fine today).
+- Adding a new `coolify_set_compose_env_*` tool family — the existing
+  `coolify_create_app_env` / `coolify_bulk_create_app_envs` should
+  transparently handle both app types.
+
+### Acceptance criteria
+
+- [ ] `coolify_create_app_env({uuid: <compose-app>, key: "FOO", value: "bar", instance})`
+      succeeds on both prod and dev Coolify instances.
+- [ ] `coolify_bulk_create_app_envs` accepts an array of vars for a
+      compose app in one call.
+- [ ] `coolify_list_app_envs` returns the newly-created vars correctly
+      (round-trip verifies the encryption cast was applied).
+- [ ] Works for `is_build_time`, `is_preview`, and the standard string
+      value path — not just basic string creation.
+- [ ] Documented in `CLAUDE.md` "Coolify / Infrastructure" section with
+      any known limitations of the implementation path chosen.
+
+### References
+
+- `INFRAOPS_IMPROVEMENTS.md` item #2 (original 2026-03-27 filing)
+- `infra-brain` lessons #113, #118
+- Auto-memory `infraops_brain_knowledge.md` lesson #2

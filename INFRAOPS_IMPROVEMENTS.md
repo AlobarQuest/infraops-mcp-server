@@ -2,6 +2,21 @@
 
 Date: 2026-03-27
 
+---
+
+**Status (as of 2026-04-12): mostly shipped.**
+
+- ✅ Tier 1 Tool 1 (`coolify_create_application_deploykey`) — landed in commit `ea14d47` (v3.2.0, 2026-03-27)
+- ⏳ Tier 1 Tool 2 (`coolify_set_compose_config`) — also landed in `ea14d47`
+- ❌ Tier 1 Tool 3 (fix compose env vars) — **still open**, now tracked in `BACKLOG.md` item #2
+- ✅ Tier 2 Tools 4–7 (GitHub provider: `github_create_repo`, `github_add_deploy_key`, `github_list_deploy_keys`, `github_remove_deploy_key`) — all landed in `ea14d47`
+- ✅ Tier 3 Tool 8 (extend `coolify_update_application` with compose-specific fields) — landed in `ea14d47`
+- ✅ Tier 3 Tool 9 (`coolify_reset_labels`) — landed in `ea14d47`
+
+8 of 9 items are in `main`. Only "fix compose env vars" remains as real work. This file is retained as historical context for the design decisions behind v3.2.0.
+
+---
+
 ## Context
 
 During the app-brain migration (Supabase → self-hosted Coolify), multiple infraops gaps forced manual workarounds via direct Coolify DB access, `php artisan tinker`, and `gh` CLI. These same gaps were previously documented in infra-brain lessons #111, #112, #113, #118 during the open-brain and real-estate-engine deployments. This document consolidates all known gaps into an actionable improvement plan.
