@@ -1,22 +1,35 @@
 /**
- * VPS operations tools — SSH-based commands on the Hetzner VPS.
+ * VPS operations tools — shell, health, file, and Docker operations on a chosen VPS.
  *
- * These use the ssh2 library to connect directly, bypassing local ssh config.
- * Provides shell access, health monitoring, file operations, and Docker inspection.
+ * Every tool accepts an `instance` parameter:
+ *   - "prod" (default) → Hetzner VPS via SSH (existing path, unchanged).
+ *   - "dev"            → OrbStack `ubuntu` machine via `orb run` (no user SSH setup required).
+ *
+ * Callers already use `coolify_*({instance: "dev"})` to query the dev Coolify; these tools
+ * must mirror that routing so follow-up VPS introspection lands on the same host. Leaving
+ * instance unspecified preserves existing prod behavior for every pre-existing caller.
  */
 import { z } from "zod";
-import { sshExec, sshReadFile, sshWriteFile, handleSSHError, } from "../services/ssh-client.js";
+import { vpsExec, vpsReadFile, vpsWriteFile, dockerCmdPrefix, handleVpsError, } from "../services/vps-dispatch.js";
+const instanceSchema = z
+    .enum(["prod", "dev"])
+    .default("prod")
+    .describe("Which VPS to target: 'prod' (Hetzner at 178.156.247.239 via SSH) or 'dev' " +
+    "(local OrbStack machine via `orb run`). Defaults to 'prod'. Must match the Coolify " +
+    "instance when debugging Coolify-managed containers — mismatched routing silently hits the wrong host.");
 export function registerVPSTools(server) {
     // ── Execute Command ──────────────────────────────────────────────
     server.registerTool("vps_exec", {
         title: "Execute VPS Command",
-        description: "Run a shell command on the VPS via SSH. Returns stdout, stderr, and exit code. " +
+        description: "Run a shell command on the selected VPS and return stdout, stderr, and exit code. " +
+            "Targets Hetzner prod by default; pass instance='dev' to run inside the OrbStack ubuntu machine. " +
             "Use for any ad-hoc operation: checking processes, installing packages, inspecting logs, etc.",
         inputSchema: {
+            instance: instanceSchema,
             command: z
                 .string()
                 .min(1)
-                .describe("Shell command to execute on the VPS"),
+                .describe("Shell command to execute on the selected VPS"),
             timeout: z
                 .number()
                 .int()
@@ -31,10 +44,14 @@ export function registerVPSTools(server) {
             idempotentHint: false,
             openWorldHint: true,
         },
-    }, async ({ command, timeout }) => {
+    }, async ({ instance, command, timeout, }) => {
         try {
-            const result = await sshExec(command, { timeout, allowFailure: true });
+            const result = await vpsExec(instance, command, {
+                timeout,
+                allowFailure: true,
+            });
             const output = [
+                `Instance: ${instance}`,
                 `Exit code: ${result.exitCode}`,
                 result.stdout ? `\n--- stdout ---\n${result.stdout}` : "",
                 result.stderr ? `\n--- stderr ---\n${result.stderr}` : "",
@@ -46,24 +63,28 @@ export function registerVPSTools(server) {
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleSSHError(error) }],
+                content: [{ type: "text", text: handleVpsError(instance, error) }],
             };
         }
     });
     // ── VPS Health ───────────────────────────────────────────────────
     server.registerTool("vps_health", {
         title: "VPS Health Check",
-        description: "Get a comprehensive health snapshot of the VPS: uptime, CPU load, memory usage, " +
-            "disk usage, running Docker containers count, and top processes by CPU.",
-        inputSchema: {},
+        description: "Get a comprehensive health snapshot of the selected VPS: uptime, CPU load, memory usage, " +
+            "disk usage, running Docker containers count, and top processes by CPU. " +
+            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
+        inputSchema: {
+            instance: instanceSchema,
+        },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async () => {
+    }, async ({ instance }) => {
         try {
+            const docker = dockerCmdPrefix(instance);
             const healthCommand = [
                 "echo '=== UPTIME ==='",
                 "uptime",
@@ -78,12 +99,12 @@ export function registerVPSTools(server) {
                 "cat /proc/loadavg",
                 "echo ''",
                 "echo '=== DOCKER CONTAINERS ==='",
-                "docker ps --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}' 2>/dev/null || echo 'Docker not available'",
+                `${docker} ps --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}' 2>/dev/null || echo 'Docker not available'`,
                 "echo ''",
                 "echo '=== TOP PROCESSES (CPU) ==='",
                 "ps aux --sort=-%cpu | head -10",
             ].join(" && ");
-            const result = await sshExec(healthCommand, { timeout: 15000 });
+            const result = await vpsExec(instance, healthCommand, { timeout: 15000 });
             return {
                 content: [{ type: "text", text: result.stdout }],
             };
@@ -91,15 +112,17 @@ export function registerVPSTools(server) {
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleSSHError(error) }],
+                content: [{ type: "text", text: handleVpsError(instance, error) }],
             };
         }
     });
     // ── Read File ────────────────────────────────────────────────────
     server.registerTool("vps_read_file", {
         title: "Read VPS File",
-        description: "Read the contents of a file on the VPS.",
+        description: "Read the contents of a file on the selected VPS. " +
+            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
         inputSchema: {
+            instance: instanceSchema,
             path: z.string().min(1).describe("Absolute path to the file on the VPS"),
         },
         annotations: {
@@ -108,9 +131,9 @@ export function registerVPSTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ path }) => {
+    }, async ({ instance, path }) => {
         try {
-            const content = await sshReadFile(path);
+            const content = await vpsReadFile(instance, path);
             return {
                 content: [{ type: "text", text: content }],
             };
@@ -118,15 +141,17 @@ export function registerVPSTools(server) {
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleSSHError(error) }],
+                content: [{ type: "text", text: handleVpsError(instance, error) }],
             };
         }
     });
     // ── Write File ───────────────────────────────────────────────────
     server.registerTool("vps_write_file", {
         title: "Write VPS File",
-        description: "Write content to a file on the VPS. Creates the file if it doesn't exist, overwrites if it does.",
+        description: "Write content to a file on the selected VPS. Creates the file if it doesn't exist, overwrites if it does. " +
+            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
         inputSchema: {
+            instance: instanceSchema,
             path: z.string().min(1).describe("Absolute path for the file on the VPS"),
             content: z.string().describe("Content to write"),
         },
@@ -136,25 +161,28 @@ export function registerVPSTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ path, content }) => {
+    }, async ({ instance, path, content, }) => {
         try {
-            await sshWriteFile(path, content);
+            await vpsWriteFile(instance, path, content);
             return {
-                content: [{ type: "text", text: `File written: ${path}` }],
+                content: [{ type: "text", text: `File written to ${instance}: ${path}` }],
             };
         }
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleSSHError(error) }],
+                content: [{ type: "text", text: handleVpsError(instance, error) }],
             };
         }
     });
     // ── Docker PS ────────────────────────────────────────────────────
     server.registerTool("vps_docker_ps", {
         title: "List Docker Containers",
-        description: "List running Docker containers on the VPS. Shows name, image, status, ports, and resource usage.",
+        description: "List running Docker containers on the selected VPS. Shows name, image, status, ports, and size. " +
+            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine " +
+            "(docker is invoked via sudo on dev).",
         inputSchema: {
+            instance: instanceSchema,
             all: z
                 .boolean()
                 .default(false)
@@ -166,10 +194,11 @@ export function registerVPSTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ all }) => {
+    }, async ({ instance, all }) => {
         try {
+            const docker = dockerCmdPrefix(instance);
             const flag = all ? " -a" : "";
-            const result = await sshExec(`docker ps${flag} --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}\\t{{.Size}}'`, { timeout: 15000 });
+            const result = await vpsExec(instance, `${docker} ps${flag} --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}\\t{{.Ports}}\\t{{.Size}}'`, { timeout: 15000 });
             return {
                 content: [{ type: "text", text: result.stdout }],
             };
@@ -177,19 +206,18 @@ export function registerVPSTools(server) {
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleSSHError(error) }],
+                content: [{ type: "text", text: handleVpsError(instance, error) }],
             };
         }
     });
     // ── Docker Logs ──────────────────────────────────────────────────
     server.registerTool("vps_docker_logs", {
         title: "Get Docker Container Logs",
-        description: "Retrieve logs from a Docker container on the VPS. Useful for debugging app issues directly.",
+        description: "Retrieve logs from a Docker container on the selected VPS. " +
+            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
         inputSchema: {
-            container: z
-                .string()
-                .min(1)
-                .describe("Container name or ID"),
+            instance: instanceSchema,
+            container: z.string().min(1).describe("Container name or ID"),
             lines: z
                 .number()
                 .int()
@@ -208,39 +236,52 @@ export function registerVPSTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ container, lines, since, }) => {
+    }, async ({ instance, container, lines, since, }) => {
         try {
-            let cmd = `docker logs --tail ${lines}`;
+            const docker = dockerCmdPrefix(instance);
+            let cmd = `${docker} logs --tail ${lines}`;
             if (since)
                 cmd += ` --since ${since}`;
             cmd += ` ${container} 2>&1`;
-            const result = await sshExec(cmd, { timeout: 15000, allowFailure: true });
+            const result = await vpsExec(instance, cmd, {
+                timeout: 15000,
+                allowFailure: true,
+            });
             return {
-                content: [{ type: "text", text: result.stdout || result.stderr || "(no output)" }],
+                content: [
+                    {
+                        type: "text",
+                        text: result.stdout || result.stderr || "(no output)",
+                    },
+                ],
             };
         }
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleSSHError(error) }],
+                content: [{ type: "text", text: handleVpsError(instance, error) }],
             };
         }
     });
     // ── Docker Stats ─────────────────────────────────────────────────
     server.registerTool("vps_docker_stats", {
         title: "Docker Container Resource Usage",
-        description: "Get current CPU, memory, network, and disk I/O usage for all running containers. " +
-            "One-shot snapshot (not streaming).",
-        inputSchema: {},
+        description: "Get current CPU, memory, network, and disk I/O usage for all running containers on the selected VPS. " +
+            "One-shot snapshot (not streaming). Targets Hetzner prod by default; pass instance='dev' for " +
+            "the OrbStack ubuntu machine.",
+        inputSchema: {
+            instance: instanceSchema,
+        },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async () => {
+    }, async ({ instance }) => {
         try {
-            const result = await sshExec("docker stats --no-stream --format 'table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\\t{{.NetIO}}\\t{{.BlockIO}}'", { timeout: 15000 });
+            const docker = dockerCmdPrefix(instance);
+            const result = await vpsExec(instance, `${docker} stats --no-stream --format 'table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\\t{{.NetIO}}\\t{{.BlockIO}}'`, { timeout: 15000 });
             return {
                 content: [{ type: "text", text: result.stdout }],
             };
@@ -248,7 +289,7 @@ export function registerVPSTools(server) {
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleSSHError(error) }],
+                content: [{ type: "text", text: handleVpsError(instance, error) }],
             };
         }
     });
