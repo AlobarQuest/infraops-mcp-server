@@ -17,8 +17,9 @@
 #   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
 #
 # Namecheap credentials are fetched from BWS by name (no env vars needed):
-#   Sandbox: BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID, BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID
-#   Production: BWS_NAMECHEAP_PROD_API_USER_SECRET_ID, BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID
+#   Sandbox: NAMECHEAP_SANDBOX_API_USER, NAMECHEAP_SANDBOX_API_KEY
+#   Production: NAMECHEAP_API_USER, NAMECHEAP_API_KEY
+#   Proxy token: NAMECHEAP_PROXY_BEARER_TOKEN
 
 set -euo pipefail
 
@@ -80,6 +81,12 @@ if [ -n "${BWS_HETZNER_SECRET_ID:-}" ]; then
   fi
 fi
 
+# ── GitHub API (optional) ──────────────────────────────────────────
+export GITHUB_TOKEN=$(fetch_bws_secret_by_name "github-pat")
+if [ -n "$GITHUB_TOKEN" ]; then
+  echo "GitHub API token loaded from BWS" >&2
+fi
+
 # ── SSH Key Passphrase (optional) ───────────────────────────────────
 if [ -n "${BWS_SSH_PASSPHRASE_SECRET_ID:-}" ]; then
   export VPS_SSH_PASSPHRASE=$(fetch_bws_secret "$BWS_SSH_PASSPHRASE_SECRET_ID")
@@ -96,12 +103,12 @@ export NAMECHEAP_USE_SANDBOX="${NAMECHEAP_USE_SANDBOX:-true}"
 
 # Pick the right BWS secret names based on environment
 if [ "${NAMECHEAP_USE_SANDBOX}" = "true" ]; then
-  NC_USER_BWS_NAME="BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID"
-  NC_KEY_BWS_NAME="BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID"
+  NC_USER_BWS_NAME="NAMECHEAP_SANDBOX_API_USER"
+  NC_KEY_BWS_NAME="NAMECHEAP_SANDBOX_API_KEY"
   NC_ENV_LABEL="sandbox"
 else
-  NC_USER_BWS_NAME="BWS_NAMECHEAP_PROD_API_USER_SECRET_ID"
-  NC_KEY_BWS_NAME="BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID"
+  NC_USER_BWS_NAME="NAMECHEAP_API_USER"
+  NC_KEY_BWS_NAME="NAMECHEAP_API_KEY"
   NC_ENV_LABEL="production"
 fi
 
