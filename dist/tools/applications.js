@@ -2,7 +2,9 @@
  * Application management tools for Coolify.
  *
  * Covers the full CRUD lifecycle plus logs retrieval.
- * Supports creation from: Docker Image, Dockerfile, Public Git, GitHub App.
+ * Supports all 6 Coolify deployment types:
+ *   Git-based:    Public Repository, Private Repository (GitHub App), Private Repository (Deploy Key)
+ *   Docker-based: Dockerfile, Docker Compose (Empty), Docker Image
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
@@ -58,10 +60,11 @@ export function registerApplicationTools(server) {
             };
         }
     });
-    // ── Create Application (Public Git) ──────────────────────────────
+    // ── Git: Public Repository ───────────────────────────────────────
     server.registerTool("coolify_create_application_public", {
-        title: "Create Application from Public Git Repo",
-        description: "Create a new application from a public Git repository. Suitable for open-source repos or public forks. " +
+        title: "Create Application — Public Repository",
+        description: "Create an application from a public Git repository. " +
+            "You can deploy any kind of public repo from supported Git providers. " +
             "For Devon's Flavor A apps (Coolify source build).",
         inputSchema: {
             project_uuid: z.string().min(1).describe("UUID of the target project"),
@@ -137,10 +140,10 @@ export function registerApplicationTools(server) {
             };
         }
     });
-    // ── Create Application (Docker Image) ────────────────────────────
+    // ── Docker: Docker Image ─────────────────────────────────────────
     server.registerTool("coolify_create_application_dockerimage", {
-        title: "Create Application from Docker Image",
-        description: "Create an application from a pre-built Docker image (e.g. from GHCR). " +
+        title: "Create Application — Docker Image",
+        description: "Create an application from any Docker registry without Git. " +
             "This is the standard pattern for Devon's Flavor B/C apps: GitHub Actions builds → pushes to ghcr.io/alobarquest/<app> → Coolify pulls.",
         inputSchema: {
             project_uuid: z.string().min(1).describe("UUID of the target project"),
@@ -208,11 +211,11 @@ export function registerApplicationTools(server) {
             };
         }
     });
-    // ── Create Application (Dockerfile) ──────────────────────────────
+    // ── Docker: Dockerfile ───────────────────────────────────────────
     server.registerTool("coolify_create_application_dockerfile", {
-        title: "Create Application from Inline Dockerfile",
-        description: "Create an application using an inline Dockerfile (no Git repo required). " +
-            "Useful for quick containerised deployments or testing.",
+        title: "Create Application — Dockerfile",
+        description: "Create an application from a Dockerfile without Git. " +
+            "You can deploy a simple Dockerfile by providing its content directly.",
         inputSchema: {
             project_uuid: z.string().min(1).describe("UUID of the target project"),
             environment_name: z
@@ -265,12 +268,13 @@ export function registerApplicationTools(server) {
             };
         }
     });
-    // ── Create Application (Private Repo via Deploy Key) ─────────────
+    // ── Git: Private Repository (Deploy Key) ─────────────────────────
     server.registerTool("coolify_create_application_deploykey", {
-        title: "Create Application from Private Repo (Deploy Key)",
-        description: "Create an application from a private Git repository using an SSH deploy key. " +
-            "Requires a private key already stored in Coolify (via coolify_create_private_key). " +
-            "The key's public counterpart must be added to GitHub (via github_add_deploy_key) before deploying.",
+        title: "Create Application — Private Repository (Deploy Key)",
+        description: "Create an application from a private Git repository with a deploy key. " +
+            "You can deploy private repos with a deploy key. " +
+            "Requires a private key already stored in Coolify (via coolify_create_private_key) " +
+            "and the public key added to GitHub (via github_add_deploy_key).",
         inputSchema: {
             project_uuid: z.string().min(1).describe("UUID of the target project"),
             environment_name: z
@@ -339,6 +343,156 @@ export function registerApplicationTools(server) {
             if (params.domains)
                 body.domains = params.domains;
             const app = await coolifyPost("/applications/private-deploy-key", body, params.instance);
+            return {
+                content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
+            };
+        }
+        catch (error) {
+            return {
+                isError: true,
+                content: [{ type: "text", text: handleCoolifyError(error) }],
+            };
+        }
+    });
+    // ── Git: Private Repository (GitHub App) ──────────────────────────
+    server.registerTool("coolify_create_application_githubapp", {
+        title: "Create Application — Private Repository (GitHub App)",
+        description: "Create an application from a private Git repository using a GitHub App. " +
+            "You can deploy public and private repos through your GitHub Apps. " +
+            "Requires a GitHub App already configured in Coolify.",
+        inputSchema: {
+            project_uuid: z.string().min(1).describe("UUID of the target project"),
+            environment_name: z
+                .string()
+                .default("production")
+                .describe("Environment name (default: production)"),
+            server_uuid: z
+                .string()
+                .min(1)
+                .describe("UUID of the destination server"),
+            destination_uuid: z
+                .string()
+                .min(1)
+                .describe("UUID of the Docker network/destination on the server"),
+            github_app_uuid: z
+                .string()
+                .min(1)
+                .describe("UUID of the GitHub App configured in Coolify"),
+            git_repository: z
+                .string()
+                .min(1)
+                .describe("Git repo URL (e.g. 'https://github.com/user/repo')"),
+            git_branch: z
+                .string()
+                .default("main")
+                .describe("Git branch to deploy (default: main)"),
+            build_pack: z
+                .enum(["nixpacks", "static", "dockerfile", "dockercompose"])
+                .default("nixpacks")
+                .describe("Build strategy"),
+            name: z.string().optional().describe("Application display name"),
+            description: z.string().optional().describe("Application description"),
+            ports_exposes: z
+                .string()
+                .default("8000")
+                .describe("Comma-separated ports to expose (default: 8000)"),
+            domains: z
+                .string()
+                .optional()
+                .describe("FQDN for single-container apps (not for dockercompose — use coolify_set_compose_config instead)"),
+            instance: CoolifyInstanceSchema,
+        },
+        annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true,
+        },
+    }, async (params) => {
+        try {
+            const body = {
+                project_uuid: params.project_uuid,
+                environment_name: params.environment_name,
+                server_uuid: params.server_uuid,
+                destination_uuid: params.destination_uuid,
+                github_app_uuid: params.github_app_uuid,
+                git_repository: params.git_repository,
+                git_branch: params.git_branch,
+                build_pack: params.build_pack,
+                ports_exposes: params.ports_exposes,
+            };
+            if (params.name)
+                body.name = params.name;
+            if (params.description)
+                body.description = params.description;
+            if (params.domains)
+                body.domains = params.domains;
+            const app = await coolifyPost("/applications/private-github-app", body, params.instance);
+            return {
+                content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
+            };
+        }
+        catch (error) {
+            return {
+                isError: true,
+                content: [{ type: "text", text: handleCoolifyError(error) }],
+            };
+        }
+    });
+    // ── Docker: Docker Compose (Empty) ────────────────────────────────
+    server.registerTool("coolify_create_application_dockercompose", {
+        title: "Create Application — Docker Compose (Empty)",
+        description: "Create a Docker Compose application without Git. " +
+            "You can deploy complex applications easily with Docker Compose by providing the raw compose file content directly. " +
+            "Note: Coolify marks this endpoint as deprecated in favor of /services, but it remains available in the UI.",
+        inputSchema: {
+            project_uuid: z.string().min(1).describe("UUID of the target project"),
+            environment_name: z
+                .string()
+                .default("production")
+                .describe("Environment name (default: production)"),
+            server_uuid: z
+                .string()
+                .min(1)
+                .describe("UUID of the destination server"),
+            destination_uuid: z
+                .string()
+                .optional()
+                .describe("UUID of the Docker network/destination on the server"),
+            docker_compose_raw: z
+                .string()
+                .min(1)
+                .describe("Full docker-compose.yml content as a string"),
+            name: z.string().optional().describe("Application display name"),
+            description: z.string().optional().describe("Application description"),
+            instant_deploy: z
+                .boolean()
+                .default(false)
+                .describe("Deploy immediately after creation (default: false)"),
+            instance: CoolifyInstanceSchema,
+        },
+        annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true,
+        },
+    }, async (params) => {
+        try {
+            const body = {
+                project_uuid: params.project_uuid,
+                environment_name: params.environment_name,
+                server_uuid: params.server_uuid,
+                docker_compose_raw: params.docker_compose_raw,
+                instant_deploy: params.instant_deploy,
+            };
+            if (params.destination_uuid)
+                body.destination_uuid = params.destination_uuid;
+            if (params.name)
+                body.name = params.name;
+            if (params.description)
+                body.description = params.description;
+            const app = await coolifyPost("/applications/dockercompose", body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
             };
