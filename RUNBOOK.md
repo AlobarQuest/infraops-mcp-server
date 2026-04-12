@@ -1,6 +1,6 @@
 # InfraOps MCP Server — Runbook
 
-Version 3.2.0 | TypeScript | stdio transport | Node.js 18+
+Version 3.3.0 | TypeScript | stdio transport | Node.js 18+
 
 ---
 
@@ -70,7 +70,7 @@ Startup messages are written to stderr (not stdout — stdout is reserved for th
 ```
 VPS SSH tools registered (host: 178.156.247.239)
 GITHUB_TOKEN not set — GitHub tools disabled
-InfraOps MCP server v3.2.0 running via stdio
+InfraOps MCP server v3.3.0 running via stdio
   Coolify prod: https://coolify-1.devonwatkins.com/api/v1
 ```
 
@@ -82,12 +82,14 @@ Note: running `node dist/index.js` directly without `start.sh` will fail for Coo
 
 ### Scripts
 
-| Command         | What it does                                              |
-|-----------------|-----------------------------------------------------------|
-| `npm run dev`   | Runs `tsx watch src/index.ts` — restarts on file changes  |
-| `npm run build` | Runs `tsc` — compiles to `dist/`                          |
-| `npm run start` | Runs `node dist/index.js` — requires a prior build        |
-| `npm run clean` | Removes `dist/`                                           |
+| Command              | What it does                                              |
+|----------------------|-----------------------------------------------------------|
+| `npm run dev`        | Runs `tsx watch src/index.ts` — restarts on file changes  |
+| `npm run build`      | Runs `tsc` — compiles to `dist/`                          |
+| `npm run start`      | Runs `node dist/index.js` — requires a prior build        |
+| `npm test`           | Runs `vitest run` — one-shot unit test suite              |
+| `npm run test:watch` | Runs `vitest` in watch mode for TDD                       |
+| `npm run clean`      | Removes `dist/`                                           |
 
 ### Dev workflow
 
@@ -127,7 +129,9 @@ Steps:
 3. `npm ci` — clean install
 4. `npm run build` — TypeScript compilation
 
-The build step (`tsc`) is the type-check gate. If any type error exists, the build fails and the push is rejected. There are no tests yet.
+The build step (`tsc`) is the type-check gate. If any type error exists, the build fails and the push is rejected.
+
+Unit tests live under `tests/` and run via `npm test` (vitest). Current coverage focuses on `src/services/vps-dispatch.ts` — the prod/dev routing logic that landed in v3.3.0 — with both `ssh-client` and `orb-client` mocked so the tests are hermetic. The CI workflow does **not** run `npm test` today; tests are expected to pass locally before pushing. Adding `npm test` to CI is a trivial follow-up when the suite grows beyond the current 15 tests.
 
 This pipeline does not deploy anything — the server runs locally and is never hosted remotely.
 
@@ -141,7 +145,7 @@ This pipeline does not deploy anything — the server runs locally and is never 
 
 Coolify and VPS are exceptions:
 - Coolify tools are always registered. If no instances are configured, a warning is logged but the server still starts.
-- VPS tools are always registered with no configuration check. Connection details default at call time.
+- VPS tools are always registered with no configuration check. Connection details default at call time. Like the Coolify tools, every `vps_*` tool accepts an `instance` parameter (`"prod"` or `"dev"`) and routes to a different backend per instance (see below).
 
 ### Environment variables by provider
 
@@ -163,14 +167,25 @@ COOLIFY_DEV_API_TOKEN
 
 All Coolify tools accept an `instance` parameter (`"prod"` or `"dev"`, defaults to `"prod"`). The dev instance is intended for a local OrbStack VM.
 
-**VPS SSH (no required env vars)**
+**VPS (multi-instance, no required env vars)**
+
+Every `vps_*` tool (`vps_exec`, `vps_health`, `vps_read_file`, `vps_write_file`, `vps_docker_ps`, `vps_docker_logs`, `vps_docker_stats`) accepts an `instance` parameter (`"prod"` or `"dev"`, defaults to `"prod"`). The two instances use different backends:
+
+- **`instance: "prod"`** — SSH into the Hetzner VPS via the `ssh2` library (existing path, unchanged).
+- **`instance: "dev"`** — Runs commands inside an OrbStack Linux machine via `orb run -m <machine> bash -c <cmd>`. Requires no SSH setup — the `orb` CLI is assumed to be installed and managing the dev machine. The docker-specific VPS tools automatically prefix `sudo docker` on dev because the default OrbStack user is not in the `docker` group.
 
 ```
+# Prod (SSH to Hetzner)
 VPS_HOST                    Default: 178.156.247.239
 VPS_USER                    Default: root
 VPS_SSH_KEY_PATH            Default: ~/.ssh/hetzner_ed25519
 VPS_SSH_PASSPHRASE          SSH key passphrase, if the key is encrypted (optional)
+
+# Dev (orb run against OrbStack machine)
+VPS_DEV_ORB_MACHINE         Default: "ubuntu" — OrbStack machine name for the dev VPS
 ```
+
+**Important:** when debugging Coolify-managed containers, the `instance` parameter on `vps_*` tools must match the `instance` you passed to `coolify_*` tools. Mismatched routing silently lands on the wrong host. This was the class of bug that introduced multi-instance VPS routing in v3.3.0 — see `issue-with-dev-coolify-04-12-2026.md` for the original filing.
 
 **GitHub**
 
