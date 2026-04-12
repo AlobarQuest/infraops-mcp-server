@@ -1,6 +1,6 @@
 # InfraOps MCP Server
 
-Multi-provider MCP server for infrastructure operations (v3.2.0). TypeScript, Node.js 18+, stdio transport.
+Multi-provider MCP server for infrastructure operations (v3.3.0). TypeScript, Node.js 18+, stdio transport.
 
 ## Quick Reference
 

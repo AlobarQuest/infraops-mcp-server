@@ -1,6 +1,6 @@
 {
   "name": "infraops-mcp-server",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "MCP server for infrastructure operations — Coolify, Hetzner, VPS, Namecheap, Cloudflare, Supabase, and GitHub",
   "type": "module",
   "main": "dist/index.js",

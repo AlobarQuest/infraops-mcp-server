@@ -27,7 +27,7 @@
  *   NAMECHEAP_PROXY_TOKEN       - Bearer token for namecheap-proxy (from BWS via start.sh)
  *   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
  *   CLOUDFLARE_API_TOKEN        - Cloudflare API token (optional, from BWS via start.sh)
- *   CLOUDFLARE_ACCOUNT_ID       - Cloudflare account ID (optional, from BWS via start.sh)
+ *   CLOUDFLARE_ACCOUNT_ID       - Cloudflare account ID (plain env var in .mcp.json, not a secret)
  *   SUPABASE_ACCESS_TOKEN       - Supabase management API token (optional, from BWS via start.sh)
  */
 export {};

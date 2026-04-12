@@ -27,7 +27,7 @@
  *   NAMECHEAP_PROXY_TOKEN       - Bearer token for namecheap-proxy (from BWS via start.sh)
  *   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
  *   CLOUDFLARE_API_TOKEN        - Cloudflare API token (optional, from BWS via start.sh)
- *   CLOUDFLARE_ACCOUNT_ID       - Cloudflare account ID (optional, from BWS via start.sh)
+ *   CLOUDFLARE_ACCOUNT_ID       - Cloudflare account ID (plain env var in .mcp.json, not a secret)
  *   SUPABASE_ACCESS_TOKEN       - Supabase management API token (optional, from BWS via start.sh)
  */
 
@@ -85,7 +85,7 @@ import { isSupabaseConfigured } from "./services/supabase-client.js";
 
 const server = new McpServer({
   name: "infraops-mcp-server",
-  version: "3.2.0",
+  version: "3.3.0",
 });
 
 // ── Register Coolify tools ───────────────────────────────────────────
@@ -169,7 +169,7 @@ if (isSupabaseConfigured()) {
 async function runStdio(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("InfraOps MCP server v3.2.0 running via stdio");
+  console.error("InfraOps MCP server v3.3.0 running via stdio");
   console.error(
     `  Coolify prod: ${isCoolifyInstanceConfigured("prod") ? getCoolifyInstanceUrl("prod") : "not configured"}`
   );
