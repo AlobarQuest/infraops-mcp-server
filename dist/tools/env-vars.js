@@ -14,6 +14,10 @@ export function registerEnvVarTools(server) {
         description: "List all environment variables for an application. Values of secrets may be masked by Coolify.",
         inputSchema: {
             uuid: z.string().min(1).describe("Application UUID"),
+            reveal: z
+                .boolean()
+                .default(false)
+                .describe("Return plaintext values (default: false — values are masked as ***)"),
             instance: CoolifyInstanceSchema,
         },
         annotations: {
@@ -22,11 +26,14 @@ export function registerEnvVarTools(server) {
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ uuid, instance }) => {
+    }, async ({ uuid, reveal, instance }) => {
         try {
             const envs = await coolifyGet(`/applications/${uuid}/envs`, undefined, instance);
+            const output = reveal
+                ? envs
+                : envs.map((e) => ({ ...e, value: "***" }));
             return {
-                content: [{ type: "text", text: JSON.stringify(envs, null, 2) }],
+                content: [{ type: "text", text: JSON.stringify(output, null, 2) }],
             };
         }
         catch (error) {
@@ -45,10 +52,14 @@ export function registerEnvVarTools(server) {
             uuid: z.string().min(1).describe("Application UUID"),
             key: z.string().min(1).describe("Variable name (e.g. DATABASE_URL)"),
             value: z.string().describe("Variable value"),
-            is_build_time: z
+            is_buildtime: z
                 .boolean()
                 .default(false)
-                .describe("Available during build phase (default: false)"),
+                .describe("Available during build phase (default: false). Use false for runtime-only vars like secrets."),
+            is_runtime: z
+                .boolean()
+                .default(true)
+                .describe("Available at runtime (default: true)"),
             is_preview: z
                 .boolean()
                 .default(false)
@@ -66,7 +77,8 @@ export function registerEnvVarTools(server) {
             const env = await coolifyPost(`/applications/${params.uuid}/envs`, {
                 key: params.key,
                 value: params.value,
-                is_build_time: params.is_build_time,
+                is_buildtime: params.is_buildtime,
+                is_runtime: params.is_runtime,
                 is_preview: params.is_preview,
             }, params.instance);
             return {
@@ -81,15 +93,18 @@ export function registerEnvVarTools(server) {
         }
     });
     // ── Update Env Var (Application) ─────────────────────────────────
+    // Coolify's update endpoint is PATCH /applications/{uuid}/envs with key+value
+    // in the body — it updates by key name, not by env_uuid in the path.
     server.registerTool("coolify_update_app_env", {
         title: "Update Application Environment Variable",
-        description: "Update an existing environment variable on an application. Supply only the fields to change.",
+        description: "Update an existing environment variable on an application. " +
+            "Coolify matches the var by key name — key and value are both required.",
         inputSchema: {
             uuid: z.string().min(1).describe("Application UUID"),
-            env_uuid: z.string().min(1).describe("Environment variable UUID"),
-            key: z.string().optional().describe("New variable name"),
-            value: z.string().optional().describe("New variable value"),
-            is_build_time: z.boolean().optional().describe("Build-time availability"),
+            key: z.string().min(1).describe("Variable name to update"),
+            value: z.string().describe("New variable value"),
+            is_buildtime: z.boolean().optional().describe("Build-time availability"),
+            is_runtime: z.boolean().optional().describe("Runtime availability"),
             is_preview: z.boolean().optional().describe("Preview-only flag"),
             instance: CoolifyInstanceSchema,
         },
@@ -101,16 +116,17 @@ export function registerEnvVarTools(server) {
         },
     }, async (params) => {
         try {
-            const body = {};
-            if (params.key !== undefined)
-                body.key = params.key;
-            if (params.value !== undefined)
-                body.value = params.value;
-            if (params.is_build_time !== undefined)
-                body.is_build_time = params.is_build_time;
+            const body = {
+                key: params.key,
+                value: params.value,
+            };
+            if (params.is_buildtime !== undefined)
+                body.is_buildtime = params.is_buildtime;
+            if (params.is_runtime !== undefined)
+                body.is_runtime = params.is_runtime;
             if (params.is_preview !== undefined)
                 body.is_preview = params.is_preview;
-            const env = await coolifyPatch(`/applications/${params.uuid}/envs/${params.env_uuid}`, body, params.instance);
+            const env = await coolifyPatch(`/applications/${params.uuid}/envs`, body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(env, null, 2) }],
             };
@@ -156,53 +172,40 @@ export function registerEnvVarTools(server) {
             };
         }
     });
-    // ── Bulk Create Env Vars ─────────────────────────────────────────
+    // ── Bulk Update Env Vars ─────────────────────────────────────────
+    // Uses PATCH /applications/{uuid}/envs/bulk — creates or updates all vars
+    // in a single API call. Coolify upserts: existing keys are updated, new keys
+    // are created.
     server.registerTool("coolify_bulk_create_app_envs", {
-        title: "Bulk Create Application Environment Variables",
-        description: "Create multiple environment variables at once. Useful when setting up a new application " +
-            "with all its required env vars from BWS.",
+        title: "Bulk Create/Update Application Environment Variables",
+        description: "Create or update multiple environment variables at once via a single API call. " +
+            "Coolify upserts: existing keys are updated, new keys are created. " +
+            "Useful when setting up a new application with all its required env vars from BWS.",
         inputSchema: {
             uuid: z.string().min(1).describe("Application UUID"),
             variables: z
                 .array(z.object({
                 key: z.string().min(1).describe("Variable name"),
                 value: z.string().describe("Variable value"),
-                is_build_time: z.boolean().default(false).describe("Build-time flag"),
+                is_buildtime: z.boolean().default(false).describe("Build-time flag"),
+                is_runtime: z.boolean().default(true).describe("Runtime flag"),
                 is_preview: z.boolean().default(false).describe("Preview-only flag"),
             }))
                 .min(1)
-                .describe("Array of env vars to create"),
+                .describe("Array of env vars to create or update"),
             instance: CoolifyInstanceSchema,
         },
         annotations: {
             readOnlyHint: false,
             destructiveHint: false,
-            idempotentHint: false,
+            idempotentHint: true,
             openWorldHint: true,
         },
     }, async ({ uuid, variables, instance, }) => {
         try {
-            const results = [];
-            for (const v of variables) {
-                try {
-                    await coolifyPost(`/applications/${uuid}/envs`, {
-                        key: v.key,
-                        value: v.value,
-                        is_build_time: v.is_build_time,
-                        is_preview: v.is_preview,
-                    }, instance);
-                    results.push({ key: v.key, status: "created" });
-                }
-                catch (err) {
-                    results.push({
-                        key: v.key,
-                        status: "failed",
-                        error: handleCoolifyError(err),
-                    });
-                }
-            }
+            const result = await coolifyPatch(`/applications/${uuid}/envs/bulk`, { data: variables }, instance);
             return {
-                content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+                content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
             };
         }
         catch (error) {

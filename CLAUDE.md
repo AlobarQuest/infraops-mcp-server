@@ -30,7 +30,8 @@ src/
 └── tools/                # Tool registration modules (registerXxxTools functions)
     ├── projects.ts, applications.ts, private-keys.ts,
     │   deployments.ts, env-vars.ts, databases.ts,
-    │   servers.ts, services.ts, control.ts              # Coolify (50 tools)
+    │   servers.ts, services.ts, control.ts,
+│   diagnostics.ts, storages.ts, scheduled-tasks.ts  # Coolify (62 tools)
     ├── github.ts                                         # GitHub (4 tools)
     ├── hetzner-servers.ts, hetzner-networking.ts          # Hetzner (26 tools)
     ├── vps.ts                                             # VPS SSH (7 tools)
@@ -42,7 +43,7 @@ src/
         supabase-functions.ts, supabase-config.ts          # Supabase (28 tools)
 ```
 
-**178 tools total** across 7 providers.
+**190 tools total** across 7 providers.
 
 ## Providers
 

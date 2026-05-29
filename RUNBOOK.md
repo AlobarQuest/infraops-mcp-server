@@ -22,11 +22,11 @@ Version 3.3.0 | TypeScript | stdio transport | Node.js 18+
 
 InfraOps MCP Server is a local-only Model Context Protocol server that exposes infrastructure operations as tools to Claude Code. It communicates over stdio — there is no HTTP server, no Docker container, and no Coolify deployment. The process is started by Claude Code as a subprocess.
 
-**178 tools across 7 providers:**
+**190 tools across 7 providers:**
 
 | Provider   | Prefix         | Always On | Tools |
 |------------|----------------|-----------|-------|
-| Coolify    | `coolify_`     | Yes       | 50    |
+| Coolify    | `coolify_`     | Yes       | 62    |
 | VPS SSH    | `vps_`         | Yes       | 7     |
 | Hetzner    | `hetzner_`     | No        | 26    |
 | Namecheap  | `namecheap_`   | No        | 19    |
@@ -541,3 +541,23 @@ Also verify `dist/index.js` exists. If it does not, run `npm run build` first.
 **Cause:** A tool call passed `instance: "dev"` but `COOLIFY_DEV_BASE_URL` is not set.
 
 **Fix:** Either set `COOLIFY_DEV_BASE_URL` and `BWS_COOLIFY_DEV_SECRET_ID` in `.claude.json`, or omit the `instance` parameter to use the prod default.
+
+---
+
+## Known Non-obvious Invariants
+
+### Coolify env var field names
+
+The Coolify API uses `is_buildtime` (no underscore) and `is_runtime` as the field names for env var flags. The old infraops implementation incorrectly sent `is_build_time`, which caused all env var writes (create, update, bulk) to silently fail or return 422 validation errors.
+
+Additionally, the update endpoint is `PATCH /applications/{uuid}/envs` with `key` + `value` in the request body — Coolify matches the var by key name. There is no `PATCH /applications/{uuid}/envs/{env_uuid}` endpoint. The delete endpoint does use the UUID in the path: `DELETE /applications/{uuid}/envs/{env_uuid}`.
+
+Always include both `is_buildtime: false` and `is_runtime: true` for standard runtime-only secrets (the most common case). Omitting `is_runtime` can result in the var not being injected into the running container.
+
+### Env var values are masked by default
+
+`coolify_list_app_envs` returns `***` for all values unless `reveal: true` is passed. This prevents accidental secret leakage in diagnostic or exploratory tool calls.
+
+### Diagnostic tools resolve by name or UUID
+
+`coolify_diagnose_app` and `coolify_diagnose_server` accept a UUID, name substring, or FQDN/IP — they do a list-then-filter resolution if the query doesn't look like a UUID. If multiple resources match the query string, the tool returns an error listing the ambiguous matches rather than guessing.
