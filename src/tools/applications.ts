@@ -9,6 +9,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import axios from "axios";
 import {
   coolifyGet,
   coolifyPost,
@@ -960,18 +961,14 @@ export function registerApplicationTools(server: McpServer): void {
         };
       } catch (error) {
         // 400 = app is stopped/not running — informational, not a hard error
-        if (
-          error instanceof Error &&
-          "response" in error &&
-          (error as any).response?.status === 400
-        ) {
-          const msg =
-            (error as any).response?.data?.message ?? "Application is not running.";
+        if (axios.isAxiosError(error) && error.response?.status === 400) {
+          const msg = error.response?.data?.message as string | undefined;
+          const suffix = msg && msg !== "Application is not running." ? ` ${msg}` : "";
           return {
             content: [
               {
                 type: "text",
-                text: `Application ${uuid} is not running — no logs available. ${msg}`,
+                text: `Application ${uuid} is not running — no logs available.${suffix}`,
               },
             ],
           };
