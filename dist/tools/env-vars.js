@@ -150,7 +150,7 @@ export function registerEnvVarTools(server) {
         annotations: {
             readOnlyHint: false,
             destructiveHint: true,
-            idempotentHint: false,
+            idempotentHint: true,
             openWorldHint: true,
         },
     }, async ({ uuid, env_uuid, instance }) => {
@@ -357,7 +357,7 @@ export function registerEnvVarTools(server) {
         annotations: {
             readOnlyHint: false,
             destructiveHint: true,
-            idempotentHint: false,
+            idempotentHint: true,
             openWorldHint: true,
         },
     }, async ({ uuid, env_uuid, instance }) => {

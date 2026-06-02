@@ -147,14 +147,12 @@ export function registerServiceTools(server) {
             const uuid = params.uuid;
             const instance = params.instance;
             const body = {};
-            for (const field of [
-                "name",
-                "description",
-                "docker_compose_raw",
-                "domains",
-            ]) {
+            for (const field of ["name", "description", "domains"]) {
                 if (params[field] !== undefined)
                     body[field] = params[field];
+            }
+            if (params["docker_compose_raw"] !== undefined) {
+                body.docker_compose_raw = Buffer.from(params["docker_compose_raw"], "utf8").toString("base64");
             }
             const svc = await coolifyPatch(`/services/${uuid}`, body, instance);
             return {

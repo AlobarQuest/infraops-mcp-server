@@ -7,6 +7,7 @@
  *   Docker-based: Dockerfile, Docker Compose (Empty), Docker Image
  */
 import { z } from "zod";
+import axios from "axios";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
 export function registerApplicationTools(server) {
@@ -714,7 +715,9 @@ export function registerApplicationTools(server) {
     // ── Application Logs ─────────────────────────────────────────────
     server.registerTool("coolify_application_logs", {
         title: "Get Application Logs",
-        description: "Retrieve recent logs for an application. Useful for debugging deployment failures or runtime errors.",
+        description: "Retrieve recent logs for an application by its UUID. " +
+            "Returns an informational message (not an error) if the application is stopped. " +
+            "Requires: uuid (application UUID, not service UUID — use vps_docker_logs for compose services).",
         inputSchema: {
             uuid: UuidSchema,
             lines: z
@@ -745,6 +748,19 @@ export function registerApplicationTools(server) {
             };
         }
         catch (error) {
+            // 400 = app is stopped/not running — informational, not a hard error
+            if (axios.isAxiosError(error) && error.response?.status === 400) {
+                const msg = error.response?.data?.message;
+                const suffix = msg && msg !== "Application is not running." ? ` ${msg}` : "";
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: `Application ${uuid} is not running — no logs available.${suffix}`,
+                        },
+                    ],
+                };
+            }
             return {
                 isError: true,
                 content: [{ type: "text", text: handleCoolifyError(error) }],

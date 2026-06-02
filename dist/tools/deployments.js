@@ -81,10 +81,14 @@ export function registerDeploymentTools(server) {
         },
     }, async ({ uuid, instance }) => {
         try {
-            const deployments = await coolifyGet(`/applications/${uuid}/deployments`, undefined, instance);
+            const envelope = await coolifyGet(`/deployments/applications/${uuid}`, undefined, instance);
+            const deployments = Array.isArray(envelope?.deployments) ? envelope.deployments : [];
             return {
                 content: [
-                    { type: "text", text: JSON.stringify(deployments, null, 2) },
+                    {
+                        type: "text",
+                        text: JSON.stringify({ count: envelope?.count ?? deployments.length, deployments }, null, 2),
+                    },
                 ],
             };
         }
