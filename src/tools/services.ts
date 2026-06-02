@@ -193,13 +193,14 @@ export function registerServiceTools(server: McpServer): void {
         const uuid = params.uuid as string;
         const instance = params.instance as CoolifyInstance;
         const body: Record<string, unknown> = {};
-        for (const field of [
-          "name",
-          "description",
-          "docker_compose_raw",
-          "domains",
-        ]) {
+        for (const field of ["name", "description", "domains"]) {
           if (params[field] !== undefined) body[field] = params[field];
+        }
+        if (params["docker_compose_raw"] !== undefined) {
+          body.docker_compose_raw = Buffer.from(
+            params["docker_compose_raw"] as string,
+            "utf8"
+          ).toString("base64");
         }
         const svc = await coolifyPatch<CoolifyService>(
           `/services/${uuid}`,
