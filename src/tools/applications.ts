@@ -921,7 +921,9 @@ export function registerApplicationTools(server: McpServer): void {
     {
       title: "Get Application Logs",
       description:
-        "Retrieve recent logs for an application. Useful for debugging deployment failures or runtime errors.",
+        "Retrieve recent logs for an application by its UUID. " +
+        "Returns an informational message (not an error) if the application is stopped. " +
+        "Requires: uuid (application UUID, not service UUID — use vps_docker_logs for compose services).",
       inputSchema: {
         uuid: UuidSchema,
         lines: z
@@ -957,6 +959,23 @@ export function registerApplicationTools(server: McpServer): void {
           ],
         };
       } catch (error) {
+        // 400 = app is stopped/not running — informational, not a hard error
+        if (
+          error instanceof Error &&
+          "response" in error &&
+          (error as any).response?.status === 400
+        ) {
+          const msg =
+            (error as any).response?.data?.message ?? "Application is not running.";
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Application ${uuid} is not running — no logs available. ${msg}`,
+              },
+            ],
+          };
+        }
         return {
           isError: true,
           content: [{ type: "text", text: handleCoolifyError(error) }],
