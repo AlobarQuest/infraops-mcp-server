@@ -87,4 +87,19 @@ describe("service env var tools", () => {
       "prod"
     );
   });
+
+  it("coolify_delete_service_env calls DELETE /services/{uuid}/envs/{env_uuid}", async () => {
+    vi.mocked(client.coolifyDelete).mockResolvedValueOnce(undefined);
+    const result = await mockServer._handlers["coolify_delete_service_env"]({
+      uuid: "svc-uuid-1",
+      env_uuid: "env-uuid-1",
+      instance: "prod",
+    });
+    expect(client.coolifyDelete).toHaveBeenCalledWith(
+      "/services/svc-uuid-1/envs/env-uuid-1",
+      "prod"
+    );
+    expect(result.isError).toBeUndefined();
+    expect(result.content[0].text).toContain("env-uuid-1");
+  });
 });

@@ -209,7 +209,7 @@ export function registerEnvVarTools(server: McpServer): void {
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
-        idempotentHint: false,
+        idempotentHint: true,
         openWorldHint: true,
       },
     },
@@ -492,7 +492,7 @@ export function registerEnvVarTools(server: McpServer): void {
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
-        idempotentHint: false,
+        idempotentHint: true,
         openWorldHint: true,
       },
     },
