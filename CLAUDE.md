@@ -7,7 +7,7 @@ Multi-provider MCP server for infrastructure operations (v3.3.0). TypeScript, No
 - **Build:** `npm run build` (tsc → dist/)
 - **Dev:** `npm run dev` (tsx watch)
 - **Entry:** `src/index.ts` → `dist/index.js`
-- **No tests yet**
+- **Tests:** `npx vitest run` (test files in `tests/`)
 
 ## Architecture
 
@@ -31,7 +31,7 @@ src/
     ├── projects.ts, applications.ts, private-keys.ts,
     │   deployments.ts, env-vars.ts, databases.ts,
     │   servers.ts, services.ts, control.ts,
-│   diagnostics.ts, storages.ts, scheduled-tasks.ts  # Coolify (62 tools)
+│   diagnostics.ts, storages.ts, scheduled-tasks.ts  # Coolify (67 tools)
     ├── github.ts                                         # GitHub (4 tools)
     ├── hetzner-servers.ts, hetzner-networking.ts          # Hetzner (26 tools)
     ├── vps.ts                                             # VPS SSH (7 tools)
@@ -43,7 +43,7 @@ src/
         supabase-functions.ts, supabase-config.ts          # Supabase (28 tools)
 ```
 
-**190 tools total** across 7 providers.
+**195 tools total** across 7 providers.
 
 ## Providers
 
@@ -108,6 +108,21 @@ For `dockercompose` build pack apps:
 2. Create `src/tools/<provider>-<feature>.ts` with `registerXxx(server)` export
 3. Import and conditionally register in `src/index.ts`
 4. Prefix all tool names with `<provider>_` to avoid collisions
+
+## Known Non-obvious Invariants
+
+**Service vs. Application env var endpoints are different**
+Coolify has two distinct resource types with separate env var APIs:
+- *Application* (single-container, Flavor A/B): `/applications/{uuid}/envs` — use `coolify_*_app_env` tools
+- *Service* (docker-compose multi-container, Flavor C): `/services/{uuid}/envs` — use `coolify_*_service_env` tools
+
+Calling `coolify_create_app_env` with a service UUID fails with a validation error. Always check which resource type a UUID belongs to before writing env vars.
+
+**`coolify_update_service` requires base64-encoded `docker_compose_raw`**
+The PATCH `/services/{uuid}` endpoint rejects raw YAML. Encode with `Buffer.from(yaml, "utf8").toString("base64")` before sending. The GET endpoints return raw YAML; only writes require base64.
+
+**`coolify_list_deployments` uses a non-obvious endpoint path**
+The deployment history endpoint is `/deployments/applications/{app_uuid}` (not `/applications/{uuid}/deployments`). Response is `{ count, deployments: [] }`, not a raw array.
 
 ## Secrets
 
