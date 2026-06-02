@@ -114,14 +114,22 @@ export function registerDeploymentTools(server: McpServer): void {
     },
     async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
-        const deployments = await coolifyGet<CoolifyDeployment[]>(
-          `/applications/${uuid}/deployments`,
+        const envelope = await coolifyGet<{ count: number; deployments: CoolifyDeployment[] }>(
+          `/deployments/applications/${uuid}`,
           undefined,
           instance
         );
+        const deployments = Array.isArray(envelope?.deployments) ? envelope.deployments : [];
         return {
           content: [
-            { type: "text", text: JSON.stringify(deployments, null, 2) },
+            {
+              type: "text",
+              text: JSON.stringify(
+                { count: envelope?.count ?? deployments.length, deployments },
+                null,
+                2
+              ),
+            },
           ],
         };
       } catch (error) {
