@@ -152,4 +152,16 @@ if [ -n "${BWS_SUPABASE_SECRET_ID:-}" ]; then
   fi
 fi
 
+# ── infra-brain (optional — degrades to cache/seed if absent) ────
+# Fetch the audit access key from BWS by name (like github-pat / namecheap) so it
+# works off BWS_ACCESS_TOKEN alone — no per-secret UUID env var to propagate, which
+# avoids silent "seed" degradation when the MCP config env block omits the ID.
+export INFRABRAIN_BASE_URL="${INFRABRAIN_BASE_URL:-https://infra-brain.devonwatkins.com}"
+export INFRABRAIN_ACCESS_KEY=$(fetch_bws_secret_by_name "INFRABRAIN_ACCESS_KEY")
+if [ -n "$INFRABRAIN_ACCESS_KEY" ]; then
+  echo "infra-brain access key loaded from BWS" >&2
+else
+  echo "WARN: infra-brain access key not found in BWS — audit tool will degrade to cache/seed" >&2
+fi
+
 exec node "$SCRIPT_DIR/dist/index.js"
