@@ -1,9 +1,6 @@
 import { z } from "zod";
-import { coolifyGet } from "../services/coolify-client.js";
 import { CoolifyInstanceSchema } from "../schemas/common.js";
-import { loadCoolifyChecks } from "../standards/standards-source.js";
-import { evaluateCheck } from "../standards/check-engine.js";
-import { resolveRemediation } from "../standards/remediation-registry.js";
+import { auditInstance } from "../standards/run-audit.js";
 export function registerAuditTools(server) {
     server.registerTool("coolify_audit_standards", {
         title: "Audit Coolify Resources Against Standards",
@@ -23,67 +20,7 @@ export function registerAuditTools(server) {
             openWorldHint: true,
         },
     }, async ({ scope, instance }) => {
-        const { checks, source } = await loadCoolifyChecks();
-        const [appsRes, dbsRes] = await Promise.allSettled([
-            coolifyGet("/applications", undefined, instance),
-            coolifyGet("/databases", undefined, instance),
-        ]);
-        const errors = [];
-        function extract(result, label) {
-            if (result.status === "fulfilled")
-                return result.value;
-            errors.push(`${label}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
-            return null;
-        }
-        let apps = extract(appsRes, "applications");
-        let dbs = extract(dbsRes, "databases");
-        // Apply scope filter
-        if (scope) {
-            const s = scope.toLowerCase();
-            const matchesScope = (r) => String(r.uuid ?? "").toLowerCase() === s ||
-                String(r.name ?? "").toLowerCase().includes(s);
-            if (apps)
-                apps = apps.filter(matchesScope);
-            if (dbs)
-                dbs = dbs.filter(matchesScope);
-        }
-        const appChecks = checks.filter((c) => c.resource === "coolify_application");
-        const dbChecks = checks.filter((c) => c.resource === "coolify_database");
-        const proposals = [];
-        for (const app of apps ?? []) {
-            for (const c of appChecks) {
-                const p = evaluateCheck(c, app, resolveRemediation);
-                if (p)
-                    proposals.push(p);
-            }
-        }
-        for (const db of dbs ?? []) {
-            for (const c of dbChecks) {
-                const p = evaluateCheck(c, db, resolveRemediation);
-                if (p)
-                    proposals.push(p);
-            }
-        }
-        const byRisk = { safe: 0, caution: 0, destructive: 0 };
-        const byKind = { remediation: 0, question: 0 };
-        for (const p of proposals) {
-            byRisk[p.risk]++;
-            byKind[p.kind]++;
-        }
-        const output = {
-            meta: {
-                standards_source: source,
-                checks_evaluated: checks.length,
-                not_audited: 0,
-                ...(errors.length > 0 && { errors }),
-            },
-            summary: {
-                total_proposals: proposals.length,
-                by_risk: byRisk,
-                by_kind: byKind,
-            },
-            proposals,
-        };
+        const output = await auditInstance(instance, { scope });
         return { content: [{ type: "text", text: JSON.stringify(output, null, 2) }] };
     });
 }

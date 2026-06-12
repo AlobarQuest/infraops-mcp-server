@@ -4,12 +4,16 @@
   "description": "MCP server for infrastructure operations — Coolify, Hetzner, VPS, Namecheap, Cloudflare, Supabase, and GitHub",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "infraops-audit": "dist/cli/audit-cli.js"
+  },
   "scripts": {
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
+    "audit": "node dist/cli/audit-cli.js",
     "clean": "rm -rf dist"
   },
   "engines": {
