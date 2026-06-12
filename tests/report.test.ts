@@ -4,6 +4,7 @@ import {
   diffProposals,
   buildDriftReport,
   renderMarkdown,
+  wasCleanlyAudited,
   type InstanceSection,
   type DriftReport,
 } from "../src/standards/report.js";
@@ -131,6 +132,28 @@ describe("buildDriftReport", () => {
     const auditFn = async () => auditResult([], "live", ["databases: boom"]);
     const report = await buildDriftReport(["prod"], auditFn as any, null, "2026-06-13T07:00:00Z");
     expect(report.instances.prod.errors).toEqual(["databases: boom"]);
+  });
+});
+
+describe("wasCleanlyAudited", () => {
+  it("is true when an instance is ok with no read errors", async () => {
+    const report = await buildDriftReport(["prod"], (async () => auditResult([])) as any, null, "t");
+    expect(wasCleanlyAudited(report)).toBe(true);
+  });
+
+  it("is false when every instance errored out (e.g. missing tokens)", async () => {
+    const auditFn = async () => auditResult([], "cache", ["applications: TOKEN required", "databases: TOKEN required"]);
+    const report = await buildDriftReport(["prod", "dev"], auditFn as any, null, "t");
+    expect(wasCleanlyAudited(report)).toBe(false);
+  });
+
+  it("is true when one instance is clean even if another is unreachable", async () => {
+    const auditFn = async (inst: string) => {
+      if (inst === "dev") throw new Error("offline");
+      return auditResult([]);
+    };
+    const report = await buildDriftReport(["prod", "dev"], auditFn as any, null, "t");
+    expect(wasCleanlyAudited(report)).toBe(true);
   });
 });
 

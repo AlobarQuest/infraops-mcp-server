@@ -2,7 +2,7 @@
 import fs from "fs";
 import path from "path";
 import { auditInstance } from "../standards/run-audit.js";
-import { buildDriftReport, renderMarkdown } from "../standards/report.js";
+import { buildDriftReport, renderMarkdown, wasCleanlyAudited } from "../standards/report.js";
 /**
  * Headless drift audit. Runs `coolify_audit_standards` for one or more instances,
  * writes a structured JSON report + day-over-day delta + a human markdown summary,
@@ -69,8 +69,10 @@ async function main() {
     if (toStdout) {
         process.stdout.write(JSON.stringify(report, null, 2) + "\n");
     }
-    const allFailed = report.totals.instances_ok === 0 && report.totals.instances_failed > 0;
-    process.exit(allFailed ? 1 : 0);
+    // Exit non-zero unless at least one instance was audited cleanly. This trips the
+    // heartbeat on a wholly broken run — e.g. missing tokens make every read error
+    // out, which must NOT look like a healthy "0 deviations".
+    process.exit(wasCleanlyAudited(report) ? 0 : 1);
 }
 main().catch((e) => {
     console.error(e instanceof Error ? e.message : String(e));
