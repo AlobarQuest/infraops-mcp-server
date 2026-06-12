@@ -8,6 +8,9 @@ Multi-provider MCP server for infrastructure operations (v3.3.0). TypeScript, No
 - **Dev:** `npm run dev` (tsx watch)
 - **Entry:** `src/index.ts` → `dist/index.js`
 - **Tests:** `npx vitest run` (test files in `tests/`)
+- **Test watch:** `npm run test:watch` (vitest watch mode)
+- **Clean:** `npm run clean` (removes `dist/`)
+- **Run:** use `./start.sh` for full env var initialization (fetches secrets from BWS); use `node dist/index.js` only for standalone debugging where providers without env vars stay disabled.
 
 ## Architecture
 
@@ -45,6 +48,8 @@ src/
 
 **195 tools total** across 7 providers.
 
+See [RUNBOOK.md](./RUNBOOK.md) for provider configuration details (env vars, BWS secret IDs, `.claude.json` wiring, troubleshooting).
+
 ## Providers
 
 | Provider | Prefix | Always On | Env Vars Required |
@@ -71,7 +76,7 @@ All Coolify tools accept an `instance` parameter (`"prod"` or `"dev"`, defaults 
 All `vps_*` tools (`vps_exec`, `vps_health`, `vps_read_file`, `vps_write_file`, `vps_docker_ps`, `vps_docker_logs`, `vps_docker_stats`) accept the same `instance` parameter and MUST be kept in sync with the Coolify instance when debugging Coolify-managed containers. Omitting `instance` defaults to `"prod"` so existing callers keep working.
 
 - **Prod** (`instance: "prod"`): SSH into Hetzner at `VPS_HOST` (default `178.156.247.239`) as `VPS_USER` (default `root`), key from `VPS_SSH_KEY_PATH` (default `~/.ssh/hetzner_ed25519`). Unchanged from pre-v3.3.0 behavior.
-- **Dev** (`instance: "dev"`): `orb run -m $VPS_DEV_ORB_MACHINE bash -c <cmd>` against an OrbStack Linux machine (default machine `ubuntu`, routable at `192.168.139.217`). Runs as `devon`, so the docker-specific tools automatically prefix `sudo docker` — callers of `vps_exec` must add `sudo` themselves for raw docker commands.
+- **Dev** (`instance: "dev"`): `orb run -m $VPS_DEV_ORB_MACHINE bash -c <cmd>` against an OrbStack Linux machine. The optional `VPS_DEV_ORB_MACHINE` env var selects the OrbStack machine name and defaults to `"ubuntu"` (see `src/services/orb-client.ts`); the machine is routable at `192.168.139.217`. Runs as `devon`, so the docker-specific tools automatically prefix `sudo docker` — callers of `vps_exec` must add `sudo` themselves for raw docker commands.
 
 **Why this exists:** prior to v3.3.0 the `vps_*` tools silently ignored any instance intent and always hit Hetzner prod, so pairing `coolify_list_applications({instance: "dev"})` with `vps_exec(...)` misrouted and returned phantom "container not found" results. See the routing dispatcher in `src/services/vps-dispatch.ts`.
 

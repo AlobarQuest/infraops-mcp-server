@@ -11,7 +11,7 @@ see the `infra-brain` MCP. For application-level context see `app-brain`.
 
 | Provider      | Prefix         | Tools | Always on | Required env |
 |---------------|----------------|-------|-----------|--------------|
-| Coolify       | `coolify_`     | 50    | ✅        | `COOLIFY_PROD_BASE_URL` + `COOLIFY_PROD_API_TOKEN` |
+| Coolify       | `coolify_`     | 67    | ✅        | `COOLIFY_PROD_BASE_URL` + `COOLIFY_PROD_API_TOKEN` |
 | VPS (SSH/orb) | `vps_`         | 7     | ✅        | — (defaults route to Hetzner prod) |
 | Hetzner Cloud | `hetzner_`     | 26    | ❌        | `HETZNER_API_TOKEN` |
 | Namecheap     | `namecheap_`   | 19    | ❌        | `NAMECHEAP_API_USER` + `NAMECHEAP_API_KEY` + `NAMECHEAP_PROXY_TOKEN` |
@@ -19,7 +19,7 @@ see the `infra-brain` MCP. For application-level context see `app-brain`.
 | Supabase      | `supabase_`    | 28    | ❌        | `SUPABASE_ACCESS_TOKEN` |
 | GitHub        | `github_`      | 4     | ❌        | `GITHUB_TOKEN` |
 
-**178 tools across 7 providers.** Coolify and VPS register unconditionally;
+**195 tools across 7 providers.** Coolify and VPS register unconditionally;
 optional providers register only when their env vars are present at startup.
 
 Coolify and VPS tools both accept an `instance: "prod" | "dev"` parameter

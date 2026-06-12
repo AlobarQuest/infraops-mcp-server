@@ -22,11 +22,11 @@ Version 3.3.0 | TypeScript | stdio transport | Node.js 18+
 
 InfraOps MCP Server is a local-only Model Context Protocol server that exposes infrastructure operations as tools to Claude Code. It communicates over stdio — there is no HTTP server, no Docker container, and no Coolify deployment. The process is started by Claude Code as a subprocess.
 
-**190 tools across 7 providers:**
+**195 tools across 7 providers:**
 
 | Provider   | Prefix         | Always On | Tools |
 |------------|----------------|-----------|-------|
-| Coolify    | `coolify_`     | Yes       | 62    |
+| Coolify    | `coolify_`     | Yes       | 67    |
 | VPS SSH    | `vps_`         | Yes       | 7     |
 | Hetzner    | `hetzner_`     | No        | 26    |
 | Namecheap  | `namecheap_`   | No        | 19    |
