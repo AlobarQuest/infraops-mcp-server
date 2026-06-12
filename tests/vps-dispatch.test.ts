@@ -15,10 +15,6 @@ vi.mock("../src/services/ssh-client.js", () => ({
   handleSSHError: vi.fn((e: unknown) => `ssh error: ${String(e)}`),
 }));
 
-vi.mock("../src/services/orb-client.ts", async () => {
-  return import("../src/services/orb-client.js").then(() => ({}));
-});
-
 vi.mock("../src/services/orb-client.js", () => ({
   orbExec: vi.fn(
     async (
