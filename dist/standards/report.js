@@ -98,6 +98,14 @@ export async function buildDriftReport(instances, auditFn, prevReport, generated
         delta: diffProposals(prevReport?.instances ?? null, sections),
     };
 }
+/**
+ * True when at least one instance was audited cleanly (ok, with no read errors).
+ * Used to gate the heartbeat: a run where every instance errored out (e.g. missing
+ * tokens) must NOT look healthy just because it produced "0 deviations".
+ */
+export function wasCleanlyAudited(report) {
+    return Object.values(report.instances).some((s) => s.ok && !(s.errors && s.errors.length));
+}
 /** Deterministic human-readable summary for the daily email digest. */
 export function renderMarkdown(report) {
     const { totals, delta } = report;

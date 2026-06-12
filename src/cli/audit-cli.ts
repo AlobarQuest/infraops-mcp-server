@@ -2,7 +2,7 @@
 import fs from "fs";
 import path from "path";
 import { auditInstance } from "../standards/run-audit.js";
-import { buildDriftReport, renderMarkdown } from "../standards/report.js";
+import { buildDriftReport, renderMarkdown, wasCleanlyAudited } from "../standards/report.js";
 import type { DriftReport } from "../standards/report.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 
@@ -75,8 +75,10 @@ async function main(): Promise<void> {
     process.stdout.write(JSON.stringify(report, null, 2) + "\n");
   }
 
-  const allFailed = report.totals.instances_ok === 0 && report.totals.instances_failed > 0;
-  process.exit(allFailed ? 1 : 0);
+  // Exit non-zero unless at least one instance was audited cleanly. This trips the
+  // heartbeat on a wholly broken run — e.g. missing tokens make every read error
+  // out, which must NOT look like a healthy "0 deviations".
+  process.exit(wasCleanlyAudited(report) ? 0 : 1);
 }
 
 main().catch((e) => {

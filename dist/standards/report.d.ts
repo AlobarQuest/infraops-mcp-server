@@ -62,6 +62,12 @@ export declare function diffProposals(prevInstances: Record<string, InstanceSect
  * section, never aborting the others.
  */
 export declare function buildDriftReport(instances: CoolifyInstance[], auditFn: AuditFn, prevReport: DriftReport | null, generatedAt: string): Promise<DriftReport>;
+/**
+ * True when at least one instance was audited cleanly (ok, with no read errors).
+ * Used to gate the heartbeat: a run where every instance errored out (e.g. missing
+ * tokens) must NOT look healthy just because it produced "0 deviations".
+ */
+export declare function wasCleanlyAudited(report: DriftReport): boolean;
 /** Deterministic human-readable summary for the daily email digest. */
 export declare function renderMarkdown(report: DriftReport): string;
 //# sourceMappingURL=report.d.ts.map
