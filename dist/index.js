@@ -45,6 +45,7 @@ import { registerServerTools } from "./tools/servers.js";
 import { registerServiceTools } from "./tools/services.js";
 import { registerControlTools } from "./tools/control.js";
 import { registerDiagnosticTools } from "./tools/diagnostics.js";
+import { registerAuditTools } from "./tools/audit.js";
 import { registerStorageTools } from "./tools/storages.js";
 import { registerScheduledTaskTools } from "./tools/scheduled-tasks.js";
 // GitHub tools
@@ -77,7 +78,7 @@ import { isSupabaseConfigured } from "./services/supabase-client.js";
 // ── Create server ────────────────────────────────────────────────────
 const server = new McpServer({
     name: "infraops-mcp-server",
-    version: "3.3.0",
+    version: "3.4.0",
 });
 // ── Register Coolify tools ───────────────────────────────────────────
 // Tools are always registered — instance selection happens at call time via the `instance` parameter.
@@ -96,6 +97,7 @@ registerServerTools(server);
 registerServiceTools(server);
 registerControlTools(server);
 registerDiagnosticTools(server);
+registerAuditTools(server);
 registerStorageTools(server);
 registerScheduledTaskTools(server);
 // ── Register GitHub tools ──────────────────────────────────────────
@@ -155,7 +157,7 @@ else {
 async function runStdio() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("InfraOps MCP server v3.3.0 running via stdio");
+    console.error("InfraOps MCP server v3.4.0 running via stdio");
     console.error(`  Coolify prod: ${isCoolifyInstanceConfigured("prod") ? getCoolifyInstanceUrl("prod") : "not configured"}`);
     console.error(`  Coolify dev:  ${isCoolifyInstanceConfigured("dev") ? getCoolifyInstanceUrl("dev") : "not configured"}`);
     console.error(`  Hetzner: ${isHetznerConfigured() ? "configured" : "not configured"}`);

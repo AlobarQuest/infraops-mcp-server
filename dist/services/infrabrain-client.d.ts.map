@@ -1,0 +1,1 @@
+{"version":3,"file":"infrabrain-client.d.ts","sourceRoot":"","sources":["../../src/services/infrabrain-client.ts"],"names":[],"mappings":"AA8BA,wBAAsB,aAAa,CAAC,CAAC,EACnC,QAAQ,EAAE,MAAM,EAChB,MAAM,CAAC,EAAE,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC,GAC/B,OAAO,CAAC,CAAC,CAAC,CAIZ;AAED,wBAAgB,qBAAqB,CAAC,KAAK,EAAE,OAAO,GAAG,MAAM,CAoC5D;AAED,wBAAgB,sBAAsB,IAAI,OAAO,CAEhD"}
