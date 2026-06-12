@@ -1,0 +1,34 @@
+# Headless drift-audit image: runs the standards audit on a cron and emails a digest.
+# Built/published by CI to ghcr.io/alobarquest/infraops-audit. Run with `--network host`
+# so it reaches prod Coolify (localhost:8000) and dev Coolify (mini tailnet IP) directly.
+FROM node:24-slim
+
+# Runtime tooling: bws (fetch secrets by name), jq (parse), curl (heartbeat + Resend), bash.
+ARG BWS_VERSION=2.0.0
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl unzip jq ca-certificates bash tzdata \
+ && curl -fsSL -o /tmp/bws.zip \
+      "https://github.com/bitwarden/sdk-sm/releases/download/bws-v${BWS_VERSION}/bws-x86_64-unknown-linux-gnu-${BWS_VERSION}.zip" \
+ && unzip -o /tmp/bws.zip -d /usr/local/bin \
+ && chmod +x /usr/local/bin/bws \
+ && rm /tmp/bws.zip \
+ && apt-get purge -y unzip \
+ && apt-get autoremove -y \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install deps (with dev deps for the TS build), compile, then drop dev deps.
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build && npm prune --omit=dev
+
+COPY docker/audit-entrypoint.sh /usr/local/bin/audit-entrypoint.sh
+RUN chmod +x /usr/local/bin/audit-entrypoint.sh
+
+ENV REPORT_DIR=/reports \
+    INSTANCES=prod,dev
+VOLUME ["/reports"]
+ENTRYPOINT ["/usr/local/bin/audit-entrypoint.sh"]
