@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildRemediationReport, type Escalation } from "../src/standards/remediation-report.js";
+import { renderRemediationMarkdown, buildRemediationReport as build2 } from "../src/standards/remediation-report.js";
 import type { ApplyResult } from "../src/standards/executor.js";
 
 const applied: ApplyResult[] = [
@@ -24,5 +25,31 @@ describe("buildRemediationReport", () => {
   it("carries the runaway flag through", () => {
     const r = buildRemediationReport({ generatedAt: "t", sourceReport: "s", applied: [], escalations, selfResolved: 0, runawayTripped: true });
     expect(r.totals.runaway_tripped).toBe(true);
+  });
+});
+
+describe("renderRemediationMarkdown", () => {
+  it("renders a headline, an applied section, and an escalations section with the plan", () => {
+    const r = build2({ generatedAt: "2026-06-13T07:00:00Z", sourceReport: "2026-06-13.json", applied, escalations, selfResolved: 0, runawayTripped: false });
+    const md = renderRemediationMarkdown(r);
+    expect(md).toContain("# Infra Remediation");
+    expect(md).toContain("1 fixed");
+    expect(md).toContain("1 need"); // escalations needing attention
+    expect(md).toContain("app1");   // an applied target
+    expect(md).toContain("pg1");    // an escalated target
+    expect(md).toContain("Plan");   // a plan section marker (e.g. "plan by sonnet")
+  });
+
+  it("renders cleanly on an empty day (nothing drifted)", () => {
+    const r = build2({ generatedAt: "t", sourceReport: "s", applied: [], escalations: [], selfResolved: 0, runawayTripped: false });
+    const md = renderRemediationMarkdown(r);
+    expect(md).toContain("0 fixed");
+    expect(md).toMatch(/no .* attention|nothing/i);
+  });
+
+  it("surfaces a loud banner when the runaway guard tripped", () => {
+    const r = build2({ generatedAt: "t", sourceReport: "s", applied: [], escalations, selfResolved: 0, runawayTripped: true });
+    const md = renderRemediationMarkdown(r);
+    expect(md).toMatch(/runaway|safety guard/i);
   });
 });
