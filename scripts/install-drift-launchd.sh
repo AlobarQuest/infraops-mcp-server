@@ -14,7 +14,7 @@ if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<'EOF'
 # Drift-audit secrets — gitignored, never commit. (chmod 600)
 # BWS_ACCESS_TOKEN: a BWS machine token that can read prod-coolify-api-token,
-#   local-coolify-api, INFRABRAIN_ACCESS_KEY, resend-api-key.
+#   local-coolify-api, INFRABRAIN_ACCESS_KEY, resend-api-key, anthropic-api-key.
 # INFRADRIFT_HC_PING_URL: the Healthchecks.io check ping URL.
 BWS_ACCESS_TOKEN=
 INFRADRIFT_HC_PING_URL=
@@ -30,5 +30,5 @@ sed -e "s#__REPO__#$REPO#g" -e "s#__HOME__#$HOME#g" \
 
 launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
-echo "Installed + loaded com.devon.infra-drift (daily 07:00)."
+echo "Installed + loaded com.devon.infra-drift (daily 03:00)."
 echo "Run once now:  launchctl start com.devon.infra-drift   (or: bash $REPO/scripts/drift-audit.sh)"
