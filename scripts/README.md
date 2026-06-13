@@ -27,10 +27,15 @@ BWS + Healthchecks.io).
 3. Audits **prod** (`coolify-1.devonwatkins.com`) and **dev** (mini-local OrbStack)
    → writes `~/infra-drift/reports/<date>.json` (proposals + day-over-day delta)
    and `<date>.md`.
-4. **Remediate:** `remediate-cli.js` re-audits live, auto-applies all `safe`
+4. **Remediate:** `remediate-cli.js` re-audits live, auto-applies `safe`
    remediations (idempotent re-check before each write; never more than
-   `MAX_AUTO_APPLIES`, default 20). For every `caution`, `destructive`, and
-   `question` item it asks Sonnet (`claude-sonnet-4-6`) to write a remediation plan.
+   `MAX_AUTO_APPLIES`, default 20). A `safe` item can still be **held back** by a
+   pre-apply verify gate: `coolify.enable_healthcheck` only auto-applies when the
+   app is currently `running:healthy` (proof it serves a health endpoint) —
+   otherwise it's escalated with an "Auto-fix held" note so a working app isn't
+   marked unhealthy by a check pointed at a path it doesn't serve. For every
+   `caution`, `destructive`, `question`, and verify-held item it asks Sonnet
+   (`claude-sonnet-4-6`) to write a remediation plan.
    Writes `~/infra-drift/reports/<date>.remediation.json` (machine record + the
    `escalations` change-manager contract) and `<date>.remediation.md`.
 5. Emails the **consolidated** digest (`<date>.remediation.md`) via Resend, falling

@@ -34,5 +34,23 @@ export declare function maxAutoApplies(): number;
 export declare function applyAction(p: Proposal, instance: CoolifyInstance, opts?: {
     dryRun?: boolean;
 }): Promise<ApplyResult>;
+export interface VerifyResult {
+    ok: boolean;
+    reason: string;
+}
+/**
+ * Pre-apply gate for safe remediations that could misfire. Currently only the
+ * health-check enable: a Coolify health check pointed at /api/health is only safe
+ * to auto-enable if the app already passes its Docker healthcheck (live status
+ * running:healthy → it serves a working health endpoint). Otherwise the new check
+ * could mark a working-but-non-conforming app unhealthy, so the proposal is
+ * rerouted to escalation (a Sonnet plan) instead of auto-applied. Remediations
+ * with no gate return ok without a network call.
+ *
+ * Keyed on the remediation_key (the proposal id prefix), not the tool name, so it
+ * gates *only* enable_healthcheck — never some future safe use of the same tool.
+ * Fails closed: an unreadable status escalates rather than applies.
+ */
+export declare function verifySafe(p: Proposal, instance: CoolifyInstance): Promise<VerifyResult>;
 export {};
 //# sourceMappingURL=executor.d.ts.map

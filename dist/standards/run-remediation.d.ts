@@ -11,6 +11,11 @@ export interface RemediationDeps {
         dryRun?: boolean;
     }) => Promise<ApplyResult>;
     plan: (p: Proposal) => Promise<RemediationPlan>;
+    /** Pre-apply gate: returns ok=false (with a reason) to reroute a "safe" proposal to escalation. */
+    verify: (p: Proposal, inst: CoolifyInstance) => Promise<{
+        ok: boolean;
+        reason: string;
+    }>;
     maxAutoApplies: number;
     dryRun: boolean;
 }

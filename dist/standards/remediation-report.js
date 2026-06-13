@@ -49,6 +49,8 @@ export function renderRemediationMarkdown(r) {
         for (const e of r.escalations) {
             lines.push("");
             lines.push(`### ${e.target.resource_type} '${e.target.name}' (${e.risk}) — Plan by ${e.plan.generated_by}`);
+            if (e.note)
+                lines.push(`- **Auto-fix held:** ${e.note}`);
             lines.push(`- **Why:** ${e.reasoning}`);
             lines.push(`- **Root cause:** ${e.plan.root_cause}`);
             lines.push(`- **Steps:**`);

@@ -9,6 +9,8 @@ export interface Escalation {
     kind: string;
     reasoning: string;
     plan: RemediationPlan;
+    /** Why this was escalated rather than auto-applied (e.g. a verify gate held it). Absent for inherently-escalated items. */
+    note?: string;
 }
 export interface RemediationReport {
     schema_version: number;

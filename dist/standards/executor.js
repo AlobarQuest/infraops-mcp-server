@@ -66,4 +66,39 @@ export async function applyAction(p, instance, opts = {}) {
         return { ...base, status: "failed", detail: e instanceof Error ? e.message : String(e) };
     }
 }
+/**
+ * Pre-apply gate for safe remediations that could misfire. Currently only the
+ * health-check enable: a Coolify health check pointed at /api/health is only safe
+ * to auto-enable if the app already passes its Docker healthcheck (live status
+ * running:healthy → it serves a working health endpoint). Otherwise the new check
+ * could mark a working-but-non-conforming app unhealthy, so the proposal is
+ * rerouted to escalation (a Sonnet plan) instead of auto-applied. Remediations
+ * with no gate return ok without a network call.
+ *
+ * Keyed on the remediation_key (the proposal id prefix), not the tool name, so it
+ * gates *only* enable_healthcheck — never some future safe use of the same tool.
+ * Fails closed: an unreadable status escalates rather than applies.
+ */
+export async function verifySafe(p, instance) {
+    const remediationKey = p.id.split(":")[0];
+    if (remediationKey !== "coolify.enable_healthcheck") {
+        return { ok: true, reason: "no health-path gate for this remediation" };
+    }
+    try {
+        const app = await coolifyGet(`/applications/${p.target.uuid}`, undefined, instance);
+        const status = String(app.status ?? "");
+        const health = status.split(":")[1] ?? "";
+        if (health === "healthy") {
+            return { ok: true, reason: "running:healthy (Docker healthcheck passing — serves its health path)" };
+        }
+        return {
+            ok: false,
+            reason: `status '${status || "unknown"}' is not running:healthy — the app may not serve /api/health, ` +
+                `so auto-enabling the check could mark it unhealthy. Confirm the health path/port, then enable manually.`,
+        };
+    }
+    catch (e) {
+        return { ok: false, reason: `could not verify live status: ${e instanceof Error ? e.message : String(e)}` };
+    }
+}
 //# sourceMappingURL=executor.js.map

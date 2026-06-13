@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import Anthropic from "@anthropic-ai/sdk";
 import { auditInstance } from "../standards/run-audit.js";
-import { applyAction, maxAutoApplies } from "../standards/executor.js";
+import { applyAction, maxAutoApplies, verifySafe } from "../standards/executor.js";
 import { planEscalation } from "../standards/remediation-plan.js";
 import { renderRemediationMarkdown } from "../standards/remediation-report.js";
 import { runRemediation } from "../standards/run-remediation.js";
@@ -79,6 +79,7 @@ async function main() {
         audit: (inst) => auditInstance(inst),
         apply: (p, inst, opts) => applyAction(p, inst, opts),
         plan: (p) => planEscalation(p, getAnthropic()),
+        verify: (p, inst) => verifySafe(p, inst),
         maxAutoApplies: maxAutoApplies(),
         dryRun,
     });
