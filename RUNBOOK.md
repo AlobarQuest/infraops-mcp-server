@@ -246,12 +246,16 @@ Because `exec` is used, the shell process disappears and Node inherits all the e
 
 ### BWS secret lookup methods
 
-`start.sh` uses two helper functions:
+`start.sh` uses one helper function:
 
-- `fetch_bws_secret <id>` — fetches a secret by its UUID (BWS secret ID)
-- `fetch_bws_secret_by_name <name>` — fetches a secret by its key name across all secrets in the vault
+- `fetch_bws_secret <id>` — fetches a secret by its stable UUID (BWS secret ID)
 
-Most providers use the ID-based approach. Namecheap uses name-based lookup because the secret names themselves encode the environment (`BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID` vs `BWS_NAMECHEAP_PROD_API_USER_SECRET_ID`).
+**All** providers reference secrets by stable UUID — never by name. The UUID is immutable; a
+secret's name is a mutable human label that gets renamed and silently breaks a by-name lookup. The
+UUID is non-secret (useless without `BWS_ACCESS_TOKEN`), so production UUIDs are defaulted inline
+in `start.sh` and can be overridden via `BWS_*_SECRET_ID` env vars. Namecheap selects the
+sandbox-vs-production UUID with the `NAMECHEAP_USE_SANDBOX` flag (sandbox secrets are not
+provisioned, so their IDs default empty). See infra-brain lesson #277.
 
 ### BWS secret ID mapping
 

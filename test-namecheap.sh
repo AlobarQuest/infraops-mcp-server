@@ -18,38 +18,36 @@ fi
 
 # ── Resolve credentials from BWS ─────────────────────────────────────
 
-fetch_bws_secret_by_name() {
-  local secret_name="$1"
-  bws secret list --output json 2>/dev/null | python3 -c "
-import sys, json
-secrets = json.load(sys.stdin)
-for s in secrets:
-    if s.get('key') == '${secret_name}':
-        print(s['value'])
-        sys.exit(0)
-print('')
-" 2>/dev/null || echo ""
+fetch_bws_secret() {
+  local secret_id="$1"
+  if [ -z "$secret_id" ]; then
+    echo ""
+    return
+  fi
+  bws secret get "$secret_id" --output json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])" 2>/dev/null || echo ""
 }
 
+# Reference secrets by stable UUID (infra-brain lesson #277). Production UUIDs default inline;
+# override via env. Sandbox secrets are not provisioned in BWS, so their IDs default empty.
 if [ "$ENV" = "sandbox" ]; then
   export NAMECHEAP_USE_SANDBOX="true"
-  NC_USER_KEY="BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID"
-  NC_API_KEY="BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID"
+  NC_USER_SECRET_ID="${BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID:-}"
+  NC_KEY_SECRET_ID="${BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID:-}"
 else
   export NAMECHEAP_USE_SANDBOX="false"
-  NC_USER_KEY="BWS_NAMECHEAP_PROD_API_USER_SECRET_ID"
-  NC_API_KEY="BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID"
+  NC_USER_SECRET_ID="${BWS_NAMECHEAP_PROD_API_USER_SECRET_ID:-506f7af7-0844-4f69-b5c2-b4020115a388}"
+  NC_KEY_SECRET_ID="${BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID:-cd0f8751-7938-45cb-947d-b4020115d1e6}"
 fi
 
 echo "Fetching ${ENV} credentials from BWS..."
-export NAMECHEAP_API_USER=$(fetch_bws_secret_by_name "$NC_USER_KEY")
-export NAMECHEAP_API_KEY=$(fetch_bws_secret_by_name "$NC_API_KEY")
+export NAMECHEAP_API_USER=$(fetch_bws_secret "$NC_USER_SECRET_ID")
+export NAMECHEAP_API_KEY=$(fetch_bws_secret "$NC_KEY_SECRET_ID")
 
 if [ -z "$NAMECHEAP_API_USER" ] || [ -z "$NAMECHEAP_API_KEY" ]; then
   echo "ERROR: Could not fetch Namecheap ${ENV} credentials from BWS." >&2
-  echo "Make sure these secrets exist:" >&2
-  echo "  $NC_USER_KEY" >&2
-  echo "  $NC_API_KEY" >&2
+  echo "Set the secret-ID env vars (or, for ${ENV}, ensure the secrets are provisioned):" >&2
+  echo "  BWS_NAMECHEAP_$([ "$ENV" = sandbox ] && echo SANDBOX || echo PROD)_API_USER_SECRET_ID" >&2
+  echo "  BWS_NAMECHEAP_$([ "$ENV" = sandbox ] && echo SANDBOX || echo PROD)_API_KEY_SECRET_ID" >&2
   exit 1
 fi
 
@@ -59,7 +57,7 @@ echo "  Environment: $ENV"
 # ── Proxy token ──────────────────────────────────────────────────────
 
 echo "Fetching proxy token from BWS..."
-export NAMECHEAP_PROXY_TOKEN=$(fetch_bws_secret_by_name "NAMECHEAP_PROXY_BEARER_TOKEN")
+export NAMECHEAP_PROXY_TOKEN=$(fetch_bws_secret "${BWS_NAMECHEAP_PROXY_SECRET_ID:-0b6525ee-101e-4a59-887b-b41401304be8}")
 
 if [ -z "$NAMECHEAP_PROXY_TOKEN" ]; then
   echo "ERROR: Could not fetch NAMECHEAP_PROXY_BEARER_TOKEN from BWS." >&2
