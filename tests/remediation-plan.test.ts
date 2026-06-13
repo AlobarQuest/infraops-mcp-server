@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildPlanPrompt, rawFallback, RemediationPlanSchema, planEscalation } from "../src/standards/remediation-plan.js";
+import { buildPlanPrompt, rawFallback, RemediationPlanSchema, planEscalation, planOutputFormat } from "../src/standards/remediation-plan.js";
 import type { Proposal } from "../src/standards/check-engine.js";
 
 function questionProposal(): Proposal {
@@ -70,5 +70,47 @@ describe("planEscalation", () => {
     const client = fakeClient(async () => { throw new Error("api down"); });
     const plan = await planEscalation(questionProposal(), client);
     expect(plan.generated_by).toBe("raw");
+  });
+});
+
+describe("planOutputFormat", () => {
+  const validPlanPayload = {
+    root_cause: "No backup schedule configured.",
+    steps: ["Create a nightly backup scheduled task."],
+    infraops_tools: ["coolify_create_scheduled_task"],
+    risk: "caution" as const,
+    rollback: "Delete the scheduled task.",
+    cm_window_hint: "Off-peak; additive and non-disruptive.",
+  };
+
+  it("returns type === 'json_schema'", () => {
+    const fmt = planOutputFormat();
+    expect(fmt.type).toBe("json_schema");
+  });
+
+  it("schema has no top-level $schema key (stripped by SDK strict-transform)", () => {
+    const fmt = planOutputFormat();
+    expect("$schema" in fmt.schema).toBe(false);
+  });
+
+  it("schema top-level object has additionalProperties === false (SDK strict-transform)", () => {
+    const fmt = planOutputFormat();
+    expect(fmt.schema["additionalProperties"]).toBe(false);
+  });
+
+  it("parse returns validated data for a valid plan payload", () => {
+    const fmt = planOutputFormat();
+    const result = fmt.parse(JSON.stringify(validPlanPayload));
+    expect(result).toEqual(validPlanPayload);
+  });
+
+  it("parse throws on invalid JSON", () => {
+    const fmt = planOutputFormat();
+    expect(() => fmt.parse("{not valid json}")).toThrow();
+  });
+
+  it("parse throws on structurally invalid payload (missing required fields)", () => {
+    const fmt = planOutputFormat();
+    expect(() => fmt.parse(JSON.stringify({ root_cause: "only this field" }))).toThrow();
   });
 });

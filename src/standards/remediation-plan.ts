@@ -1,5 +1,6 @@
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
+import { jsonSchemaOutputFormat } from "@anthropic-ai/sdk/helpers/json-schema";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { Proposal } from "./check-engine.js";
 
@@ -52,12 +53,20 @@ export function buildPlanPrompt(p: Proposal): string {
 /**
  * AutoParseableOutputFormat built from a zod v3 schema via zod-to-json-schema.
  * The SDK's zodOutputFormat() helper uses zod/v4 internally and is incompatible
- * with zod v3 schemas at runtime, so we build the equivalent format object manually.
+ * with zod v3 schemas at runtime, so we route through jsonSchemaOutputFormat instead —
+ * the SDK's own strict-transform helper that strips unsupported keys (like $schema)
+ * and forces additionalProperties:false recursively, producing an API-valid schema.
+ * We override the base parse with a zod-validated parse so the model output is
+ * type-checked against PlanModelSchema before the pipeline uses it.
+ *
+ * Exported so it can be unit-tested directly (the format is the real network path).
  */
-function planOutputFormat(): { type: "json_schema"; schema: unknown; parse: (s: string) => z.infer<typeof PlanModelSchema> } {
+export function planOutputFormat() {
+  const rawSchema = zodToJsonSchema(PlanModelSchema, { $refStrategy: "none" }) as Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const base = jsonSchemaOutputFormat(rawSchema as any);
   return {
-    type: "json_schema",
-    schema: zodToJsonSchema(PlanModelSchema, { $refStrategy: "none" }),
+    ...base,
     parse: (content: string) => {
       const result = PlanModelSchema.safeParse(JSON.parse(content));
       if (!result.success) throw new Error(result.error.message);
