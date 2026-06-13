@@ -4,7 +4,8 @@
 #
 # Secrets: sources a gitignored env file ($HOME/.config/infra-drift/env) for the
 # bootstrap BWS_ACCESS_TOKEN + Healthchecks.io ping URL, then fetches every other
-# secret from BWS *by name* (no UUIDs, no secrets in this public file). Runs the
+# secret from BWS *by stable UUID* (per infra-brain lesson #277 — no secrets in this
+# public file; UUIDs defaulted inline, overridable via BWS_*_SECRET_ID). Runs the
 # audit CLI (writes <date>.json + delta + <date>.md to the report dir), then the
 # remediation CLI (auto-applies safe fixes, plans caution/destructive/question items,
 # writes <date>.remediation.json + <date>.remediation.md), emails the consolidated
@@ -25,16 +26,9 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
 [ -n "${BWS_ACCESS_TOKEN:-}" ] || { log "FATAL: BWS_ACCESS_TOKEN not set (check $CONFIG)"; exit 1; }
 
-# Fetch a BWS secret by its name (key), empty string if absent.
-# The name is passed as argv to python3 (a `K=.. cmd | python3` prefix would only
-# set K for the left side of the pipe, not the parser — which silently returns "").
-get_secret() {
-  bws secret list --output json 2>/dev/null \
-    | python3 -c "import sys,json; k=sys.argv[1]; d=json.load(sys.stdin); print(next((s['value'] for s in d if s.get('key')==k), ''))" "$1" 2>/dev/null
-}
-
 # Fetch a BWS secret by its immutable UUID (per infra-brain lesson #277 — names are
-# mutable, UUIDs are stable). Mirrors start.sh. Empty string if absent.
+# mutable, UUIDs are stable). Mirrors start.sh. Empty string if absent. Every secret
+# is referenced by UUID (defaulted inline, overridable via BWS_*_SECRET_ID).
 get_secret_by_id() {
   bws secret get "$1" --output json 2>/dev/null \
     | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])" 2>/dev/null || echo ""
@@ -47,15 +41,15 @@ HC_URL="${INFRADRIFT_HC_PING_URL:-}"
 
 # ── Coolify (prod via public domain, dev via mini-local OrbStack) ──────────────
 export COOLIFY_BASE_URL="${COOLIFY_BASE_URL:-http://coolify-1.devonwatkins.com}"
-export COOLIFY_API_TOKEN="$(get_secret prod-coolify-api-token)"
+export COOLIFY_API_TOKEN="$(get_secret_by_id "${BWS_PROD_COOLIFY_SECRET_ID:-bbd71f41-b7df-4ae9-8fdb-b41501447308}")"
 export COOLIFY_DEV_BASE_URL="${COOLIFY_DEV_BASE_URL:-http://192.168.139.217:8000}"
-export COOLIFY_DEV_API_TOKEN="$(get_secret local-coolify-api)"
+export COOLIFY_DEV_API_TOKEN="$(get_secret_by_id "${BWS_DEV_COOLIFY_SECRET_ID:-8a2e1e10-d67b-4382-bbf3-b4150178e2a8}")"
 
 # ── infra-brain (live standards) ──────────────────────────────────────────────
 export INFRABRAIN_BASE_URL="${INFRABRAIN_BASE_URL:-https://infra-brain.devonwatkins.com}"
-export INFRABRAIN_ACCESS_KEY="$(get_secret INFRABRAIN_ACCESS_KEY)"
+export INFRABRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_INFRABRAIN_SECRET_ID:-45eb083f-4b05-4251-924d-b46700e5a643}")"
 
-RESEND_API_KEY="$(get_secret resend-api-key)"
+RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
 # Anthropic key for remediation plan generation — fetched by stable UUID (BWS key
 # name "anthropic-api-key"), overridable via BWS_ANTHROPIC_SECRET_ID.
 export ANTHROPIC_API_KEY="$(get_secret_by_id "${BWS_ANTHROPIC_SECRET_ID:-b74bf8b3-938b-45c0-bc25-b415013cb563}")"
