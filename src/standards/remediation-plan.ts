@@ -1,4 +1,6 @@
 import { z } from "zod";
+import Anthropic from "@anthropic-ai/sdk";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import type { Proposal } from "./check-engine.js";
 
 /** The structured remediation plan Sonnet returns for one escalated proposal. */
@@ -37,6 +39,50 @@ export function buildPlanPrompt(p: Proposal): string {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * Ask Sonnet to plan one escalated proposal. The client is injected for testing;
+ * in production we construct a default Anthropic() (reads ANTHROPIC_API_KEY).
+ * Best-effort: any failure or empty parse degrades to the deterministic raw
+ * fallback so the pipeline never blocks on the model.
+ *
+ * Model is claude-sonnet-4-6 by explicit choice (plan quality over executor cost).
+ */
+/**
+ * AutoParseableOutputFormat built from a zod v3 schema via zod-to-json-schema.
+ * The SDK's zodOutputFormat() helper uses zod/v4 internally and is incompatible
+ * with zod v3 schemas at runtime, so we build the equivalent format object manually.
+ */
+function planOutputFormat(): { type: "json_schema"; schema: unknown; parse: (s: string) => z.infer<typeof PlanModelSchema> } {
+  return {
+    type: "json_schema",
+    schema: zodToJsonSchema(PlanModelSchema, { $refStrategy: "none" }),
+    parse: (content: string) => {
+      const result = PlanModelSchema.safeParse(JSON.parse(content));
+      if (!result.success) throw new Error(result.error.message);
+      return result.data;
+    },
+  };
+}
+
+export async function planEscalation(p: Proposal, client?: Anthropic): Promise<RemediationPlan> {
+  const anthropic = client ?? new Anthropic();
+  try {
+    const res = await anthropic.messages.parse({
+      model: "claude-sonnet-4-6",
+      max_tokens: 16000,
+      thinking: { type: "adaptive" },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      output_config: { effort: "medium", format: planOutputFormat() as any },
+      messages: [{ role: "user", content: buildPlanPrompt(p) }],
+    });
+    const parsed = (res as { parsed_output?: z.infer<typeof PlanModelSchema> | null }).parsed_output;
+    if (!parsed) return rawFallback(p);
+    return { ...parsed, generated_by: "sonnet" };
+  } catch {
+    return rawFallback(p);
+  }
 }
 
 /** Deterministic fallback when Sonnet is unreachable — keeps the pipeline flowing. */
