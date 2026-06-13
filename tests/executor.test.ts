@@ -10,7 +10,7 @@ vi.mock("../src/services/coolify-client.js", () => ({
   coolifyPatch,
 }));
 
-import { wouldChange, isAutoApplicable, applyAction, maxAutoApplies } from "../src/standards/executor.js";
+import { wouldChange, isAutoApplicable, applyAction, maxAutoApplies, verifySafe } from "../src/standards/executor.js";
 import type { Proposal } from "../src/standards/check-engine.js";
 
 function makeProposal(overrides: Partial<Proposal> = {}): Proposal {
@@ -125,5 +125,36 @@ describe("maxAutoApplies", () => {
   it("falls back to 20 on a non-numeric env value", () => {
     process.env.MAX_AUTO_APPLIES = "nonsense";
     expect(maxAutoApplies()).toBe(20);
+  });
+});
+
+describe("verifySafe", () => {
+  beforeEach(() => { coolifyGet.mockReset(); });
+
+  it("passes an enable_healthcheck when the app is running:healthy", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", status: "running:healthy" });
+    const r = await verifySafe(makeProposal(), "prod");
+    expect(r.ok).toBe(true);
+  });
+
+  it("fails (→ escalate) an enable_healthcheck when the app is running:unhealthy", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", status: "running:unhealthy" });
+    expect((await verifySafe(makeProposal(), "prod")).ok).toBe(false);
+  });
+
+  it("fails (→ escalate) an enable_healthcheck when the app is running:unknown", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", status: "running:unknown" });
+    expect((await verifySafe(makeProposal(), "prod")).ok).toBe(false);
+  });
+
+  it("does not gate a non-enable_healthcheck remediation (returns ok, no fetch)", async () => {
+    const r = await verifySafe(makeProposal({ id: "coolify.something_else:abc123" }), "prod");
+    expect(r.ok).toBe(true);
+    expect(coolifyGet).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the live status fetch throws", async () => {
+    coolifyGet.mockRejectedValue(new Error("boom"));
+    expect((await verifySafe(makeProposal(), "prod")).ok).toBe(false);
   });
 });
