@@ -47,6 +47,7 @@ export INFRABRAIN_BASE_URL="${INFRABRAIN_BASE_URL:-https://infra-brain.devonwatk
 export INFRABRAIN_ACCESS_KEY="$(get_secret INFRABRAIN_ACCESS_KEY)"
 
 RESEND_API_KEY="$(get_secret resend-api-key)"
+export ANTHROPIC_API_KEY="$(get_secret ANTHROPIC_API_KEY)"
 
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; DATE="${NOW%%T*}"
 mkdir -p "$REPORT_DIR"
@@ -58,17 +59,29 @@ log "audit CLI exited rc=$RC"
 
 JSON="$REPORT_DIR/$DATE.json"; MD="$REPORT_DIR/$DATE.md"
 
+# ── Remediate: auto-apply safe fixes, package the rest (best-effort) ────────────
+REMEDIATE_MD="$REPORT_DIR/$DATE.remediation.md"
+node "$REPO/dist/cli/remediate-cli.js" --instance prod,dev --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1
+RC_REMEDIATE=$?
+log "remediate CLI exited rc=$RC_REMEDIATE"
+
+# Prefer the consolidated remediation digest; fall back to the raw audit digest.
+if [ -f "$REMEDIATE_MD" ]; then
+  BODY_MD="$REMEDIATE_MD"
+  APPLIED=$(python3 -c "import json;print(json.load(open('$REPORT_DIR/$DATE.remediation.json'))['totals']['applied'])" 2>/dev/null || echo '?')
+  ESCALATED=$(python3 -c "import json;print(json.load(open('$REPORT_DIR/$DATE.remediation.json'))['totals']['escalated'])" 2>/dev/null || echo '?')
+  SUBJECT="Infra remediation $DATE — ${APPLIED} fixed, ${ESCALATED} need you"
+else
+  BODY_MD="$MD"
+  SUBJECT="Infra drift $DATE — audit only (remediation step failed)"
+fi
+
 # ── Email digest via Resend (best-effort) ──────────────────────────────────────
-if [ -n "$RESEND_API_KEY" ] && [ -f "$MD" ] && [ -f "$JSON" ]; then
-  TOTAL=$(python3 -c "import json;print(json.load(open('$JSON'))['totals']['total_proposals'])" 2>/dev/null || echo '?')
-  NEW=$(python3 -c "import json;print(len(json.load(open('$JSON'))['delta']['new']))" 2>/dev/null || echo '?')
-  FAILED=$(python3 -c "import json;print(json.load(open('$JSON'))['totals']['instances_failed'])" 2>/dev/null || echo '0')
-  SUBJECT="Infra drift $DATE — ${TOTAL} deviations (${NEW} new)"
-  [ "$FAILED" != "0" ] && SUBJECT="$SUBJECT — ⚠ ${FAILED} instance(s) unreachable"
+if [ -n "$RESEND_API_KEY" ] && [ -f "$BODY_MD" ]; then
   # Build the JSON payload with python (safe escaping of the markdown body), send with
   # curl (the path proven to work against the Resend API).
   PAYLOAD_FILE="$(mktemp -t infra-drift-mail)"
-  EMAIL_FROM="$EMAIL_FROM" EMAIL_TO="$EMAIL_TO" SUBJECT="$SUBJECT" MD="$MD" python3 - > "$PAYLOAD_FILE" <<'PY'
+  EMAIL_FROM="$EMAIL_FROM" EMAIL_TO="$EMAIL_TO" SUBJECT="$SUBJECT" MD="$BODY_MD" python3 - > "$PAYLOAD_FILE" <<'PY'
 import os, json
 print(json.dumps({"from": os.environ['EMAIL_FROM'], "to": [os.environ['EMAIL_TO']],
                   "subject": os.environ['SUBJECT'], "text": open(os.environ['MD']).read()}))
@@ -85,13 +98,13 @@ fi
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────
 if [ -n "$HC_URL" ]; then
-  if [ "$RC" -eq 0 ]; then
+  if [ "$RC" -eq 0 ] && [ "$RC_REMEDIATE" -eq 0 ]; then
     curl -fsS --max-time 10 "$HC_URL" >/dev/null 2>&1 || log "WARN: HC success ping failed"
   else
     curl -fsS --max-time 10 "$HC_URL/fail" >/dev/null 2>&1 || true
-    log "pinged HC /fail (rc=$RC)"
+    log "pinged HC /fail (audit rc=$RC remediate rc=$RC_REMEDIATE)"
   fi
 fi
 
-log "──────── drift audit done (rc=$RC) ────────"
-exit "$RC"
+log "──────── drift audit + remediate done (audit rc=$RC remediate rc=$RC_REMEDIATE) ────────"
+[ "$RC" -eq 0 ] && [ "$RC_REMEDIATE" -eq 0 ] && exit 0 || exit 1
