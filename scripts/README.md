@@ -14,9 +14,11 @@ BWS + Healthchecks.io).
 1. Sources `~/.config/infra-drift/env` (gitignored) for `BWS_ACCESS_TOKEN` +
    `INFRADRIFT_HC_PING_URL`.
 2. Fetches `prod-coolify-api-token`, `local-coolify-api`, `INFRABRAIN_ACCESS_KEY`,
-   `resend-api-key`, and `ANTHROPIC_API_KEY` from BWS **by name**.
-   (`ANTHROPIC_API_KEY` is used only for plan generation; the deterministic
-   safe-apply path needs no model.)
+   and `resend-api-key` from BWS **by name**, plus the Anthropic key (BWS name
+   `anthropic-api-key`) **by stable UUID** `b74bf8b3-938b-45c0-bc25-b415013cb563`
+   (overridable via `BWS_ANTHROPIC_SECRET_ID`), per infra-brain lesson #277 —
+   names are mutable, UUIDs are stable. The Anthropic key is used only for plan
+   generation; the deterministic safe-apply path needs no model.
 3. Audits **prod** (`coolify-1.devonwatkins.com`) and **dev** (mini-local OrbStack)
    → writes `~/infra-drift/reports/<date>.json` (proposals + day-over-day delta)
    and `<date>.md`.

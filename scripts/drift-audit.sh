@@ -33,6 +33,13 @@ get_secret() {
     | python3 -c "import sys,json; k=sys.argv[1]; d=json.load(sys.stdin); print(next((s['value'] for s in d if s.get('key')==k), ''))" "$1" 2>/dev/null
 }
 
+# Fetch a BWS secret by its immutable UUID (per infra-brain lesson #277 — names are
+# mutable, UUIDs are stable). Mirrors start.sh. Empty string if absent.
+get_secret_by_id() {
+  bws secret get "$1" --output json 2>/dev/null \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])" 2>/dev/null || echo ""
+}
+
 log "──────── drift audit started ────────"
 
 HC_URL="${INFRADRIFT_HC_PING_URL:-}"
@@ -49,7 +56,9 @@ export INFRABRAIN_BASE_URL="${INFRABRAIN_BASE_URL:-https://infra-brain.devonwatk
 export INFRABRAIN_ACCESS_KEY="$(get_secret INFRABRAIN_ACCESS_KEY)"
 
 RESEND_API_KEY="$(get_secret resend-api-key)"
-export ANTHROPIC_API_KEY="$(get_secret ANTHROPIC_API_KEY)"
+# Anthropic key for remediation plan generation — fetched by stable UUID (BWS key
+# name "anthropic-api-key"), overridable via BWS_ANTHROPIC_SECRET_ID.
+export ANTHROPIC_API_KEY="$(get_secret_by_id "${BWS_ANTHROPIC_SECRET_ID:-b74bf8b3-938b-45c0-bc25-b415013cb563}")"
 
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; DATE="${NOW%%T*}"
 mkdir -p "$REPORT_DIR"
