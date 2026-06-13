@@ -153,11 +153,14 @@ if [ -n "${BWS_SUPABASE_SECRET_ID:-}" ]; then
 fi
 
 # ── infra-brain (optional — degrades to cache/seed if absent) ────
-# Fetch the audit access key from BWS by name (like github-pat / namecheap) so it
-# works off BWS_ACCESS_TOKEN alone — no per-secret UUID env var to propagate, which
-# avoids silent "seed" degradation when the MCP config env block omits the ID.
+# Fetch the audit access key from BWS by its stable UUID. The UUID is immutable and
+# non-secret (useless without BWS_ACCESS_TOKEN), so defaulting the literal here is safe
+# and keeps the fetch working off BWS_ACCESS_TOKEN alone — no fragile env propagation.
+# Prefer the stable UUID over by-name: the secret's name is a mutable human label that
+# will be renamed and silently break a by-name lookup. (Supersedes the earlier by-name
+# approach / infra-brain lesson #273.)
 export INFRABRAIN_BASE_URL="${INFRABRAIN_BASE_URL:-https://infra-brain.devonwatkins.com}"
-export INFRABRAIN_ACCESS_KEY=$(fetch_bws_secret_by_name "INFRABRAIN_ACCESS_KEY")
+export INFRABRAIN_ACCESS_KEY=$(fetch_bws_secret "${BWS_INFRABRAIN_SECRET_ID:-45eb083f-4b05-4251-924d-b46700e5a643}")
 if [ -n "$INFRABRAIN_ACCESS_KEY" ]; then
   echo "infra-brain access key loaded from BWS" >&2
 else
