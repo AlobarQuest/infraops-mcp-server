@@ -1,5 +1,16 @@
-import { describe, it, expect } from "vitest";
-import { wouldChange, isAutoApplicable } from "../src/standards/executor.js";
+import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+
+const { coolifyGet, coolifyPatch } = vi.hoisted(() => ({
+  coolifyGet: vi.fn(),
+  coolifyPatch: vi.fn(),
+}));
+
+vi.mock("../src/services/coolify-client.js", () => ({
+  coolifyGet,
+  coolifyPatch,
+}));
+
+import { wouldChange, isAutoApplicable, applyAction, maxAutoApplies } from "../src/standards/executor.js";
 import type { Proposal } from "../src/standards/check-engine.js";
 
 function makeProposal(overrides: Partial<Proposal> = {}): Proposal {
@@ -52,5 +63,67 @@ describe("isAutoApplicable", () => {
   });
   it("rejects a tool that is not in SAFE_TOOLS", () => {
     expect(isAutoApplicable(makeProposal({ planned_action: { tool: "coolify_delete_application", args: { uuid: "u1" } } }))).toBe(false);
+  });
+});
+
+describe("applyAction", () => {
+  beforeEach(() => {
+    coolifyGet.mockReset();
+    coolifyPatch.mockReset();
+  });
+
+  it("applies a drifted safe remediation: one PATCH with the args minus uuid", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: false });
+    coolifyPatch.mockResolvedValue({});
+    const res = await applyAction(makeProposal(), "prod");
+    expect(res.status).toBe("applied");
+    expect(coolifyPatch).toHaveBeenCalledTimes(1);
+    expect(coolifyPatch).toHaveBeenCalledWith("/applications/u1", { health_check_enabled: true }, "prod");
+  });
+
+  it("skips (no PATCH) when the resource already conforms — idempotent", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: true });
+    const res = await applyAction(makeProposal(), "prod");
+    expect(res.status).toBe("skipped");
+    expect(coolifyPatch).not.toHaveBeenCalled();
+  });
+
+  it("dry-run previews without PATCHing even when drifted", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: false });
+    const res = await applyAction(makeProposal(), "prod", { dryRun: true });
+    expect(res.status).toBe("skipped");
+    expect(res.detail).toMatch(/dry-run/i);
+    expect(coolifyPatch).not.toHaveBeenCalled();
+  });
+
+  it("records failed (no throw) when the client errors, leaving the batch to continue", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: false });
+    coolifyPatch.mockRejectedValue(new Error("boom"));
+    const res = await applyAction(makeProposal(), "prod");
+    expect(res.status).toBe("failed");
+    expect(res.detail).toContain("boom");
+  });
+
+  it("refuses (failed, no fetch) a non-auto-applicable proposal as defense in depth", async () => {
+    const res = await applyAction(makeProposal({ risk: "destructive" }), "prod");
+    expect(res.status).toBe("failed");
+    expect(coolifyGet).not.toHaveBeenCalled();
+    expect(coolifyPatch).not.toHaveBeenCalled();
+  });
+});
+
+describe("maxAutoApplies", () => {
+  const orig = process.env.MAX_AUTO_APPLIES;
+  beforeEach(() => { delete process.env.MAX_AUTO_APPLIES; });
+  afterAll(() => { if (orig !== undefined) process.env.MAX_AUTO_APPLIES = orig; });
+
+  it("defaults to 20", () => { expect(maxAutoApplies()).toBe(20); });
+  it("reads a positive integer from env", () => {
+    process.env.MAX_AUTO_APPLIES = "5";
+    expect(maxAutoApplies()).toBe(5);
+  });
+  it("falls back to 20 on a non-numeric env value", () => {
+    process.env.MAX_AUTO_APPLIES = "nonsense";
+    expect(maxAutoApplies()).toBe(20);
   });
 });
