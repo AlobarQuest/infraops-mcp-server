@@ -15,6 +15,8 @@ export interface RemediationDeps {
   audit: (inst: CoolifyInstance) => Promise<AuditResult>;
   apply: (p: Proposal, inst: CoolifyInstance, opts: { dryRun?: boolean }) => Promise<ApplyResult>;
   plan: (p: Proposal) => Promise<RemediationPlan>;
+  /** Pre-apply gate: returns ok=false (with a reason) to reroute a "safe" proposal to escalation. */
+  verify: (p: Proposal, inst: CoolifyInstance) => Promise<{ ok: boolean; reason: string }>;
   maxAutoApplies: number;
   dryRun: boolean;
 }
@@ -22,6 +24,8 @@ export interface RemediationDeps {
 interface Tagged {
   instance: CoolifyInstance;
   proposal: Proposal;
+  /** Set when a verify gate held an otherwise-safe proposal back for review. */
+  note?: string;
 }
 
 /**
@@ -62,16 +66,33 @@ export async function runRemediation(
   // 3. Runaway guard: a sudden fleet-wide spike of "safe" fixes is the signature
   // of a bad rule — apply nothing and escalate everything instead.
   const runawayTripped = safe.length > deps.maxAutoApplies;
-  const toApply = runawayTripped ? [] : safe;
-  const toEscalate = runawayTripped ? live : escalateTagged;
 
-  // 4. Apply safe (per-item isolation lives in deps.apply — it never throws).
+  // 4. Verify gate (skipped on the runaway path): a "safe" proposal that fails its
+  // pre-apply check (e.g. enable_healthcheck on an app that isn't running:healthy)
+  // is rerouted to escalation with a note, rather than auto-applied.
+  let toApply: Tagged[];
+  let toEscalate: Tagged[];
+  if (runawayTripped) {
+    toApply = [];
+    toEscalate = live;
+  } else {
+    toApply = [];
+    const verifyHeld: Tagged[] = [];
+    for (const t of safe) {
+      const v = await deps.verify(t.proposal, t.instance);
+      if (v.ok) toApply.push(t);
+      else verifyHeld.push({ ...t, note: v.reason });
+    }
+    toEscalate = [...escalateTagged, ...verifyHeld];
+  }
+
+  // 5. Apply safe (per-item isolation lives in deps.apply — it never throws).
   const applied: ApplyResult[] = [];
   for (const t of toApply) {
     applied.push(await deps.apply(t.proposal, t.instance, { dryRun: deps.dryRun }));
   }
 
-  // 5. Plan escalations.
+  // 6. Plan escalations.
   const escalations: Escalation[] = [];
   for (const t of toEscalate) {
     const plan = await deps.plan(t.proposal);
@@ -82,10 +103,11 @@ export async function runRemediation(
       kind: t.proposal.kind,
       reasoning: t.proposal.reasoning,
       plan,
+      ...(t.note ? { note: t.note } : {}),
     });
   }
 
-  // 6. Self-resolved: morning proposals (for instances we could audit this run)
+  // 7. Self-resolved: morning proposals (for instances we could audit this run)
   // that are no longer present live.
   const liveIds = new Set(live.map((t) => proposalIdentity(t.instance, t.proposal)));
   let selfResolved = 0;

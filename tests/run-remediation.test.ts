@@ -40,6 +40,7 @@ function deps(over: Partial<RemediationDeps> = {}): RemediationDeps {
     audit: vi.fn(async () => auditResult([])),
     apply: vi.fn(async (p: Proposal) => appliedOk(p)),
     plan: vi.fn(async () => plan()),
+    verify: vi.fn(async () => ({ ok: true, reason: "ok" })),
     maxAutoApplies: 20,
     dryRun: false,
     ...over,
@@ -57,6 +58,32 @@ describe("runRemediation", () => {
     expect(report.totals.escalated).toBe(1);
     expect(d.apply).toHaveBeenCalledTimes(1);
     expect(d.plan).toHaveBeenCalledTimes(1);
+  });
+
+  it("escalates a safe proposal that fails verify; applies the one that passes", async () => {
+    const ok = prop("570", "u1");
+    const held = prop("570", "u2");
+    const verify = vi.fn(async (p: Proposal) => ({ ok: p.target.uuid === "u1", reason: p.target.uuid === "u1" ? "healthy" : "not running:healthy" }));
+    const d = deps({ audit: vi.fn(async () => auditResult([ok, held])), verify });
+    const { report } = await runRemediation(["prod"], null, "t", "s", d);
+    expect(report.totals.applied).toBe(1);
+    expect(report.totals.escalated).toBe(1);
+    expect(d.apply).toHaveBeenCalledTimes(1);
+    // the applied one is u1; the held one (u2) is escalated and carries a note
+    expect(report.applied[0].target.uuid).toBe("u1");
+    const heldEsc = report.escalations.find((e) => e.target.uuid === "u2");
+    expect(heldEsc).toBeTruthy();
+    expect(heldEsc!.note).toMatch(/not running:healthy/i);
+  });
+
+  it("does not run verify on the runaway path (everything escalates regardless)", async () => {
+    const many = [prop("570", "u1"), prop("570", "u2"), prop("570", "u3")];
+    const verify = vi.fn(async () => ({ ok: true, reason: "ok" }));
+    const d = deps({ audit: vi.fn(async () => auditResult(many)), maxAutoApplies: 2, verify });
+    const { report } = await runRemediation(["prod"], null, "t", "s", d);
+    expect(report.totals.runaway_tripped).toBe(true);
+    expect(report.totals.applied).toBe(0);
+    expect(verify).not.toHaveBeenCalled();
   });
 
   it("trips the runaway guard: applies nothing, escalates all safe", async () => {

@@ -10,6 +10,8 @@ export interface Escalation {
   kind: string;
   reasoning: string;
   plan: RemediationPlan;
+  /** Why this was escalated rather than auto-applied (e.g. a verify gate held it). Absent for inherently-escalated items. */
+  note?: string;
 }
 
 export interface RemediationReport {
@@ -91,6 +93,7 @@ export function renderRemediationMarkdown(r: RemediationReport): string {
     for (const e of r.escalations) {
       lines.push("");
       lines.push(`### ${e.target.resource_type} '${e.target.name}' (${e.risk}) — Plan by ${e.plan.generated_by}`);
+      if (e.note) lines.push(`- **Auto-fix held:** ${e.note}`);
       lines.push(`- **Why:** ${e.reasoning}`);
       lines.push(`- **Root cause:** ${e.plan.root_cause}`);
       lines.push(`- **Steps:**`);

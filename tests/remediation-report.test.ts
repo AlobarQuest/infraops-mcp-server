@@ -52,4 +52,11 @@ describe("renderRemediationMarkdown", () => {
     const md = renderRemediationMarkdown(r);
     expect(md).toMatch(/runaway|safety guard/i);
   });
+
+  it("renders an 'Auto-fix held' line when an escalation carries a verify note", () => {
+    const held: Escalation[] = [{ ...escalations[0], note: "status 'running:unknown' is not running:healthy" }];
+    const md = renderRemediationMarkdown(build2({ generatedAt: "t", sourceReport: "s", applied: [], escalations: held, selfResolved: 0, runawayTripped: false }));
+    expect(md).toContain("Auto-fix held");
+    expect(md).toContain("running:unknown");
+  });
 });
