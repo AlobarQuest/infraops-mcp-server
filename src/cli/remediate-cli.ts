@@ -65,8 +65,19 @@ async function main(): Promise<void> {
   const sourceBasename = `${dateStr}.json`;
   const morning = reportDir ? loadReport(reportDir, sourceBasename) : null;
 
-  // Build one Anthropic client (reused across all plan calls).
-  const anthropic = new Anthropic();
+  // Lazily construct one Anthropic client, reused across plan calls. Tolerant of
+  // a missing key: if construction fails, planEscalation gets undefined and
+  // raw-falls-back — the model never gates the deterministic safe-apply path.
+  let anthropic: Anthropic | undefined;
+  const getAnthropic = (): Anthropic | undefined => {
+    if (anthropic) return anthropic;
+    try {
+      anthropic = new Anthropic();
+    } catch {
+      // no key / bad config — escalations degrade to raw plans
+    }
+    return anthropic;
+  };
 
   const { report, cleanlyAudited } = await runRemediation(
     instances,
@@ -76,7 +87,7 @@ async function main(): Promise<void> {
     {
       audit: (inst) => auditInstance(inst),
       apply: (p, inst, opts) => applyAction(p, inst, opts),
-      plan: (p) => planEscalation(p, anthropic),
+      plan: (p) => planEscalation(p, getAnthropic()),
       maxAutoApplies: maxAutoApplies(),
       dryRun,
     },

@@ -76,8 +76,11 @@ export function planOutputFormat() {
 }
 
 export async function planEscalation(p: Proposal, client?: Anthropic): Promise<RemediationPlan> {
-  const anthropic = client ?? new Anthropic();
   try {
+    // Construct inside the try: a missing ANTHROPIC_API_KEY makes the SDK
+    // constructor throw, and that must degrade to the raw fallback like any
+    // other plan-gen failure — never block the (model-free) safe-apply path.
+    const anthropic = client ?? new Anthropic();
     const res = await anthropic.messages.parse({
       model: "claude-sonnet-4-6",
       max_tokens: 16000,
