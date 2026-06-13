@@ -1,25 +1,47 @@
-# Daily drift audit (Mac mini / launchd)
+# Daily drift audit + remediation pipeline (Mac mini / launchd)
 
-Surfaces Coolify standards drift every day. The audit logic is the same
-`coolify_audit_standards` shipped in this MCP server, exposed as a headless CLI
-(`dist/cli/audit-cli.js`) and run on a schedule by launchd on the Mac mini —
-matching the `vps-backup` operational pattern (launchd + BWS + Healthchecks.io).
+Surfaces Coolify standards drift every day, auto-applies safe fixes, and produces
+a remediation plan for everything that needs human sign-off. The audit logic is the
+same `coolify_audit_standards` shipped in this MCP server, exposed as headless CLIs
+(`dist/cli/audit-cli.js`, `dist/cli/remediate-cli.js`) and run on a schedule by
+launchd on the Mac mini — matching the `vps-backup` operational pattern (launchd +
+BWS + Healthchecks.io).
 
 ## What runs
 
-`scripts/drift-audit.sh` (daily 07:00 via `com.devon.infra-drift`):
+`scripts/drift-audit.sh` (daily 03:00 via `com.devon.infra-drift`):
 
 1. Sources `~/.config/infra-drift/env` (gitignored) for `BWS_ACCESS_TOKEN` +
    `INFRADRIFT_HC_PING_URL`.
 2. Fetches `prod-coolify-api-token`, `local-coolify-api`, `INFRABRAIN_ACCESS_KEY`,
-   `resend-api-key` from BWS **by name**.
+   `resend-api-key`, and `ANTHROPIC_API_KEY` from BWS **by name**.
+   (`ANTHROPIC_API_KEY` is used only for plan generation; the deterministic
+   safe-apply path needs no model.)
 3. Audits **prod** (`coolify-1.devonwatkins.com`) and **dev** (mini-local OrbStack)
    → writes `~/infra-drift/reports/<date>.json` (proposals + day-over-day delta)
    and `<date>.md`.
-4. Emails the markdown digest via Resend.
-5. Pings the Healthchecks.io dead-man's switch (`/start`, success, `/fail`).
+4. **Remediate:** `remediate-cli.js` re-audits live, auto-applies all `safe`
+   remediations (idempotent re-check before each write; never more than
+   `MAX_AUTO_APPLIES`, default 20). For every `caution`, `destructive`, and
+   `question` item it asks Sonnet (`claude-sonnet-4-6`) to write a remediation plan.
+   Writes `~/infra-drift/reports/<date>.remediation.json` (machine record + the
+   `escalations` change-manager contract) and `<date>.remediation.md`.
+5. Emails the **consolidated** digest (`<date>.remediation.md`) via Resend, falling
+   back to the raw audit `<date>.md` if the remediation step hard-failed.
+6. Pings the Healthchecks.io dead-man's switch (`/start`, success, `/fail`).
+   The heartbeat is healthy only if BOTH the audit and remediate steps succeed.
 
-The JSON lands on the mini for the downstream remediation-planner to consume.
+## Dry run
+
+Preview without writing or emailing:
+`node dist/cli/remediate-cli.js --instance prod --dry-run`
+
+## Future: change manager
+
+The `escalations` array in `<date>.remediation.json` is a stable, versioned
+(`schema_version`) contract for a later change-manager process that implements the
+hard fixes during change-management windows. This pipeline only produces the
+package; it never auto-applies escalated items.
 
 ## Install
 

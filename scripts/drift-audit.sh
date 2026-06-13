@@ -1,12 +1,14 @@
 #!/bin/bash
-# Daily infrastructure standards drift audit — runs on the Mac mini via launchd
-# (com.devon.infra-drift). Mirrors the vps-backup pattern.
+# Daily infrastructure standards drift audit + remediation pass — runs on the Mac
+# mini via launchd (com.devon.infra-drift) at 03:00. Mirrors the vps-backup pattern.
 #
 # Secrets: sources a gitignored env file ($HOME/.config/infra-drift/env) for the
 # bootstrap BWS_ACCESS_TOKEN + Healthchecks.io ping URL, then fetches every other
 # secret from BWS *by name* (no UUIDs, no secrets in this public file). Runs the
-# audit CLI (writes <date>.json + delta + <date>.md to the report dir), emails the
-# markdown digest via Resend, and pings the Healthchecks.io dead-man's switch.
+# audit CLI (writes <date>.json + delta + <date>.md to the report dir), then the
+# remediation CLI (auto-applies safe fixes, plans caution/destructive/question items,
+# writes <date>.remediation.json + <date>.remediation.md), emails the consolidated
+# digest via Resend, and pings the Healthchecks.io dead-man's switch.
 set -uo pipefail
 
 # ── Config (overridable via the sourced env file) ──────────────────────────────
