@@ -70,6 +70,12 @@ node "$REPO/dist/cli/remediate-cli.js" --instance prod,dev --report-dir "$REPORT
 RC_REMEDIATE=$?
 log "remediate CLI exited rc=$RC_REMEDIATE"
 
+# ── Best-effort: push the day's escalations to the change manager (non-fatal) ────
+export CHANGE_MGR_API_BASE="${CHANGE_MGR_API_BASE:-https://change-mgr.alobar.net}"
+export CHANGE_MGR_M2M_TOKEN="$(get_secret_by_id "${BWS_CHANGE_MGR_M2M_SECRET_ID:-af0e4192-edc6-46ae-9e4f-b469011dbb8d}")"
+node "$REPO/dist/cli/change-mgr-cli.js" sync --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
+  && log "change-mgr sync ok" || log "WARN: change-mgr sync failed (non-fatal)"
+
 # Prefer the consolidated remediation digest; fall back to the raw audit digest.
 if [ -f "$REMEDIATE_MD" ]; then
   BODY_MD="$REMEDIATE_MD"

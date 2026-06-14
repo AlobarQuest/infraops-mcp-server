@@ -12,19 +12,19 @@ export declare const RemediationPlanSchema: z.ZodObject<{
     cm_window_hint: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     risk: "safe" | "caution" | "destructive";
+    rollback: string;
     generated_by: "sonnet" | "raw";
     root_cause: string;
     steps: string[];
     infraops_tools: string[];
-    rollback: string;
     cm_window_hint: string;
 }, {
     risk: "safe" | "caution" | "destructive";
+    rollback: string;
     generated_by: "sonnet" | "raw";
     root_cause: string;
     steps: string[];
     infraops_tools: string[];
-    rollback: string;
     cm_window_hint: string;
 }>;
 export type RemediationPlan = z.infer<typeof RemediationPlanSchema>;
@@ -39,17 +39,17 @@ export declare const PlanModelSchema: z.ZodObject<Omit<{
     cm_window_hint: z.ZodString;
 }, "generated_by">, "strip", z.ZodTypeAny, {
     risk: "safe" | "caution" | "destructive";
+    rollback: string;
     root_cause: string;
     steps: string[];
     infraops_tools: string[];
-    rollback: string;
     cm_window_hint: string;
 }, {
     risk: "safe" | "caution" | "destructive";
+    rollback: string;
     root_cause: string;
     steps: string[];
     infraops_tools: string[];
-    rollback: string;
     cm_window_hint: string;
 }>;
 /** Deterministic prompt for one escalated proposal. No timestamps/randomness (keeps tests + caching stable). */
@@ -76,10 +76,10 @@ export declare function buildPlanPrompt(p: Proposal): string;
 export declare function planOutputFormat(): {
     parse: (content: string) => {
         risk: "safe" | "caution" | "destructive";
+        rollback: string;
         root_cause: string;
         steps: string[];
         infraops_tools: string[];
-        rollback: string;
         cm_window_hint: string;
     };
     schema: {
