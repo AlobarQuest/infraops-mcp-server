@@ -359,3 +359,56 @@ project UUID is the natural choice).
 
 Item #3 is the data-side fix (close the gap); this is the check-side fix. Do #3
 first, then #4 so the check verifies real state.
+
+---
+
+## 5. Change-window post-verify confirms domain *config*, not async deploy/cert health
+
+**Filed:** 2026-06-14
+**Severity:** Low–medium — a failed redeploy on an HTTPS auto-fix can be reported `done` with a stale/missing cert.
+**Component:** `src/change-manager/agent.ts` (`postVerifyOrRevert`), `src/change-manager/tools.ts` (`httpsConformant`).
+
+### Problem
+
+The change-window executor's deterministic post-verify (added in Plan 3) re-fetches
+the application and reverts if the change "didn't take." For the HTTPS path,
+"didn't take" is `!httpsConformant(app)` — i.e. the **domain config string** is not
+all-https. But `set_application_domains` sets that field synchronously via PATCH, so
+it is already https regardless of whether the subsequent `redeploy_application`
+(`POST /applications/{uuid}/deploy`, which regenerates the Traefik route + Let's
+Encrypt cert) actually succeeded. If the deploy fails, the agent receives an
+`is_error` tool result and is *instructed* to `report_blocked`, but nothing
+**deterministically** prevents a `done` with a broken cert.
+
+This matches the drift standard's own conformance definition (rule #571 asserts
+`fqdn not_starts_with http://` — a config check, not a cert probe), so the next-day
+audit won't catch it either: both verify config, not live cert health.
+
+### Options
+
+- **A. Post-verify confirms a deploy was triggered + probe the live cert (preferred).**
+  After the agent reports done on an HTTPS item, poll the deployment
+  (`GET /deployments/applications/{uuid}`) for a recent success, and/or make an HTTPS
+  request to the domain and check the TLS handshake / cert validity. Deploys are
+  async, so this needs a bounded poll/timeout. Revert (or mark `failed`) if the
+  deploy errored or the cert isn't valid.
+- **B. Cheap deterministic guard.** In post-verify, when `rollback.domains` was
+  captured, require that a `redeploy_application` call exists in `tool_calls` and did
+  not error; otherwise → `failed` + revert. Catches the "domain set but deploy
+  errored / never run" half-applied state without async polling. Doesn't verify the
+  cert actually regenerated (deploy "triggered" ≠ "succeeded").
+- **C. Re-point rule #571 at real cert health** (parallels item #4 for #572) so both
+  the audit and the executor verify live TLS, not just config. Broadest fix.
+
+### Acceptance criteria
+
+- [ ] A failed/never-run redeploy on an approved HTTPS item results in `failed`
+      (with revert), not `done`.
+- [ ] (If A/C) the live cert is actually validated, not just the domain config field.
+
+### Notes
+
+Surfaced by the Plan 3 final review (2026-06-14). Not a blocker for the initial
+ship — observe behavior on the first live window run (operational follow-up with
+Devon) before deciding A vs B vs C. The agent's `is_error` feedback + system-prompt
+instruction to `report_blocked` is the current (model-judgment) mitigation.

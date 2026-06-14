@@ -38,6 +38,12 @@ async function preValidateConformant(item: ApprovedItem, ctx: ToolCtx): Promise<
  * revert via the captured rollback and return a 'failed' outcome to substitute.
  * Returns null to keep 'done'. A post-verify *read* error is inconclusive → keep 'done'
  * (don't revert a possibly-good change on a transient read failure).
+ *
+ * SCOPE: for HTTPS this confirms the domain *config* is all-https — the same thing the
+ * drift standard (#571 `fqdn not_starts_with http://`) asserts. It does NOT confirm the
+ * async redeploy/cert regeneration actually succeeded: `set_application_domains` sets the
+ * config field synchronously, so this check passes even if `redeploy_application` errored.
+ * Deterministic deploy-success / live-cert verification is BACKLOG.md #5.
  */
 async function postVerifyOrRevert(item: ApprovedItem, ctx: ToolCtx, calls: ToolCalls): Promise<ChangeOutcome | null> {
   const checksDomains = ctx.rollback.domains !== undefined;
