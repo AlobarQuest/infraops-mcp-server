@@ -2,6 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use `- [ ]`. **Prerequisite: Plan 2c Part 2 (the deployed change-manager API) must be live** — the live `sync`/`run-window` wiring + verification depend on it, though all code below is unit-tested with a mocked API client and can be *built* beforehand.
 
+> **Execution corrections (applied 2026-06-14 during the build, approved by Devon):**
+> 1. **`redeploy_application` triggers a full deploy, not a restart.** An HTTPS domain
+>    change only regenerates the Traefik route + Let's Encrypt cert on a full **deploy**;
+>    a `restart` leaves the cert stale. The repo's own `reset_labels`
+>    (`src/tools/control.ts`) uses `/applications/{uuid}/deploy` for exactly this reason.
+>    Task 2 wraps `POST /applications/{uuid}/deploy` (the test asserts `/deploy`).
+> 2. **Deterministic pre-validate + post-verify + revert** (the kickoff's CRITICAL
+>    CORRECTNESS, the design spec's "Agent safety model"). The original draft only
+>    *captured* rollback. The executor now: (a) **pre-validates** live before the agent
+>    runs — an already-conformant HTTPS item → `skipped_conformant` (no writes); (b)
+>    **post-verifies** after the agent reports `done` — re-fetch live, and if the change
+>    didn't actually take (still `http://` / health not enabled) → **revert** via the
+>    captured rollback and mark `failed`. `set_application_healthcheck` therefore also
+>    captures rollback. `ChangeOutcome.outcome` gains `skipped_conformant`; `run-window`
+>    counts it. See Tasks 2–4.
+
 **Goal:** In the `infraops-mcp-server` repo, build the mini-side of the change manager: a `sync` step that pushes the day's escalations to the web app, and a nightly (04:00) windowed agent that pulls approved items and implements the genuinely-automatable ones (HTTPS, health-check) via a **curated** infraops tool surface, reporting outcomes back.
 
 **Architecture:** Mirrors the remediation pipeline's shape (dep-injected core + thin CLI + launchd wrapper). A thin HTTP `api-client` talks to the change-manager API with the M2M token. A narrow `tools` allowlist (the blast-radius boundary) wraps `coolify-client` with validation/idempotency/rollback. An `agent` (Sonnet tool-use loop) reads each escalation + plan as guidance and acts only through those tools. `run-window` orchestrates: claim → re-validate → agent → post outcome, per-item isolation, capped.
@@ -157,7 +173,7 @@ const coolifyPatch = vi.fn();
 const coolifyPost = vi.fn();
 vi.mock("../src/services/coolify-client.js", () => ({ coolifyGet, coolifyPatch, coolifyPost }));
 
-import { TOOLS, runTool } from "../src/change-manager/tools.js";
+import { TOOLS, runTool, httpsConformant, revertRollback } from "../src/change-manager/tools.js";
 
 beforeEach(() => { coolifyGet.mockReset(); coolifyPatch.mockReset(); coolifyPost.mockReset(); });
 
@@ -180,23 +196,55 @@ describe("curated tools", () => {
     expect(out).toMatch(/updated/i);
   });
 
-  it("set_application_healthcheck PATCHes the health fields", async () => {
+  it("set_application_healthcheck captures rollback + PATCHes the health fields", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: false, health_check_path: null, health_check_port: null });
     coolifyPatch.mockResolvedValue({});
-    const ctx = { instance: "prod" as const, rollback: {} };
+    const ctx = { instance: "prod" as const, rollback: {} as Record<string, unknown> };
     await runTool("set_application_healthcheck", { uuid: "u1", path: "/health", port: 3000 }, ctx);
     expect(coolifyPatch).toHaveBeenCalledWith("/applications/u1",
       { health_check_enabled: true, health_check_path: "/health", health_check_port: 3000 }, "prod");
+    expect(ctx.rollback.health_check_enabled).toBe(false);  // original captured
   });
 
-  it("redeploy_application POSTs restart", async () => {
+  it("redeploy_application POSTs a full deploy (regenerates routing/cert, not just restart)", async () => {
     coolifyPost.mockResolvedValue({});
     const ctx = { instance: "prod" as const, rollback: {} };
     await runTool("redeploy_application", { uuid: "u1" }, ctx);
-    expect(coolifyPost).toHaveBeenCalledWith("/applications/u1/restart", undefined, "prod");
+    expect(coolifyPost).toHaveBeenCalledWith("/applications/u1/deploy", undefined, "prod");
   });
 
   it("an unknown tool throws (defense in depth)", async () => {
     await expect(runTool("rm_rf", {}, { instance: "prod", rollback: {} })).rejects.toThrow(/unknown tool/i);
+  });
+});
+
+describe("conformance helpers + revert", () => {
+  it("httpsConformant: true only when every domain is https", () => {
+    expect(httpsConformant({ domains: "https://x.com" })).toBe(true);
+    expect(httpsConformant({ domains: "https://x.com,https://y.com" })).toBe(true);
+    expect(httpsConformant({ domains: "http://x.com" })).toBe(false);
+    expect(httpsConformant({ domains: "https://x.com,http://y.com" })).toBe(false);
+    expect(httpsConformant({ fqdn: "https://x.com" })).toBe(true);
+    expect(httpsConformant({})).toBe(false);
+  });
+
+  it("revertRollback restores captured domains via force_domain_override", async () => {
+    coolifyPatch.mockResolvedValue({});
+    await revertRollback("u1", { domains: "http://x.com" }, "prod");
+    expect(coolifyPatch).toHaveBeenCalledWith("/applications/u1",
+      { domains: "http://x.com", force_domain_override: true }, "prod");
+  });
+
+  it("revertRollback restores captured health fields", async () => {
+    coolifyPatch.mockResolvedValue({});
+    await revertRollback("u1", { health_check_enabled: false, health_check_path: null, health_check_port: null }, "prod");
+    expect(coolifyPatch).toHaveBeenCalledWith("/applications/u1",
+      { health_check_enabled: false, health_check_path: null, health_check_port: null }, "prod");
+  });
+
+  it("revertRollback with an empty rollback is a no-op", async () => {
+    await revertRollback("u1", {}, "prod");
+    expect(coolifyPatch).not.toHaveBeenCalled();
   });
 });
 ```
@@ -253,22 +301,49 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
     case "set_application_healthcheck": {
       const path = String(args.path ?? ""), port = Number(args.port);
       if (!path.startsWith("/") || !Number.isInteger(port)) throw new Error("path must start with / and port must be an integer");
+      const app = (await coolifyGet<Record<string, unknown>>(`/applications/${uuid}`, undefined, ctx.instance)) ?? {};
+      ctx.rollback.health_check_enabled = app.health_check_enabled ?? false;  // capture original for revert
+      ctx.rollback.health_check_path = app.health_check_path ?? null;
+      ctx.rollback.health_check_port = app.health_check_port ?? null;
       await coolifyPatch(`/applications/${uuid}`,
         { health_check_enabled: true, health_check_path: path, health_check_port: port }, ctx.instance);
       return `health check enabled at ${path}:${port}`;
     }
     case "redeploy_application": {
-      await coolifyPost(`/applications/${uuid}/restart`, undefined, ctx.instance);
-      return "redeploy triggered";
+      // Full deploy (not restart): only a deploy regenerates Traefik routing + the
+      // Let's Encrypt cert after a domain change. Mirrors reset_labels in control.ts.
+      await coolifyPost(`/applications/${uuid}/deploy`, undefined, ctx.instance);
+      return "redeploy (full deploy) triggered";
     }
     // report_done / report_blocked are handled by the agent loop (control tools); never reach here as writes
     default:
       throw new Error(`tool ${name} is a control tool, not a write`);
   }
 }
+
+/** True only when every domain on the app is https:// — the HTTPS post-/pre-verify check. */
+export function httpsConformant(app: Record<string, unknown>): boolean {
+  const raw = String(app.domains ?? app.fqdn ?? "");
+  const urls = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  return urls.length > 0 && urls.every((u) => u.startsWith("https://"));
+}
+
+/** Revert a captured rollback (domains and/or health fields). Best-effort; idempotent per-dimension. */
+export async function revertRollback(uuid: string, rollback: Record<string, unknown>, instance: CoolifyInstance): Promise<void> {
+  if (rollback.domains != null) {
+    await coolifyPatch(`/applications/${uuid}`, { domains: String(rollback.domains), force_domain_override: true }, instance);
+  }
+  if (rollback.health_check_enabled !== undefined) {
+    await coolifyPatch(`/applications/${uuid}`, {
+      health_check_enabled: rollback.health_check_enabled,
+      health_check_path: rollback.health_check_path ?? null,
+      health_check_port: rollback.health_check_port ?? null,
+    }, instance);
+  }
+}
 ```
 
-- [ ] **Step 4: Run green** → 5 passed. (`report_done`/`report_blocked` aren't executed by `runTool` — the agent loop intercepts them; the allowlist test still lists them.)
+- [ ] **Step 4: Run green** → all passed (`report_done`/`report_blocked` aren't executed by `runTool` — the agent loop intercepts them; the allowlist test still lists them).
 
 - [ ] **Step 5: Commit**
 
@@ -315,9 +390,12 @@ const textTurn = (text: string) => ({ stop_reason: "end_turn", content: [{ type:
 const toolTurn = (name: string, input: any) => ({ stop_reason: "tool_use", content: [{ type: "tool_use", id: "t1", name, input }] });
 
 describe("runChangeAgent", () => {
-  it("runs tool calls then report_done → outcome done with tool_calls recorded", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", domains: "http://x.com" });
-    coolifyPatch.mockResolvedValue({}); coolifyPost.mockResolvedValue({});
+  it("runs tool calls then report_done → outcome done (post-verify passes) with tool_calls recorded", async () => {
+    // Stateful Coolify: starts http; the domains PATCH flips it to https so post-verify passes.
+    let domains = "http://x.com";
+    coolifyGet.mockImplementation(async () => ({ uuid: "u1", domains, fqdn: domains }));
+    coolifyPatch.mockImplementation(async (_p: string, body: any) => { if (body?.domains) domains = body.domains; return {}; });
+    coolifyPost.mockResolvedValue({});
     const client = fakeAnthropic([
       toolTurn("set_application_domains", { uuid: "u1", domains: "https://x.com" }),
       toolTurn("redeploy_application", { uuid: "u1" }),
@@ -330,7 +408,34 @@ describe("runChangeAgent", () => {
     expect(out.tool_calls.calls.length).toBe(3);
   });
 
+  it("already-conformant HTTPS item → skipped_conformant before any write", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", domains: "https://x.com", fqdn: "https://x.com" });
+    const create = vi.fn();
+    const client = { messages: { create } } as any;
+    const out = await runChangeAgent(item(), { client, maxSteps: 10 });
+    expect(out.outcome).toBe("skipped_conformant");
+    expect(create).not.toHaveBeenCalled();         // agent loop never ran
+    expect(coolifyPatch).not.toHaveBeenCalled();    // nothing written
+  });
+
+  it("post-verify failure → revert + failed (agent claims done but domains still http)", async () => {
+    // coolifyGet always returns http (the change never actually took); patch is a no-op.
+    coolifyGet.mockResolvedValue({ uuid: "u1", domains: "http://x.com", fqdn: "http://x.com" });
+    coolifyPatch.mockResolvedValue({}); coolifyPost.mockResolvedValue({});
+    const client = fakeAnthropic([
+      toolTurn("set_application_domains", { uuid: "u1", domains: "https://x.com" }),
+      toolTurn("report_done", { summary: "claims done" }),
+    ]);
+    const out = await runChangeAgent(item(), { client, maxSteps: 10 });
+    expect(out.outcome).toBe("failed");
+    expect(out.detail).toMatch(/post-verify/i);
+    // revert PATCHed domains back to the captured original
+    expect(coolifyPatch).toHaveBeenCalledWith("/applications/u1",
+      { domains: "http://x.com", force_domain_override: true }, "prod");
+  });
+
   it("report_blocked → outcome blocked with reason", async () => {
+    coolifyGet.mockResolvedValue(undefined);  // pre-validate can't confirm conformance → proceeds to the loop
     const client = fakeAnthropic([toolTurn("report_blocked", { reason: "no health endpoint" })]);
     const out = await runChangeAgent(item(), { client, maxSteps: 10 });
     expect(out.outcome).toBe("blocked");
@@ -352,8 +457,7 @@ describe("runChangeAgent", () => {
       toolTurn("report_done", { summary: "done" }),
     ]);
     const out = await runChangeAgent(item(), { client, maxSteps: 10 });
-    // the tool error is fed back to the model as a tool_result error; if it still report_done we trust it,
-    // but the recorded tool_calls capture the error
+    // the tool error is fed back to the model as a tool_result error; the recorded tool_calls capture it.
     expect(out.tool_calls.calls.some((c: any) => /boom/.test(JSON.stringify(c)))).toBe(true);
   });
 });
@@ -365,18 +469,65 @@ describe("runChangeAgent", () => {
 
 ```typescript
 import Anthropic from "@anthropic-ai/sdk";
-import type { CoolifyInstance } from "../services/coolify-client.js";
+import { coolifyGet, type CoolifyInstance } from "../services/coolify-client.js";
 import type { ApprovedItem } from "./api-client.js";
-import { TOOLS, runTool, type ToolCtx } from "./tools.js";
+import { TOOLS, runTool, httpsConformant, revertRollback, type ToolCtx } from "./tools.js";
 
 export interface ChangeOutcome {
-  outcome: "done" | "blocked" | "failed";
+  outcome: "done" | "blocked" | "failed" | "skipped_conformant";
   detail: string;
   rollback: Record<string, unknown>;
   tool_calls: { calls: Array<{ name: string; input: unknown; result: string }> };
 }
 
+type ToolCalls = ChangeOutcome["tool_calls"]["calls"];
+
 export interface AgentDeps { client?: Anthropic; maxSteps?: number; }
+
+/** Heuristic: is this an HTTPS-enable remediation (the one type we live-pre/post-verify)? */
+function isHttpsRemediation(item: ApprovedItem): boolean {
+  const blob = `${item.rule_key} ${item.reasoning} ${JSON.stringify(item.plan)}`.toLowerCase();
+  return item.rule_key === "571" || blob.includes("https") || blob.includes("http://");
+}
+
+/** Pre-validate live: an already-conformant HTTPS item needs no change → skip it (no writes). */
+async function preValidateConformant(item: ApprovedItem, ctx: ToolCtx): Promise<boolean> {
+  if (!isHttpsRemediation(item)) return false;
+  try {
+    const app = await coolifyGet<Record<string, unknown>>(`/applications/${item.resource_uuid}`, undefined, ctx.instance);
+    return !!app && httpsConformant(app);
+  } catch {
+    return false; // can't confirm → let the agent try
+  }
+}
+
+/**
+ * Post-verify a 'done': re-fetch live and confirm the change actually took. If not,
+ * revert via the captured rollback and return a 'failed' outcome to substitute.
+ * Returns null to keep 'done'. A post-verify *read* error is inconclusive → keep 'done'
+ * (don't revert a possibly-good change on a transient read failure).
+ */
+async function postVerifyOrRevert(item: ApprovedItem, ctx: ToolCtx, calls: ToolCalls): Promise<ChangeOutcome | null> {
+  try {
+    if (ctx.rollback.domains !== undefined) {
+      const app = await coolifyGet<Record<string, unknown>>(`/applications/${item.resource_uuid}`, undefined, ctx.instance);
+      if (!app || !httpsConformant(app)) {
+        await revertRollback(item.resource_uuid, ctx.rollback, ctx.instance).catch(() => {});
+        return { outcome: "failed", detail: "post-verify failed: domains not https after change; reverted via rollback", rollback: ctx.rollback, tool_calls: { calls } };
+      }
+    }
+    if (ctx.rollback.health_check_enabled !== undefined) {
+      const app = await coolifyGet<Record<string, unknown>>(`/applications/${item.resource_uuid}`, undefined, ctx.instance);
+      if (!app || app.health_check_enabled !== true) {
+        await revertRollback(item.resource_uuid, ctx.rollback, ctx.instance).catch(() => {});
+        return { outcome: "failed", detail: "post-verify failed: health check not enabled after change; reverted via rollback", rollback: ctx.rollback, tool_calls: { calls } };
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 function buildSystem(): string {
   return [
@@ -407,11 +558,16 @@ export async function runChangeAgent(item: ApprovedItem, deps: AgentDeps = {}): 
   const client = deps.client ?? new Anthropic();
   const maxSteps = deps.maxSteps ?? 12;
   const ctx: ToolCtx = { instance: item.instance as CoolifyInstance, rollback: {} };
-  const calls: ChangeOutcome["tool_calls"]["calls"] = [];
+  const calls: ToolCalls = [];
 
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserMessage(item) }];
 
   try {
+    // Pre-validate live: already-conformant → skip without running the agent or writing.
+    if (await preValidateConformant(item, ctx)) {
+      return { outcome: "skipped_conformant", detail: "already conformant live; no change needed", rollback: ctx.rollback, tool_calls: { calls } };
+    }
+
     for (let step = 0; step < maxSteps; step++) {
       const res: Anthropic.Message = await client.messages.create({
         model: "claude-sonnet-4-6",
@@ -434,7 +590,8 @@ export async function runChangeAgent(item: ApprovedItem, deps: AgentDeps = {}): 
         if (tu.name === "report_done") {
           const summary = String((tu.input as { summary?: string }).summary ?? "done");
           calls.push({ name: tu.name, input: tu.input, result: summary });
-          return { outcome: "done", detail: summary, rollback: ctx.rollback, tool_calls: { calls } };
+          const reverted = await postVerifyOrRevert(item, ctx, calls);
+          return reverted ?? { outcome: "done", detail: summary, rollback: ctx.rollback, tool_calls: { calls } };
         }
         if (tu.name === "report_blocked") {
           const reason = String((tu.input as { reason?: string }).reason ?? "blocked");
@@ -462,7 +619,7 @@ export async function runChangeAgent(item: ApprovedItem, deps: AgentDeps = {}): 
 }
 ```
 
-- [ ] **Step 4: Run green** → 4 passed. Then `npm run build` clean.
+- [ ] **Step 4: Run green** → all passed. Then `npm run build` clean.
 
 - [ ] **Step 5: Commit**
 
@@ -539,6 +696,15 @@ describe("runWindow", () => {
     const summary = await runWindow(d);
     expect(summary).toMatchObject({ applied: 0, blocked: 1, failed: 1 });
   });
+
+  it("skipped_conformant is counted as skipped and still posts its outcome", async () => {
+    const d = deps({
+      runAgent: vi.fn(async () => ({ outcome: "skipped_conformant" as const, detail: "already https", rollback: {}, tool_calls: { calls: [] } })),
+    });
+    const summary = await runWindow(d);
+    expect(summary).toMatchObject({ considered: 1, applied: 0, skipped: 1 });
+    expect(d.postOutcome).toHaveBeenCalledWith(1, expect.objectContaining({ outcome: "skipped_conformant" }));
+  });
 });
 ```
 
@@ -590,6 +756,7 @@ export async function runWindow(deps: WindowDeps): Promise<WindowSummary> {
 
     if (outcome.outcome === "done") summary.applied++;
     else if (outcome.outcome === "blocked") summary.blocked++;
+    else if (outcome.outcome === "skipped_conformant") summary.skipped++;
     else summary.failed++;
     summary.results.push({ name: item.resource_name, outcome: outcome.outcome, detail: outcome.detail });
 
