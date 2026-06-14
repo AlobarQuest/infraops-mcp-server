@@ -368,6 +368,21 @@ first, then #4 so the check verifies real state.
 **Severity:** Low–medium — a failed redeploy on an HTTPS auto-fix can be reported `done` with a stale/missing cert.
 **Component:** `src/change-manager/agent.ts` (`postVerifyOrRevert`), `src/change-manager/tools.ts` (`httpsConformant`).
 
+> **Update — first live run (2026-06-14):** This gap *manifested* on the first real
+> HTTPS run (booking-system:preview). The agent set the domain config to https and
+> `redeploy_application` returned **HTTP 404** — the redeploy never fired — yet
+> post-verify (config check) passed and the item was reported `done`; the sslip https
+> URL had no cert until a deploy was triggered manually. Two findings:
+> 1. **Endpoint bug — FIXED.** `redeploy_application` used `POST /applications/{uuid}/deploy`,
+>    which 404s. The canonical working form (verified live) is `POST /deploy?uuid={uuid}`
+>    (what `coolify_deploy` uses). `tools.ts` now uses it. **Note:** `reset_labels` in
+>    `src/tools/control.ts` still uses the broken `/applications/{uuid}/deploy` form
+>    (wrapped in a try/catch that silently tolerates the failure) — same latent bug,
+>    fix separately.
+> 2. **Verification gap — STILL OPEN (this item).** Even with the endpoint fixed, post-verify
+>    confirms only the domain *config*, not that the deploy succeeded or the cert is live.
+>    A failed/queued/slow deploy can still land `done`. Options B/C below address this.
+
 ### Problem
 
 The change-window executor's deterministic post-verify (added in Plan 3) re-fetches

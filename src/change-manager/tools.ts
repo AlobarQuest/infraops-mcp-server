@@ -58,8 +58,10 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
     }
     case "redeploy_application": {
       // Full deploy (not restart): only a deploy regenerates Traefik routing + the
-      // Let's Encrypt cert after a domain change. Mirrors reset_labels in control.ts.
-      await coolifyPost(`/applications/${uuid}/deploy`, undefined, ctx.instance);
+      // Let's Encrypt cert after a domain change. Use the canonical `/deploy?uuid=` form
+      // (the same one `coolify_deploy` uses). Verified live 2026-06-14: the per-app
+      // `/applications/{uuid}/deploy` form returns 404 — do NOT use it.
+      await coolifyPost(`/deploy?uuid=${uuid}`, undefined, ctx.instance);
       return "redeploy (full deploy) triggered";
     }
     // report_done / report_blocked are handled by the agent loop (control tools); never reach here as writes

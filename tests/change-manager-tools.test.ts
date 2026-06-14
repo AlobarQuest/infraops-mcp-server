@@ -41,11 +41,11 @@ describe("curated tools", () => {
     expect(ctx.rollback.health_check_enabled).toBe(false);  // original captured
   });
 
-  it("redeploy_application POSTs a full deploy (regenerates routing/cert, not just restart)", async () => {
+  it("redeploy_application POSTs the canonical /deploy?uuid= full deploy (not /applications/{uuid}/deploy, which 404s)", async () => {
     coolifyPost.mockResolvedValue({});
     const ctx = { instance: "prod" as const, rollback: {} };
     await runTool("redeploy_application", { uuid: "u1" }, ctx);
-    expect(coolifyPost).toHaveBeenCalledWith("/applications/u1/deploy", undefined, "prod");
+    expect(coolifyPost).toHaveBeenCalledWith("/deploy?uuid=u1", undefined, "prod");
   });
 
   it("an unknown tool throws (defense in depth)", async () => {
