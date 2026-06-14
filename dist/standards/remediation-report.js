@@ -1,7 +1,7 @@
 export function buildRemediationReport(args) {
     const count = (s) => args.applied.filter((a) => a.status === s).length;
     return {
-        schema_version: 1,
+        schema_version: 2,
         generated_at: args.generatedAt,
         source_report: args.sourceReport,
         totals: {

@@ -4,6 +4,7 @@ import type { RemediationPlan } from "./remediation-plan.js";
 /** One escalated (non-auto-fixable) item plus its Sonnet/raw plan. The change-manager contract. */
 export interface Escalation {
     proposal_id: string;
+    instance: string;
     target: Proposal["target"];
     risk: string;
     kind: string;
