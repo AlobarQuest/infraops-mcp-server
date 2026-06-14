@@ -23,6 +23,16 @@
 
 set -euo pipefail
 
+# ── BWS access token (de-inlined → macOS Keychain) ──────────────────
+if [ -z "${BWS_ACCESS_TOKEN:-}" ]; then
+  BWS_ACCESS_TOKEN="$(/usr/bin/security find-generic-password -s 'Claude' -a 'BWS_ACCESS_TOKEN_INFRAOPS' -w 2>/dev/null || true)"
+  if [ -z "$BWS_ACCESS_TOKEN" ]; then
+    echo "ERROR: BWS_ACCESS_TOKEN not in env or Keychain (Claude/BWS_ACCESS_TOKEN_INFRAOPS)" >&2
+    exit 1
+  fi
+  export BWS_ACCESS_TOKEN
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Helper: fetch a BWS secret by ID, returns empty string if ID not set
