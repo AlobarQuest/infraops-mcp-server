@@ -98,6 +98,7 @@ export async function runRemediation(
     const plan = await deps.plan(t.proposal);
     escalations.push({
       proposal_id: t.proposal.id,
+      instance: t.instance,
       target: t.proposal.target,
       risk: t.proposal.risk,
       kind: t.proposal.kind,

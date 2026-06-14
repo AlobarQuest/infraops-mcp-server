@@ -5,6 +5,7 @@ import type { RemediationPlan } from "./remediation-plan.js";
 /** One escalated (non-auto-fixable) item plus its Sonnet/raw plan. The change-manager contract. */
 export interface Escalation {
   proposal_id: string;
+  instance: string; // 'prod' | 'dev' — which Coolify instance this came from (contract v2)
   target: Proposal["target"];
   risk: string;
   kind: string;

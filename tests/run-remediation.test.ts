@@ -58,6 +58,8 @@ describe("runRemediation", () => {
     expect(report.totals.escalated).toBe(1);
     expect(d.apply).toHaveBeenCalledTimes(1);
     expect(d.plan).toHaveBeenCalledTimes(1);
+    // contract v2: escalations carry their instance
+    expect(report.escalations[0].instance).toBe("prod");
   });
 
   it("escalates a safe proposal that fails verify; applies the one that passes", async () => {

@@ -10,7 +10,7 @@ const applied: ApplyResult[] = [
 ];
 
 const escalations: Escalation[] = [
-  { proposal_id: "q1", target: { provider: "coolify", resource_type: "database", uuid: "db1", name: "pg1" }, risk: "safe", kind: "question", reasoning: "rule #572", plan: { generated_by: "sonnet", root_cause: "x", steps: ["s"], infraops_tools: [], risk: "caution", rollback: "r", cm_window_hint: "h" } },
+  { proposal_id: "q1", instance: "prod", target: { provider: "coolify", resource_type: "database", uuid: "db1", name: "pg1" }, risk: "safe", kind: "question", reasoning: "rule #572", plan: { generated_by: "sonnet", root_cause: "x", steps: ["s"], infraops_tools: [], risk: "caution", rollback: "r", cm_window_hint: "h" } },
 ];
 
 describe("buildRemediationReport", () => {
