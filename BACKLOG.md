@@ -254,3 +254,108 @@ removed later.
 - `INFRAOPS_IMPROVEMENTS.md` item #2 (original 2026-03-27 filing)
 - `infra-brain` lessons #113, #118
 - Auto-memory `infraops_brain_knowledge.md` lesson #2
+
+---
+
+## 3. Back up the agent-sites / crm / facelesstt databases (real gap)
+
+**Filed:** 2026-06-14
+**Severity:** High — three running Postgres databases have NO backup coverage (data-loss risk); agent-sites is live at agentsweb.site.
+**Component:** `~/Projects/vps-backup/backup.sh` (the `pg_dump_container` target list). *The change lands in the **vps-backup** repo, not this one.*
+
+### Problem
+
+The daily drift audit (rule #572) flags `agent-sites-postgres`
+(uuid `htiobnojh32lbygljua91mo3`), `crm-db` (`vh6rmgm6wrn8c1owl7tjcbkn`), and
+`facelesstt-db` (`s2prstn489509v7po7icp7z9`) as lacking backups. Investigation
+(2026-06-14) confirmed these are **genuinely unbacked** — not false positives:
+`vps-backup/backup.sh`'s `pg_dump` list covers only contacthub, lifeops,
+inbox_assistant, infrabrain, realestate, coolify_db, authentik. These three are
+not in it, have no per-app backup script, and no Coolify-native backup config.
+(S3 / Coolify-native backups are a red herring — these should go to Restic/NAS
+like the other seven.)
+
+### Options
+
+- **A. Add the three to vps-backup's `pg_dump` list (preferred).** One
+  `pg_dump_container "<label>" "$(find_container <project-uuid> <service> || true)" "<db>" "<user>"`
+  line each, matching the existing seven. Backups flow to Restic on the NAS;
+  Healthchecks/freshness coverage extends automatically.
+- **B. Per-app backup scripts** (like Contacts/REDealEngine) — heavier; only if a
+  DB needs app-specific dump logic.
+
+### Acceptance criteria
+
+- [ ] `agent-sites-postgres`, `crm-db`, `facelesstt-db` each have a
+      `pg_dump_container` entry in `backup.sh` with the correct Coolify project
+      UUID, container service name, db, and user.
+- [ ] A vps-backup run produces fresh dumps for all three; `verify-backup.sh` passes.
+- [ ] Container service name + credentials confirmed before adding (inspect via
+      `coolify_get_database` / `docker exec`). Note `facelesstt` may live on the
+      dev Coolify instance — confirm prod vs dev.
+
+### Dependency
+
+Coupled to item #4: once these are backed up **and** #572 checks real coverage,
+the escalations resolve cleanly. Until then they appear as change-manager
+escalations with no executor path (handle via defer/wontfix in the GUI).
+
+---
+
+## 4. Re-point rule #572 at real backup coverage (standards fix)
+
+**Filed:** 2026-06-14
+**Severity:** Medium — the standard checks the wrong thing: it generates misleading escalations and cannot verify the coverage that actually matters.
+**Component:** infra-brain rule #572 + the standards audit (`src/standards/*`).
+
+### Problem
+
+Rule #572 asserts `backup_configs non_empty` on the Coolify database resource —
+i.e. it checks Coolify's **native** backup feature, which Devon doesn't use. Real
+backups run via **vps-backup** (Restic/NAS) + per-app `pg_dump`. So #572 both
+(a) keeps flagging DBs that *are* backed up externally, and (b) can't actually
+verify real coverage or freshness. It should check: *is this DB in the vps-backup
+coverage set, and is its last backup fresh?*
+
+### Design challenge
+
+The audit's check-engine evaluates **declarative field assertions against live
+Coolify state**. Backup coverage is not in Coolify, so #572 can't be a simple
+field assertion on the Coolify object — it needs an external source of truth plus
+an enrichment step.
+
+### Options
+
+- **A. Coverage manifest + audit enrichment (preferred).** vps-backup emits a
+  manifest (per backed-up DB: identity + last-success timestamp). The audit
+  enriches each Coolify database resource with synthetic `backup_covered` /
+  `backup_fresh` fields from the manifest (mapped by project UUID — vps-backup
+  already keys on it). Rule #572's `check.assert` becomes
+  `{field: "backup_covered", op: "eq", value: true}` (optionally also `backup_fresh`).
+  Single source of truth; verifies freshness, not just existence.
+- **B. Static allowlist in infra-brain** — a list of covered DB identities. Simple
+  but manual; no freshness; drifts as DBs are added.
+- **C. Custom (non-declarative) check function for #572** — escapes the declarative
+  model; flexible but breaks the uniform check-engine.
+
+### Recommendation
+
+**A.** Spans three places: vps-backup (emit the manifest), infraops audit (load
+the manifest + enrich DB resources), infra-brain (update rule #572's `check`).
+Open decisions when picked up: manifest location/transport (a file on the mini the
+audit reads, vs pushed to infra-brain), and the DB↔manifest mapping key (Coolify
+project UUID is the natural choice).
+
+### Acceptance criteria
+
+- [ ] vps-backup emits a coverage manifest (covered DB identities + last-success timestamps).
+- [ ] The audit enriches Coolify database resources with `backup_covered` /
+      `backup_fresh` from the manifest.
+- [ ] Rule #572 updated in infra-brain to assert on real coverage; re-audit shows
+      the covered DBs pass and any genuinely-uncovered DB flags.
+- [ ] After item #3 lands, agent-sites / crm / facelesstt pass #572.
+
+### Dependency
+
+Item #3 is the data-side fix (close the gap); this is the check-side fix. Do #3
+first, then #4 so the check verifies real state.

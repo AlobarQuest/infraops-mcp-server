@@ -232,15 +232,29 @@ on disk to sync on the next run).
 ### Curated tool surface (`src/change-manager/tools.ts`) — the blast-radius boundary
 The ONLY writes the agent can make; hallucinated tool names cannot fire. Each =
 JSON-schema def + handler wrapping `coolify-client` with validation, idempotency
-re-check, rollback capture. Initial set (maps to the three change-types):
-- `get_application(uuid, instance)` / `get_database(uuid, instance)` — read.
-- `set_application_https(uuid, instance)` — fqdn http→https (captures original).
-- `redeploy_application(uuid, instance)`.
-- `set_application_healthcheck(uuid, instance, path, port)` — agent must supply a verified path, else block.
-- `configure_database_backup(uuid, instance, schedule, storage_ref)` — returns
-  "needs prerequisite" when no storage target exists (no tool provisions S3/secrets
-  → agent reports blocked).
+re-check, rollback capture. The surface is deliberately scoped to the remediation
+types that are both **API-automatable** (verified against Coolify 4.0.0-beta.473)
+**and** genuinely a Coolify change — which, after investigation, is HTTPS and
+health-checks. **DB backups are out of scope** (see below). Initial set:
+- `get_application(uuid, instance)` — read current state.
+- `set_application_domains(uuid, instance, domains)` — `PATCH /applications/{uuid}`
+  fqdn http→https (captures original for rollback; uses `force_domain_override` to
+  bypass conflict detection on a self-referential domain change).
+- `redeploy_application(uuid, instance)` — `POST /applications/{uuid}/restart`
+  (or `/deploy`) so the proxy/cert config regenerates.
+- `set_application_healthcheck(uuid, instance, path, port)` — `PATCH /applications/{uuid}`
+  health-check fields; the agent must supply a verified path, else `report_blocked`.
 - `report_blocked(reason)` / `report_done(summary)` — end the loop with the outcome.
+
+**Why no backup tool.** Coolify's API *does* expose a backup sub-resource
+(`POST /databases/{uuid}/backups`), so backups are technically automatable — but
+the right remediation for the flagged DBs is **not** a Coolify change at all: they
+should be added to the existing **vps-backup** (Restic/NAS) pipeline like every
+other database, and rule #572 should be re-pointed to verify *that* real coverage
+(not Coolify's native `backup_configs`). Both are filed as **BACKLOG.md #3 (add the
+DBs to vps-backup) and #4 (re-point rule #572)** and revisited after the change
+manager ships. Until then, DB-backup escalations have no executor path and are
+resolved by human decision in the GUI (`defer`/`wontfix`).
 
 ### Agent safety model
 - Agent can call **only** the curated tools — `plan.infraops_tools` are guidance, never executed by name.
@@ -262,18 +276,21 @@ ones. *Operational prereq: create the Alobar ID service account + store its toke
 
 ## Realistic expectations
 
-Most of the 12 daily escalations are not cleanly auto-executable, and that's by
-design — `blocked` is a first-class outcome, not a failure (its reason text
-distinguishes *missing-prerequisite* from *needs-human-judgment*):
-- **HTTPS (rule #571):** the agent can do these (fqdn → redeploy → verify cert), with care.
+Of the daily escalations, the executor only ever *acts* on the two
+genuinely-Coolify, API-automatable change-types; the rest are first-class
+human-decision or `blocked` outcomes, not failures:
+- **HTTPS (rule #571):** the agent does these (set domains https → redeploy →
+  post-verify cert), with rollback on failure. The real, common automatable case.
 - **Health-check held (verify-gate):** apps like Watchtower/mirror may have no
-  health endpoint at all; the right action is often a different path or an exemption
-  — frequently `blocked` (needs a human path decision).
-- **DB backups (rule #572):** need an S3 target + credentials that don't exist yet →
-  `blocked: needs prerequisite` (the agent deliberately cannot provision storage/secrets).
+  health endpoint at all; the right action is often a different path or an
+  exemption — frequently `blocked` (needs a human path decision in the GUI).
+- **DB backups (rule #572):** **not an executor concern.** The flagged DBs are
+  genuinely unbacked and the fix lives in vps-backup, not Coolify (BACKLOG #3); the
+  standard itself should be re-pointed at real coverage (BACKLOG #4). In the change
+  manager these are resolved by `defer`/`wontfix` until those backlog items land.
 
 Near-term value: structured approval + autonomous execution of the genuinely-doable
-subset (mainly HTTPS), with everything else cleanly reported as `blocked` + why.
+subset (HTTPS), with everything else cleanly surfaced for a human decision + why.
 
 ## Testing
 
