@@ -114,7 +114,6 @@ export function registerDatabaseTools(server) {
                 environment_name: params.environment_name,
                 server_uuid: params.server_uuid,
                 destination_uuid: params.destination_uuid,
-                type: params.type,
                 is_public: params.is_public,
             };
             if (params.name)
@@ -125,7 +124,10 @@ export function registerDatabaseTools(server) {
                 body.image = params.image;
             if (params.public_port !== undefined)
                 body.public_port = params.public_port;
-            const db = await coolifyPost("/databases", body, params.instance);
+            // Coolify v4 has no generic POST /databases — the engine is part of the
+            // path (POST /databases/postgresql, /databases/mysql, …). `type` is the
+            // URL segment, not a body field; sending it to /databases returns 404.
+            const db = await coolifyPost(`/databases/${params.type}`, body, params.instance);
             return {
                 content: [{ type: "text", text: JSON.stringify(db, null, 2) }],
             };
