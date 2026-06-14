@@ -16,7 +16,7 @@ const escalations: Escalation[] = [
 describe("buildRemediationReport", () => {
   it("computes totals from applied results and escalations", () => {
     const r = buildRemediationReport({ generatedAt: "2026-06-13T07:00:00Z", sourceReport: "2026-06-13.json", applied, escalations, selfResolved: 2, runawayTripped: false });
-    expect(r.schema_version).toBe(1);
+    expect(r.schema_version).toBe(2);
     expect(r.totals).toEqual({ applied: 1, skipped: 1, failed: 1, escalated: 1, self_resolved: 2, runaway_tripped: false });
     expect(r.source_report).toBe("2026-06-13.json");
     expect(r.applied).toHaveLength(3);
