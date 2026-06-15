@@ -2,6 +2,8 @@ export interface SyncBody {
     generated_at: string;
     source_report: string;
     escalations: unknown[];
+    /** Pipeline source. Omitted ⇒ server treats as "drift" (backward-compatible). */
+    source?: string;
 }
 export interface SyncSummary {
     new: number;
@@ -23,6 +25,8 @@ export interface ApprovedItem {
     plan: Record<string, unknown>;
     note: string | null;
     status: string;
+    source?: string;
+    urgent?: boolean;
 }
 export interface OutcomeBody {
     outcome: "done" | "failed" | "blocked" | "skipped_conformant";
@@ -37,6 +41,7 @@ export declare class ChangeMgrClient {
     private req;
     postSync(body: SyncBody): Promise<SyncSummary>;
     getApproved(): Promise<ApprovedItem[]>;
+    getApprovedBySource(source: string): Promise<ApprovedItem[]>;
     claim(id: number): Promise<ApprovedItem>;
     postOutcome(id: number, body: OutcomeBody): Promise<unknown>;
     startWindow(startedAt: string): Promise<{

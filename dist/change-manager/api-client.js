@@ -22,6 +22,9 @@ export class ChangeMgrClient {
     getApproved() {
         return this.req("/api/items?status=approved");
     }
+    getApprovedBySource(source) {
+        return this.req(`/api/items?status=approved&source=${encodeURIComponent(source)}`);
+    }
     claim(id) {
         return this.req(`/api/items/${id}/claim`, { method: "POST" });
     }
