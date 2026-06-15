@@ -24,14 +24,17 @@
 set -euo pipefail
 
 # ── BWS access token (de-inlined → macOS Keychain) ──────────────────
-if [ -z "${BWS_ACCESS_TOKEN:-}" ]; then
-  BWS_ACCESS_TOKEN="$(/usr/bin/security find-generic-password -s 'Claude' -a 'BWS_ACCESS_TOKEN_INFRAOPS' -w 2>/dev/null || true)"
-  if [ -z "$BWS_ACCESS_TOKEN" ]; then
-    echo "ERROR: BWS_ACCESS_TOKEN not in env or Keychain (Claude/BWS_ACCESS_TOKEN_INFRAOPS)" >&2
-    exit 1
-  fi
-  export BWS_ACCESS_TOKEN
+# Keychain is the source of truth: prefer it over any (possibly stale/inherited) env token.
+# A dead BWS_ACCESS_TOKEN inherited from the launching Claude process used to slip past the old
+# `[ -z ]` guard and break the BWS fetch in some launch contexts (e.g. cwd=devon-plugins).
+_kc_bws="$(/usr/bin/security find-generic-password -s 'Claude' -a 'BWS_ACCESS_TOKEN_INFRAOPS' -w 2>/dev/null || true)"
+if [ -n "$_kc_bws" ]; then
+  export BWS_ACCESS_TOKEN="$_kc_bws"
+elif [ -z "${BWS_ACCESS_TOKEN:-}" ]; then
+  echo "ERROR: BWS_ACCESS_TOKEN not in env or Keychain (Claude/BWS_ACCESS_TOKEN_INFRAOPS)" >&2
+  exit 1
 fi
+unset _kc_bws
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
