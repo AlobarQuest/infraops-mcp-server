@@ -76,6 +76,14 @@ export CHANGE_MGR_M2M_TOKEN="$(get_secret_by_id "${BWS_CHANGE_MGR_M2M_SECRET_ID:
 node "$REPO/dist/cli/change-mgr-cli.js" sync --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
   && log "change-mgr sync ok" || log "WARN: change-mgr sync failed (non-fatal)"
 
+# ── Best-effort: machine security-posture drift → change manager (non-fatal) ─────
+# Runs security-scan.sh, auto-fixes the narrow set (guarded chmod), posts the rest
+# to the CM (source=security), and emails NEW urgent items immediately. Reuses the
+# CM token exported above; passes the Resend creds for the urgent-email path.
+RESEND_API_KEY="$RESEND_API_KEY" INFRADRIFT_EMAIL_TO="$EMAIL_TO" INFRADRIFT_EMAIL_FROM="$EMAIL_FROM" \
+  node "$REPO/dist/cli/security-drift-cli.js" run --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
+  && log "security-drift run ok" || log "WARN: security-drift run failed (non-fatal)"
+
 # Prefer the consolidated remediation digest; fall back to the raw audit digest.
 if [ -f "$REMEDIATE_MD" ]; then
   BODY_MD="$REMEDIATE_MD"
@@ -85,6 +93,13 @@ if [ -f "$REMEDIATE_MD" ]; then
 else
   BODY_MD="$MD"
   SUBJECT="Infra drift $DATE — audit only (remediation step failed)"
+fi
+
+# Append the security-drift digest to the email body if present.
+SEC_MD="$REPORT_DIR/$DATE.security.md"
+if [ -f "$SEC_MD" ] && [ -f "$BODY_MD" ]; then
+  COMBINED="$(mktemp -t infra-drift-body)"
+  { cat "$BODY_MD"; printf '\n\n---\n\n'; cat "$SEC_MD"; } > "$COMBINED" 2>/dev/null && BODY_MD="$COMBINED"
 fi
 
 # ── Email digest via Resend (best-effort) ──────────────────────────────────────

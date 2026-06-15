@@ -13,6 +13,7 @@ import { ChangeMgrClient } from "../change-manager/api-client.js";
 import { runSecurityDrift } from "../security-drift/runner.js";
 import { sendUrgentEmail } from "../security-drift/notify.js";
 import { securityPaths } from "../security-drift/paths.js";
+import { runSelfCheck } from "../security-drift/self-check.js";
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
@@ -60,6 +61,15 @@ async function main(): Promise<void> {
 
   const p = securityPaths();
 
+  const selfCheckFindings = runSelfCheck({
+    stateFiles: [p.baselineFile, p.emitStateFile, p.rollbackLog],
+    auditLog: p.auditLog,
+    hwmFile: p.hwmFile,
+    integrityFiles: [p.scanPath, p.autoFixAllowlistFile, p.fpAllowlistFile],
+    hashFile: p.hashFile,
+    now,
+  });
+
   const result = await runSecurityDrift(
     {
       scanStdout: captureScan(p.scanPath),
@@ -70,6 +80,7 @@ async function main(): Promise<void> {
       emitStateFile: p.emitStateFile,
       rollbackLog: p.rollbackLog,
       autoFixCap: Number.parseInt(process.env.SECURITY_AUTOFIX_CAP ?? "10", 10) || 10,
+      extraFindings: selfCheckFindings,
     },
     {
       postSync: (body) => client.postSync(body),

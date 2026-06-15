@@ -129,6 +129,39 @@ The PATCH `/services/{uuid}` endpoint rejects raw YAML. Encode with `Buffer.from
 **`coolify_list_deployments` uses a non-obvious endpoint path**
 The deployment history endpoint is `/deployments/applications/{app_uuid}` (not `/applications/{uuid}/deployments`). Response is `{ count, deployments: [] }`, not a raw array.
 
+## Security-Drift Subsystem (`src/security-drift/`)
+
+Feeds `~/.claude/bin/security-scan.sh` into the daily 3am drift job + the change-manager
+approval pipeline. CLI entry: `dist/cli/security-drift-cli.js run` (chained into
+`scripts/drift-audit.sh`). Modules: `scan-parser` → `taxonomy` (classify, deny-by-default)
+→ `baseline` (0600-validated accepted baseline + diff) → `autofix` (guarded chmod) →
+`emit`/`emit-state` (CM escalations + plan-hash) → `notify` (Resend urgent) → `runner`
+(orchestrator). The 4am verbatim executor is `security-executor.ts`, invoked via
+`change-mgr-cli.js run-security-window` (chained into `scripts/change-window.sh`). Shared
+file locations live in `paths.ts`. See `~/docs/security-audit/security-drift-taxonomy.md`
+for the authoritative tier rules.
+
+### Known Non-obvious Invariants (security-drift)
+
+**Security findings POST to the SAME `/api/sync` but with `source:"security"`; reconcile is source-scoped.**
+`change-manager/app/reconcile.py` resolves any open item NOT present in the current sync.
+Without source-scoping, a security sync would mark every Coolify *drift* item resolved (and
+vice-versa). The runner therefore POSTs the FULL current non-auto finding set every run (not
+the diff) so reconcile resolves cleared items correctly; the baseline/diff gates only the
+immediate URGENT email.
+
+**The 4am security executor runs approved `exec:` plans VERBATIM (no LLM) and is gated by a plan-hash.**
+`security-executor.ts` recomputes `sha256(canonicalJSON(plan))` and compares it to the hash
+recorded in the 0600 `security-emit-state.json` at emit time (keyed by the finding fingerprint
+= `resource_uuid`). Mismatch / missing / tampered emit-state → refuse + alert, never execute.
+`manual:` remediations are tracked-only. The Coolify `run-window` excludes `source==="security"`
+so the Sonnet agent never receives a security item.
+
+**Auto-fix is Node `O_NOFOLLOW` + `fchmod`-on-fd, not bash `chmod`.** The taxonomy's TOCTOU /
+symlink / hardlink / owner guards require operating on the open fd (the inode), which bash's
+path-based `chmod` cannot do safely. The path-allowlist is deny-by-default (empty ⇒ nothing
+auto-fixes); a blocked guard re-tiers the finding to URGENT.
+
 ## Secrets
 
 All secrets come from BWS (Bitwarden Secrets Manager) via start.sh. Never hardcode tokens.

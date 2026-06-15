@@ -54,11 +54,14 @@ const URGENT_KEYS = new Set<string>([
   "hooks.gate_unregistered",
   "backupkey.world_writable",
   "tiktok.plaintext_password",
-  // control-plane / persistence classes the fast-follow watcher will feed in:
+  // control-plane integrity (the fixer protecting itself):
+  "auditlog.tampered",
+  "selfcheck.state_perms",
+  "selfcheck.runner_integrity",
+  // persistence classes the fast-follow watcher will feed in:
   "authorized_keys.changed",
   "launchagent.new",
   "shell_profile.changed",
-  "auditlog.tampered",
   "mcp.server_added",
 ]);
 

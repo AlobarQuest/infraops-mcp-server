@@ -21,6 +21,8 @@ export interface RunnerConfig {
   rollbackLog: string;
   autoFixCap: number;
   emitStateMaxAgeDays?: number;
+  /** extra findings to merge with the scan output (e.g. control-plane self-check) */
+  extraFindings?: import("./scan-parser.js").Finding[];
 }
 
 export interface RunnerDeps {
@@ -40,7 +42,10 @@ export interface RunnerResult {
 
 export async function runSecurityDrift(config: RunnerConfig, deps: RunnerDeps): Promise<RunnerResult> {
   const date = config.now.slice(0, 10);
-  const findings = parseScan(config.scanStdout).filter((f) => f.severity !== "PASS");
+  const findings = [
+    ...parseScan(config.scanStdout).filter((f) => f.severity !== "PASS"),
+    ...(config.extraFindings ?? []),
+  ];
 
   const classifiedAll: ClassifiedFinding[] = [];
   for (const finding of findings) {

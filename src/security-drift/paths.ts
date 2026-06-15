@@ -14,12 +14,17 @@ export interface SecurityPaths {
   rollbackLog: string;
   autoFixAllowlistFile: string;
   fpAllowlistFile: string;
+  auditLog: string;
+  hwmFile: string;
+  hashFile: string;
 }
 
 export function securityPaths(): SecurityPaths {
   const home = os.homedir();
   const cfgDir = process.env.INFRADRIFT_CONFIG_DIR ?? path.join(home, ".config", "infra-drift");
   const stateDir = process.env.SECURITY_DRIFT_STATE_DIR ?? cfgDir;
+  const autoFixAllowlistFile = path.join(cfgDir, "security-autofix-allowlist.txt");
+  const fpAllowlistFile = path.join(cfgDir, "security-fp-allowlist.txt");
   return {
     cfgDir,
     stateDir,
@@ -27,7 +32,10 @@ export function securityPaths(): SecurityPaths {
     baselineFile: path.join(stateDir, "security-baseline.json"),
     emitStateFile: path.join(stateDir, "security-emit-state.json"),
     rollbackLog: path.join(stateDir, "security-rollback.jsonl"),
-    autoFixAllowlistFile: path.join(cfgDir, "security-autofix-allowlist.txt"),
-    fpAllowlistFile: path.join(cfgDir, "security-fp-allowlist.txt"),
+    autoFixAllowlistFile,
+    fpAllowlistFile,
+    auditLog: process.env.SECURITY_AUDIT_LOG ?? path.join(home, ".claude", "audit", "high-power-actions.jsonl"),
+    hwmFile: path.join(stateDir, "security-auditlog-hwm.json"),
+    hashFile: path.join(stateDir, "security-runner-hashes.json"),
   };
 }
