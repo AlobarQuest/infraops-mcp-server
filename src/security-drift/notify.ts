@@ -29,25 +29,24 @@ function e0(items: SecurityEscalation[]): string {
   return items[0]?.plan.blind_spots ?? "";
 }
 
-/** Send the immediate URGENT email. Returns true on a 2xx, false if skipped or failed. */
-export async function sendUrgentEmail(items: SecurityEscalation[], deps: NotifyDeps): Promise<boolean> {
-  if (!items.length) return false;
+/** Low-level Resend send. Best-effort: skips when no key, returns false on any failure. */
+export async function sendAlertEmail(subject: string, text: string, deps: NotifyDeps): Promise<boolean> {
   if (!deps.resendApiKey) return false; // no key configured → skip (non-fatal)
   const doFetch = deps.fetchImpl ?? fetch;
-  const payload = {
-    from: deps.from,
-    to: [deps.to],
-    subject: `🚨 URGENT security drift — ${items.length} item(s) need approval now`,
-    text: renderBody(items),
-  };
   try {
     const res = await doFetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${deps.resendApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ from: deps.from, to: [deps.to], subject, text }),
     });
     return res.ok;
   } catch {
     return false;
   }
+}
+
+/** Send the immediate URGENT email. Returns true on a 2xx, false if skipped or failed. */
+export async function sendUrgentEmail(items: SecurityEscalation[], deps: NotifyDeps): Promise<boolean> {
+  if (!items.length) return false;
+  return sendAlertEmail(`🚨 URGENT security drift — ${items.length} item(s) need approval now`, renderBody(items), deps);
 }

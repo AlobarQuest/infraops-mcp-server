@@ -6,6 +6,9 @@ import { ChangeMgrClient } from "../change-manager/api-client.js";
 import { runChangeAgent } from "../change-manager/agent.js";
 import { runWindow } from "../change-manager/run-window.js";
 import { renderWindowMarkdown } from "../change-manager/window-report.js";
+import { runSecurityWindow } from "../security-drift/security-executor.js";
+import { securityPaths } from "../security-drift/paths.js";
+import { sendAlertEmail } from "../security-drift/notify.js";
 
 export function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
@@ -55,6 +58,34 @@ async function doRunWindow(reportDir: string | undefined, now: string): Promise<
   process.stdout.write(md + "\n");
 }
 
+async function doRunSecurityWindow(reportDir: string | undefined, now: string): Promise<void> {
+  const c = client();
+  const p = securityPaths();
+  const notifyDeps = {
+    resendApiKey: process.env.RESEND_API_KEY,
+    from: process.env.INFRADRIFT_EMAIL_FROM ?? "infra@devonwatkins.com",
+    to: process.env.INFRADRIFT_EMAIL_TO ?? "devon.watkins@gmail.com",
+  };
+  const summary = await runSecurityWindow({
+    getApprovedSecurity: () => c.getApprovedBySource("security"),
+    claim: async (id) => { await c.claim(id); },
+    postOutcome: async (id, body) => { await c.postOutcome(id, body); },
+    onIntegrityFailure: async (item, reason) => {
+      await sendAlertEmail("🚨 Security executor REFUSED a plan (integrity)", `${item.resource_name} (item ${item.id}): ${reason}`, notifyDeps);
+    },
+    emitStateFile: p.emitStateFile,
+    maxChanges: Number.parseInt(process.env.SECURITY_MAX_CHANGES ?? "10", 10) || 10,
+  });
+  const lines = [
+    `# Security window — ${now}`,
+    `**${summary.applied} applied**, ${summary.blocked} blocked, ${summary.failed} failed, ${summary.skipped} skipped (of ${summary.considered}).`,
+    ...summary.results.map((r) => `- ${r.outcome === "done" ? "✅" : r.outcome === "blocked" ? "🚫" : r.outcome === "failed" ? "❌" : "⏭️"} **${r.name}** — ${r.outcome}: ${r.detail}`),
+  ];
+  const md = lines.join("\n");
+  if (reportDir) fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security-window.md`), md, "utf-8");
+  process.stdout.write(md + "\n");
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const now = typeof args.now === "string" ? args.now : new Date().toISOString();
@@ -64,8 +95,10 @@ async function main(): Promise<void> {
     await doSync(reportDir, now);
   } else if (args.command === "run-window") {
     await doRunWindow(reportDir, now);
+  } else if (args.command === "run-security-window") {
+    await doRunSecurityWindow(reportDir, now);
   } else {
-    throw new Error(`unknown command: ${String(args.command)} (use sync | run-window)`);
+    throw new Error(`unknown command: ${String(args.command)} (use sync | run-window | run-security-window)`);
   }
 }
 

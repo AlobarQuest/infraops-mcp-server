@@ -25,6 +25,8 @@ export interface ApprovedItem {
   plan: Record<string, unknown>;
   note: string | null;
   status: string;
+  source?: string;
+  urgent?: boolean;
 }
 export interface OutcomeBody {
   outcome: "done" | "failed" | "blocked" | "skipped_conformant";

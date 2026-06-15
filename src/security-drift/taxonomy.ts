@@ -63,10 +63,11 @@ const URGENT_KEYS = new Set<string>([
 ]);
 
 // NORMAL checks with a deterministic, idempotent exec remediation.
+// ONLY non-sudo, user-scope, idempotent commands belong here — the 4am executor runs
+// unattended as the user, so anything needing sudo (gatekeeper, critical-updates) or
+// environment-specific judgement (supply re-pins) stays manual (deny-by-default).
 const NORMAL_EXEC: Record<string, string[][]> = {
   "os.screen_lock": [["defaults", "write", "com.apple.screensaver", "askForPassword", "-int", "1"]],
-  "os.gatekeeper": [["sudo", "spctl", "--master-enable"]],
-  // critical updates + supply re-pins are environment-specific ⇒ manual (deny-by-default).
 };
 
 const SHORT_TITLES: Record<string, string> = {

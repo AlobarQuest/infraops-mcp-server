@@ -8,11 +8,11 @@
 
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 import { ChangeMgrClient } from "../change-manager/api-client.js";
 import { runSecurityDrift } from "../security-drift/runner.js";
 import { sendUrgentEmail } from "../security-drift/notify.js";
+import { securityPaths } from "../security-drift/paths.js";
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
@@ -58,20 +58,17 @@ async function main(): Promise<void> {
   if (!base || !token) throw new Error("CHANGE_MGR_API_BASE and CHANGE_MGR_M2M_TOKEN must be set");
   const client = new ChangeMgrClient(base, token);
 
-  const home = os.homedir();
-  const cfgDir = process.env.INFRADRIFT_CONFIG_DIR ?? path.join(home, ".config", "infra-drift");
-  const stateDir = process.env.SECURITY_DRIFT_STATE_DIR ?? cfgDir;
-  const scanPath = process.env.SECURITY_SCAN_PATH ?? path.join(home, ".claude", "bin", "security-scan.sh");
+  const p = securityPaths();
 
   const result = await runSecurityDrift(
     {
-      scanStdout: captureScan(scanPath),
+      scanStdout: captureScan(p.scanPath),
       now,
-      autoFixAllowlist: readList(path.join(cfgDir, "security-autofix-allowlist.txt")),
-      fpExtra: readList(path.join(cfgDir, "security-fp-allowlist.txt")),
-      baselineFile: path.join(stateDir, "security-baseline.json"),
-      emitStateFile: path.join(stateDir, "security-emit-state.json"),
-      rollbackLog: path.join(stateDir, "security-rollback.jsonl"),
+      autoFixAllowlist: readList(p.autoFixAllowlistFile),
+      fpExtra: readList(p.fpAllowlistFile),
+      baselineFile: p.baselineFile,
+      emitStateFile: p.emitStateFile,
+      rollbackLog: p.rollbackLog,
       autoFixCap: Number.parseInt(process.env.SECURITY_AUTOFIX_CAP ?? "10", 10) || 10,
     },
     {

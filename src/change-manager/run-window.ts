@@ -19,7 +19,9 @@ export interface WindowSummary {
  * runs the agent, posts the outcome. Per-item isolation; capped at maxChangesPerWindow.
  */
 export async function runWindow(deps: WindowDeps): Promise<WindowSummary> {
-  const approved = (await deps.getApproved()).slice(0, deps.maxChangesPerWindow);
+  // Security items are handled by the dedicated verbatim executor (runSecurityWindow),
+  // never by the Coolify Sonnet agent — exclude them here.
+  const approved = (await deps.getApproved()).filter((i) => i.source !== "security").slice(0, deps.maxChangesPerWindow);
   const summary: WindowSummary = { considered: 0, applied: 0, failed: 0, blocked: 0, skipped: 0, results: [] };
 
   for (const item of approved) {
