@@ -31,7 +31,7 @@ export function registerEnvVarTools(server) {
             const envs = await coolifyGet(`/applications/${uuid}/envs`, undefined, instance);
             const output = reveal
                 ? envs
-                : envs.map((e) => ({ ...e, value: "***" }));
+                : envs.map((e) => ({ ...e, value: "***", real_value: "***" }));
             return {
                 content: [{ type: "text", text: JSON.stringify(output, null, 2) }],
             };
@@ -240,7 +240,7 @@ export function registerEnvVarTools(server) {
             const envs = await coolifyGet(`/services/${uuid}/envs`, undefined, instance);
             const output = reveal
                 ? envs
-                : envs.map((e) => ({ ...e, value: "***" }));
+                : envs.map((e) => ({ ...e, value: "***", real_value: "***" }));
             return {
                 content: [{ type: "text", text: JSON.stringify(output, null, 2) }],
             };
