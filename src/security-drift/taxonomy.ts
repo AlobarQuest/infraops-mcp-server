@@ -63,7 +63,13 @@ const URGENT_KEYS = new Set<string>([
   "launchagent.new",
   "shell_profile.changed",
   "mcp.server_added",
+  // control-plane tamper-evidence (~/.claude git repo):
+  "controlplane.drift",
+  "controlplane.unmanaged",
 ]);
+
+// Findings surfaced in the scan log but intentionally NOT escalated (expected churn).
+const IGNORE_KEYS = new Set<string>(["controlplane.local_churn"]);
 
 // NORMAL checks with a deterministic, idempotent exec remediation.
 // ONLY non-sudo, user-scope, idempotent commands belong here — the 4am executor runs
@@ -81,6 +87,8 @@ const SHORT_TITLES: Record<string, string> = {
   "listener.lan_exposed": "Service port exposed on 0.0.0.0",
   "backupkey.world_writable": "World-writable backup key",
   "tiktok.plaintext_password": "Plaintext DB password in plist",
+  "controlplane.drift": "Control-plane file changed without review",
+  "controlplane.unmanaged": "Control plane not under version control",
 };
 
 function titleFor(f: Finding): string {
@@ -93,6 +101,7 @@ function titleFor(f: Finding): string {
  */
 export function classify(f: Finding, opts: ClassifyOptions): Classification | null {
   if (isFalsePositive(f, opts)) return null;
+  if (IGNORE_KEYS.has(f.check)) return null;
 
   const title = titleFor(f);
 

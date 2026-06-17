@@ -49,4 +49,29 @@ describe("classify", () => {
     const c = classify(f({ check: "credfile.private_key", target: "/Users/x/certs/fullchain.pem", detail: "/Users/x/certs/fullchain.pem (mode 644)" }), { autoFixAllowlist: [] });
     expect(c).toBeNull();
   });
+
+  it("URGENTs an uncommitted control-plane critical change (deny-by-default)", () => {
+    const c = classify(
+      f({ check: "controlplane.drift", target: "settings.json", detail: "uncommitted/untracked control-plane change:  M settings.json (review + commit if intended)" }),
+      { autoFixAllowlist: [] },
+    );
+    expect(c?.tier).toBe("URGENT");
+    expect(c && "manual" in c.remediation).toBe(true);
+  });
+
+  it("URGENTs an unmanaged control plane (no git repo)", () => {
+    const c = classify(
+      f({ check: "controlplane.unmanaged", target: "/Users/x/.claude", detail: "/Users/x/.claude is not a git repo" }),
+      { autoFixAllowlist: [] },
+    );
+    expect(c?.tier).toBe("URGENT");
+  });
+
+  it("drops settings.local.json churn (logged in scan, never escalated)", () => {
+    const c = classify(
+      f({ severity: "WARN", check: "controlplane.local_churn", target: "settings.local.json", detail: "settings.local.json changed since last commit (expected churn)" }),
+      { autoFixAllowlist: [] },
+    );
+    expect(c).toBeNull();
+  });
 });
