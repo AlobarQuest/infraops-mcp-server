@@ -160,6 +160,9 @@ The PATCH `/services/{uuid}` endpoint rejects raw YAML. Encode with `Buffer.from
 **`coolify_list_deployments` uses a non-obvious endpoint path**
 The deployment history endpoint is `/deployments/applications/{app_uuid}` (not `/applications/{uuid}/deployments`). Response is `{ count, deployments: [] }`, not a raw array.
 
+**`dist/` is tracked in git — every `src/` change must rebuild AND commit `dist/`, or the runtime stays stale**
+This repo commits its compiled output: `dist/` is NOT gitignored, because the MCP server (`dist/index.js`) and the headless drift/change-manager CLIs (`dist/cli/*.js`) run from it, not from `src/`. Vitest transpiles `src/` directly, so **a green test suite does NOT prove `dist/` is current** — you can change `src/`, pass all tests, commit, and ship a stale `dist/` whose runtime behavior lacks your change. Always `npm run build` and `git add dist/` in the same commit as the `src/` change (or a follow-up build commit). Symptom that bit us once: control-plane taxonomy routing worked in tests but the committed `dist/security-drift/taxonomy.js` still had the old classifier. When reviewing a PR that edits `src/`, confirm the matching `dist/` files are in the diff.
+
 ## Security-Drift Subsystem (`src/security-drift/`)
 
 Feeds the security detector into the daily 3am drift job + the change-manager
