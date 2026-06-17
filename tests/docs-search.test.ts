@@ -1,20 +1,26 @@
 import { describe, it, expect, vi } from "vitest";
 
 // Mock axios before importing the module under test.
-const getMock = vi.fn();
+// vi.mock is hoisted, so the mock fn must be created via vi.hoisted (not a plain top-level const).
+const { getMock } = vi.hoisted(() => ({ getMock: vi.fn() }));
 vi.mock("axios", () => ({ default: { get: getMock } }));
 
 import { searchDocs } from "../src/services/docs-search.js";
 
+// Mirrors the real llms-full.txt structure: `# Title (/path)` page headers with
+// `Section [#anchor]` sub-headers, no YAML frontmatter.
 const SAMPLE = [
-  "url: https://coolify.io/docs/health",
-  "description: Health check configuration",
-  "title: Health Checks",
-  "---",
-  "# Health Checks",
+  "# Health Checks (/docs/knowledge-base/health-checks)",
   "",
-  "## Configuring the healthcheck path",
+  "Configuring the healthcheck path [#configuring]",
+  "",
   "Set the healthcheck path to /api/health for single-container apps so Coolify can probe readiness.",
+  "",
+  "# Backups (/docs/databases/backups)",
+  "",
+  "Scheduled backups [#scheduled]",
+  "",
+  "Scheduled database backups are configured using cron expressions.",
 ].join("\n");
 
 describe("searchDocs", () => {
@@ -26,8 +32,8 @@ describe("searchDocs", () => {
       expect.objectContaining({ timeout: 15000 })
     );
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].url).toBe("https://coolify.io/docs/health");
-    expect(results[0].title).toContain("Health Checks");
+    expect(results[0].url).toBe("https://coolify.io/docs/knowledge-base/health-checks#configuring");
+    expect(results[0].title).toBe("Health Checks > Configuring the healthcheck path");
     expect(typeof results[0].snippet).toBe("string");
     expect(typeof results[0].score).toBe("number");
   });

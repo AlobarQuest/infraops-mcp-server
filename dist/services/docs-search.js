@@ -12,45 +12,49 @@ import MiniSearch from "minisearch";
 const DOCS_URL = "https://coolify.io/docs/llms-full.txt";
 const FETCH_TIMEOUT_MS = 15000;
 let indexPromise = null;
-/** Parse the llms-full.txt corpus into searchable chunks. */
+const DOCS_BASE = "https://coolify.io";
+/**
+ * Parse the llms-full.txt corpus into searchable chunks.
+ *
+ * Real format (no YAML frontmatter): each doc page begins with an H1 whose text
+ * embeds the path, e.g. `# Docker Compose Build Packs (/docs/applications/build-packs/docker-compose)`.
+ * Within a page, sections are plain lines ending in an anchor, e.g. `How It Works? [#how-it-works]`.
+ * We chunk per section (carrying the page title + url#anchor) for relevance and correct attribution.
+ */
 function parseDocs(raw) {
     const chunks = [];
     let id = 0;
-    // Pages are separated by a blank-line-padded horizontal rule run.
-    const pages = raw.split(/\n---\n\n---\n/);
-    for (const page of pages) {
-        // Frontmatter: leading `url:` / `description:` lines, then `---`, then body.
-        let url = "";
-        let description = "";
-        let title = "";
-        let body = page;
-        const fmMatch = page.match(/^([\s\S]*?)\n---\n([\s\S]*)$/);
-        if (fmMatch) {
-            const front = fmMatch[1];
-            body = fmMatch[2];
-            const urlM = front.match(/^url:\s*(.+)$/m);
-            const descM = front.match(/^description:\s*(.+)$/m);
-            const titleM = front.match(/^title:\s*(.+)$/m);
-            if (urlM)
-                url = urlM[1].trim();
-            if (descM)
-                description = descM[1].trim();
-            if (titleM)
-                title = titleM[1].trim();
+    // Page boundaries: an H1 line whose heading ends with a parenthesised "/path".
+    const pageHeader = /^#[ \t]+(.+?)[ \t]+\((\/[^)]+)\)[ \t]*$/gm;
+    const headers = [];
+    let m;
+    while ((m = pageHeader.exec(raw)) !== null) {
+        headers.push({ title: m[1].trim(), path: m[2].trim(), start: m.index, bodyStart: pageHeader.lastIndex });
+    }
+    const pushChunk = (title, url, content) => {
+        const trimmed = content.trim();
+        if (trimmed.length >= 20)
+            chunks.push({ id: id++, title, url, description: "", content: trimmed });
+    };
+    for (let i = 0; i < headers.length; i++) {
+        const h = headers[i];
+        const bodyEnd = i + 1 < headers.length ? headers[i + 1].start : raw.length;
+        const body = raw.slice(h.bodyStart, bodyEnd);
+        const url = DOCS_BASE + h.path;
+        // Section markers: a line of the form "Section Name [#anchor]".
+        const sectionRe = /^(.+?)[ \t]+\[#([^\]]+)\][ \t]*$/gm;
+        const markers = [];
+        let s;
+        while ((s = sectionRe.exec(body)) !== null) {
+            markers.push({ name: s[1].trim(), anchor: s[2], index: s.index });
         }
-        if (!title) {
-            const h1 = body.match(/^#\s+(.+)$/m);
-            title = h1 ? h1[1].trim() : url || "Coolify Docs";
+        if (markers.length === 0) {
+            pushChunk(h.title, url, body);
+            continue;
         }
-        // Sub-split the body on `## ` section headers so results land on a section.
-        const sections = body.split(/\n(?=##\s)/);
-        for (const section of sections) {
-            const content = section.trim();
-            if (content.length < 20)
-                continue;
-            const headerM = section.match(/^##\s+(.+)$/m);
-            const sectionTitle = headerM ? `${title} > ${headerM[1].trim()}` : title;
-            chunks.push({ id: id++, title: sectionTitle, url, description, content });
+        for (let j = 0; j < markers.length; j++) {
+            const segEnd = j + 1 < markers.length ? markers[j + 1].index : body.length;
+            pushChunk(`${h.title} > ${markers[j].name}`, `${url}#${markers[j].anchor}`, body.slice(markers[j].index, segEnd));
         }
     }
     return chunks;
