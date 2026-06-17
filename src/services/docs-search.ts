@@ -62,6 +62,10 @@ function parseDocs(raw: string): DocChunk[] {
   for (let i = 0; i < headers.length; i++) {
     const h = headers[i];
     const bodyEnd = i + 1 < headers.length ? headers[i + 1].start : raw.length;
+    // Skip the OpenAPI operation pages under /api-reference/api/: their bodies are raw
+    // JSON spec dumps that dominate BM25 ranking with useless snippets and bury the prose
+    // guides. (Prose api-reference pages like /api-reference/authorization are kept.)
+    if (/\/api-reference\/api\//.test(h.path)) continue;
     const body = raw.slice(h.bodyStart, bodyEnd);
     const url = DOCS_BASE + h.path;
 

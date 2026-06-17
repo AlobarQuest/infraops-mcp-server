@@ -21,6 +21,10 @@ const SAMPLE = [
   "Scheduled backups [#scheduled]",
   "",
   "Scheduled database backups are configured using cron expressions.",
+  "",
+  "# Create Backup (/docs/api-reference/api/databases/create-backup)",
+  "",
+  '{ "post": { "summary": "Create a new scheduled backup", "build_pack": "dockercompose" } }',
 ].join("\n");
 
 describe("searchDocs", () => {
@@ -36,6 +40,11 @@ describe("searchDocs", () => {
     expect(results[0].title).toBe("Health Checks > Configuring the healthcheck path");
     expect(typeof results[0].snippet).toBe("string");
     expect(typeof results[0].score).toBe("number");
+  });
+
+  it("excludes /api-reference/api/ OpenAPI dump pages from results", async () => {
+    const results = await searchDocs("backup", 10);
+    expect(results.every((r) => !r.url.includes("/api-reference/api/"))).toBe(true);
   });
 
   it("caches the index (second search does not re-fetch)", async () => {
