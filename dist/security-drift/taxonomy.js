@@ -40,7 +40,12 @@ const URGENT_KEYS = new Set([
     "launchagent.new",
     "shell_profile.changed",
     "mcp.server_added",
+    // control-plane tamper-evidence (~/.claude git repo):
+    "controlplane.drift",
+    "controlplane.unmanaged",
 ]);
+// Findings surfaced in the scan log but intentionally NOT escalated (expected churn).
+const IGNORE_KEYS = new Set(["controlplane.local_churn"]);
 // NORMAL checks with a deterministic, idempotent exec remediation.
 // ONLY non-sudo, user-scope, idempotent commands belong here — the 4am executor runs
 // unattended as the user, so anything needing sudo (gatekeeper, critical-updates) or
@@ -56,6 +61,8 @@ const SHORT_TITLES = {
     "listener.lan_exposed": "Service port exposed on 0.0.0.0",
     "backupkey.world_writable": "World-writable backup key",
     "tiktok.plaintext_password": "Plaintext DB password in plist",
+    "controlplane.drift": "Control-plane file changed without review",
+    "controlplane.unmanaged": "Control plane not under version control",
 };
 function titleFor(f) {
     return SHORT_TITLES[f.check] ?? f.check;
@@ -65,7 +72,14 @@ function titleFor(f) {
  * Only FAIL/WARN findings should be passed in; PASS findings are not drift.
  */
 export function classify(f, opts) {
-    if (isFalsePositive(f, opts))
+    // Explicitly-keyed findings (IGNORE_KEYS drops, URGENT_KEYS escalates) are routed by
+    // f.check, and their target may be a sentence-shaped detail (controlplane.drift's
+    // git-status line). Route them BEFORE the path-based false-positive filter, whose
+    // patterns (test/, fixtures/, .pem, .pub) would otherwise match an embedded tracked
+    // path and silently drop a real finding — a deny-by-default bypass.
+    if (IGNORE_KEYS.has(f.check))
+        return null;
+    if (!URGENT_KEYS.has(f.check) && isFalsePositive(f, opts))
         return null;
     const title = titleFor(f);
     // AUTO-FIX candidates: cred-file perms, ONLY when path is explicitly allowlisted.
