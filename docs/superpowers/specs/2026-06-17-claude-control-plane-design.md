@@ -72,7 +72,7 @@ The `.gitignore` ignores `/*` then un-ignores exactly:
 |------|-------|-------|
 | `CLAUDE.md`, `RTK.md` | instruction | core security policy |
 | `settings.json` | permission | **critical**: deny list, hook wiring, bypass flag |
-| `settings.local.json` | permission | per-project allowlists; expected to be churny — kept anyway so a malicious allow-add is visible. Tracked but **not escalated** (INFO churn tier — see Tamper-evidence). Revisit if noise is unmanageable. |
+| `settings.local.json` | permission | per-project allowlists; expected to be churny — kept anyway so a malicious allow-add is visible. Tracked but **not escalated** (WARN severity, dropped by taxonomy — see Tamper-evidence). Revisit if noise is unmanageable. |
 | `.mcp.json` | config | MCP server registry |
 | `hooks/` (excl. `*.bak*`) | enforcement | all 8 hook scripts |
 | `statusline-command.sh` | misc | script Claude runs |
@@ -110,8 +110,8 @@ Two layers, both reusing existing machinery:
      `RTK.md`. Dirtiness here means the deny list, hook wiring, MCP registry, or core policy
      changed without being committed/reviewed — emit a FAIL finding into the **existing**
      security-drift → change-manager → Resend pipeline (no new alerting code).
-   - **Churn set — surfaced, not escalated (INFO):** `settings.local.json`. It changes most
-     sessions (new per-project allowances), so its drift is recorded at INFO severity and is
+   - **Churn set — surfaced, not escalated (WARN severity, dropped by taxonomy):** `settings.local.json`. It changes most
+     sessions (new per-project allowances), so its drift is recorded at WARN severity and is
      **not** posted as a change-manager escalation — preventing daily flooding while keeping
      it in git history (so a malicious allow-add is still visible on review).
 

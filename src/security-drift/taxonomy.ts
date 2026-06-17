@@ -100,8 +100,13 @@ function titleFor(f: Finding): string {
  * Only FAIL/WARN findings should be passed in; PASS findings are not drift.
  */
 export function classify(f: Finding, opts: ClassifyOptions): Classification | null {
-  if (isFalsePositive(f, opts)) return null;
+  // Explicitly-keyed findings (IGNORE_KEYS drops, URGENT_KEYS escalates) are routed by
+  // f.check, and their target may be a sentence-shaped detail (controlplane.drift's
+  // git-status line). Route them BEFORE the path-based false-positive filter, whose
+  // patterns (test/, fixtures/, .pem, .pub) would otherwise match an embedded tracked
+  // path and silently drop a real finding — a deny-by-default bypass.
   if (IGNORE_KEYS.has(f.check)) return null;
+  if (!URGENT_KEYS.has(f.check) && isFalsePositive(f, opts)) return null;
 
   const title = titleFor(f);
 

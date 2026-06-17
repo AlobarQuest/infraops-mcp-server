@@ -238,7 +238,7 @@ fi
 # ---------------------------------------------------------------------------
 CP="$HOME/.claude"
 if have git && [ -d "$CP/.git" ]; then
-  crit="$(git -C "$CP" status --porcelain -- settings.json .mcp.json CLAUDE.md RTK.md hooks/ statusline-command.sh 2>/dev/null)"
+  crit="$(git -C "$CP" status --porcelain -- .gitignore settings.json .mcp.json CLAUDE.md RTK.md hooks/ statusline-command.sh 2>/dev/null)"
   if [ -n "$crit" ]; then
     while IFS= read -r l; do
       [ -n "$l" ] && emit FAIL controlplane.drift "uncommitted/untracked control-plane change: ${l} (review + commit if intended)"

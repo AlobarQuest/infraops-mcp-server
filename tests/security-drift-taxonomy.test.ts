@@ -67,6 +67,12 @@ describe("classify", () => {
     expect(c?.tier).toBe("URGENT");
   });
 
+  it("escalates controlplane.drift even when the changed path contains an FP token like /test/", () => {
+    const detail = "uncommitted/untracked control-plane change:  ?? hooks/test/evil.sh (review + commit if intended)";
+    const c = classify(f({ check: "controlplane.drift", target: detail, detail }), { autoFixAllowlist: [] });
+    expect(c?.tier).toBe("URGENT");
+  });
+
   it("drops settings.local.json churn (logged in scan, never escalated)", () => {
     const c = classify(
       f({ severity: "WARN", check: "controlplane.local_churn", target: "settings.local.json", detail: "settings.local.json changed since last commit (expected churn)" }),
