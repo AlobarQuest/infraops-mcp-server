@@ -2,9 +2,11 @@
 # Daily change-window executor — runs on the Mac mini via launchd
 # (com.devon.change-window) at 04:00. Mirrors the drift-audit pattern.
 #
-# Secrets: sources a gitignored env file ($HOME/.config/infra-drift/env) for the
-# bootstrap BWS_ACCESS_TOKEN + Healthchecks.io ping URL (INFRADRIFT_CW_HC_PING_URL),
-# then fetches every other secret from BWS *by stable UUID* (per infra-brain lesson
+# Secrets: the bootstrap BWS_ACCESS_TOKEN is loaded from the macOS login Keychain
+# (service 'Claude', account 'BWS_ACCESS_TOKEN_INFRA_DRIFT' — see bws-token.sh), never
+# from a plaintext file. The gitignored env file ($HOME/.config/infra-drift/env) now
+# carries only the Healthchecks.io ping URL (INFRADRIFT_CW_HC_PING_URL).
+# Every other secret is fetched from BWS *by stable UUID* (per infra-brain lesson
 # #277 — no secrets in this public file; UUIDs defaulted inline, overridable via
 # BWS_*_SECRET_ID). Runs the change-mgr run-window CLI (executes approved change
 # requests, writes <date>.change-window.md digest to the report dir), emails the
@@ -14,6 +16,9 @@ set -uo pipefail
 # ── Config (overridable via the sourced env file) ──────────────────────────────
 CONFIG="${INFRADRIFT_ENV:-$HOME/.config/infra-drift/env}"
 if [ -f "$CONFIG" ]; then set -a; . "$CONFIG"; set +a; fi
+
+# Bootstrap BWS token from the login Keychain (not the env file). Idempotent.
+source "$(dirname "${BASH_SOURCE[0]}")/bws-token.sh"
 
 REPO="${INFRADRIFT_REPO:-$HOME/Projects/infraops-mcp-server}"
 REPORT_DIR="${INFRADRIFT_REPORT_DIR:-$HOME/infra-drift/reports}"

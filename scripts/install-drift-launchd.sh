@@ -10,17 +10,21 @@ ENV_FILE="$HOME/.config/infra-drift/env"
 
 mkdir -p "$HOME/.config/infra-drift" "$HOME/infra-drift/reports" "$HOME/Library/LaunchAgents"
 
+# The BWS_ACCESS_TOKEN is NOT stored here — it lives in the macOS login Keychain
+# (service 'Claude', account 'BWS_ACCESS_TOKEN_INFRA_DRIFT'), loaded by bws-token.sh.
+# Create it once with:
+#   security add-generic-password -U -s Claude -a BWS_ACCESS_TOKEN_INFRA_DRIFT \
+#     -T /usr/bin/security -w   (paste the token at the prompt)
 if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<'EOF'
-# Drift-audit secrets — gitignored, never commit. (chmod 600)
-# BWS_ACCESS_TOKEN: a BWS machine token that can read prod-coolify-api-token,
-#   local-coolify-api, INFRABRAIN_ACCESS_KEY, resend-api-key, anthropic-api-key.
+# Drift-audit config — gitignored, never commit. (chmod 600)
+# Holds only the Healthchecks.io ping URL; the BWS token comes from the Keychain.
 # INFRADRIFT_HC_PING_URL: the Healthchecks.io check ping URL.
-BWS_ACCESS_TOKEN=
 INFRADRIFT_HC_PING_URL=
 EOF
   chmod 600 "$ENV_FILE"
-  echo "Created $ENV_FILE — fill in BWS_ACCESS_TOKEN + INFRADRIFT_HC_PING_URL, then re-run."
+  echo "Created $ENV_FILE — fill in INFRADRIFT_HC_PING_URL, ensure the BWS token is in"
+  echo "the Keychain (account BWS_ACCESS_TOKEN_INFRA_DRIFT), then re-run."
   exit 0
 fi
 

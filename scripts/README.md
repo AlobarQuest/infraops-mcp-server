@@ -11,8 +11,9 @@ BWS + Healthchecks.io).
 
 `scripts/drift-audit.sh` (daily 03:00 via `com.devon.infra-drift`):
 
-1. Sources `~/.config/infra-drift/env` (gitignored) for `BWS_ACCESS_TOKEN` +
-   `INFRADRIFT_HC_PING_URL`.
+1. Loads `BWS_ACCESS_TOKEN` from the macOS login Keychain (service `Claude`, account
+   `BWS_ACCESS_TOKEN_INFRA_DRIFT`, via `bws-token.sh`) — never from a plaintext file.
+   Sources `~/.config/infra-drift/env` (gitignored) only for `INFRADRIFT_HC_PING_URL`.
 2. Fetches every secret from BWS **by stable UUID** (per infra-brain lesson #277 —
    names are mutable, UUIDs are stable), each defaulted inline and overridable via
    a `BWS_*_SECRET_ID` env var:
@@ -58,13 +59,17 @@ package; it never auto-applies escalated items.
 ## Install
 
 ```bash
+# One-time: put the BWS token in the login Keychain (paste at the prompt — never echo it)
+security add-generic-password -U -s Claude -a BWS_ACCESS_TOKEN_INFRA_DRIFT -T /usr/bin/security -w
+
 bash scripts/install-drift-launchd.sh          # 1st run: creates the env file
-$EDITOR ~/.config/infra-drift/env              # fill BWS_ACCESS_TOKEN + INFRADRIFT_HC_PING_URL
+$EDITOR ~/.config/infra-drift/env              # fill INFRADRIFT_HC_PING_URL
 bash scripts/install-drift-launchd.sh          # 2nd run: renders plist + loads agent
 launchctl start com.devon.infra-drift          # run once now to verify
 tail -f ~/Library/Logs/infra-drift.log
 ```
 
-Secrets live only in `~/.config/infra-drift/env` (chmod 600) — never in this repo
-or the plist. The dead-man's switch alerts if a daily run is missed (e.g. mini
-offline), so a skipped run never goes unnoticed.
+The BWS token lives only in the login Keychain (account `BWS_ACCESS_TOKEN_INFRA_DRIFT`);
+`~/.config/infra-drift/env` (chmod 600) holds only the Healthchecks ping URL(s) — never
+the token, and never anything in this repo or the plist. The dead-man's switch alerts if
+a daily run is missed (e.g. mini offline), so a skipped run never goes unnoticed.

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Template for the daily drift-audit LaunchAgent. Install with scripts/install-drift-launchd.sh,
      which substitutes __REPO__ / __HOME__ and writes ~/Library/LaunchAgents/com.devon.infra-drift.plist.
-     No secrets live here — the wrapper sources them from ~/.config/infra-drift/env (gitignored). -->
+     No secrets live here — the wrapper loads the BWS token from the login Keychain
+     (account BWS_ACCESS_TOKEN_INFRA_DRIFT) and the Healthchecks ping URL from
+     ~/.config/infra-drift/env (gitignored). -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
