@@ -73,3 +73,36 @@ The BWS token lives only in the login Keychain (account `BWS_ACCESS_TOKEN_INFRA_
 `~/.config/infra-drift/env` (chmod 600) holds only the Healthchecks ping URL(s) — never
 the token, and never anything in this repo or the plist. The dead-man's switch alerts if
 a daily run is missed (e.g. mini offline), so a skipped run never goes unnoticed.
+
+# Standalone weekly security scan (`com.devon.security-scan`)
+
+The machine security detector is **repo-managed here** and deployed to `~/.claude/bin`:
+
+- `scripts/security-scan.sh` — read-only detector (plaintext secrets in shell configs,
+  over-permissive credential file modes, inlined secrets in MCP configs, `settings.json`
+  permission regressions, token-shape/supply-chain checks, read-guard health canary).
+  Exit 0 = clean, 1 = drift.
+- `scripts/skills-security-scan.sh` — static lint of Claude Code agent skills + hooks.
+
+These run two ways: **embedded** in the 3am `drift-audit.sh` job (via
+`dist/cli/security-drift-cli.js run`, which classifies + diffs + escalates to the change
+manager) and **standalone** every Monday 09:00 via the `com.devon.security-scan` LaunchAgent
+(logs only, to `~/.claude/audit/`). Both invoke the **deployed** `~/.claude/bin/security-scan.sh`.
+
+**Source-of-truth → deploy model.** The repo copies under `scripts/` are authoritative; the
+installer deploys byte-identical copies to `~/.claude/bin` (the path `src/security-drift/paths.ts`,
+the hooks, and the global `CLAUDE.md` weekly-tool note all expect). The 3am self-check
+(`src/security-drift/self-check.ts`) sha256s the **deployed** scanner; after you edit the repo
+copy and re-run the installer, the next run surfaces **one** `selfcheck.runner_integrity`
+URGENT ("scanner hash changed — verify intentional"), then records the new hash. That is the
+intended safety net — it also catches any out-of-band edit to the deployed copy.
+
+## Install
+
+```bash
+bash scripts/install-security-scan-launchd.sh   # deploys scanners + renders/loads the plist
+launchctl start com.devon.security-scan         # run once now to verify
+tail -f ~/.claude/audit/security-scan-launchd.err
+```
+
+No secrets and no env file — the standalone scan is read-only and takes no BWS token.

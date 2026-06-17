@@ -162,8 +162,13 @@ The deployment history endpoint is `/deployments/applications/{app_uuid}` (not `
 
 ## Security-Drift Subsystem (`src/security-drift/`)
 
-Feeds `~/.claude/bin/security-scan.sh` into the daily 3am drift job + the change-manager
-approval pipeline. CLI entry: `dist/cli/security-drift-cli.js run` (chained into
+Feeds the security detector into the daily 3am drift job + the change-manager
+approval pipeline. The detector itself is **repo-managed** (`scripts/security-scan.sh`,
+plus the skills/hooks linter `scripts/skills-security-scan.sh`) and deployed to
+`~/.claude/bin/` by `scripts/install-security-scan-launchd.sh` — which also installs the
+standalone weekly `com.devon.security-scan` LaunchAgent (Mon 09:00, logs-only). The runtime
+resolves the scanner at `~/.claude/bin/security-scan.sh` (`paths.ts`, env-overridable via
+`SECURITY_SCAN_PATH`). CLI entry: `dist/cli/security-drift-cli.js run` (chained into
 `scripts/drift-audit.sh`). Modules: `scan-parser` → `taxonomy` (classify, deny-by-default)
 → `baseline` (0600-validated accepted baseline + diff) → `autofix` (guarded chmod) →
 `emit`/`emit-state` (CM escalations + plan-hash) → `notify` (Resend urgent) → `runner`
@@ -192,6 +197,16 @@ so the Sonnet agent never receives a security item.
 symlink / hardlink / owner guards require operating on the open fd (the inode), which bash's
 path-based `chmod` cannot do safely. The path-allowlist is deny-by-default (empty ⇒ nothing
 auto-fixes); a blocked guard re-tiers the finding to URGENT.
+
+**The detector lives in the repo but RUNS from `~/.claude/bin/`; editing it requires re-running the installer.**
+`scripts/security-scan.sh` is the source of truth, but both the embedded 3am CLI and the
+standalone LaunchAgent execute the *deployed* `~/.claude/bin/security-scan.sh`. Editing the
+repo copy has NO effect until `scripts/install-security-scan-launchd.sh` redeploys it. The
+self-check's runner-integrity gate (`self-check.ts`, step 3) sha256s the deployed scanner, so
+a redeploy surfaces exactly one `selfcheck.runner_integrity` URGENT ("scanner hash changed —
+verify intentional") on the next run, then records the new hash. This same gate is what catches
+any *out-of-band* edit to the deployed copy. Keep the two in sync via the installer, never by
+hand-editing `~/.claude/bin/`.
 
 ## Secrets
 
