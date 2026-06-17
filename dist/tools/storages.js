@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 const ResourceSchema = z
     .enum(["application", "database", "service"])
     .describe("Resource type that owns the storage");
@@ -37,7 +37,7 @@ export function registerStorageTools(server) {
             name: z.string().min(1).describe("Storage name"),
             mount_path: z.string().min(1).describe("Container mount path (e.g. /data)"),
             host_path: z.string().optional().describe("Host bind-mount path (omit for named volume)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     }, async ({ resource, uuid, name, mount_path, host_path, instance, }) => {
@@ -63,7 +63,7 @@ export function registerStorageTools(server) {
             name: z.string().optional().describe("New storage name"),
             mount_path: z.string().optional().describe("New container mount path"),
             host_path: z.string().optional().describe("New host bind-mount path"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     }, async ({ resource, uuid, storage_uuid, name, mount_path, host_path, instance, }) => {
@@ -90,7 +90,7 @@ export function registerStorageTools(server) {
             resource: ResourceSchema,
             uuid: UuidSchema.describe("Resource UUID"),
             storage_uuid: z.string().min(1).describe("Storage UUID to delete"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     }, async ({ resource, uuid, storage_uuid, instance, }) => {

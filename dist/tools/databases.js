@@ -8,7 +8,7 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 export function registerDatabaseTools(server) {
     // ── List Databases ───────────────────────────────────────────────
     server.registerTool("coolify_list_databases", {
@@ -99,7 +99,7 @@ export function registerDatabaseTools(server) {
                 .number()
                 .optional()
                 .describe("Public port if is_public=true"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -150,7 +150,7 @@ export function registerDatabaseTools(server) {
             image: z.string().optional().describe("New Docker image"),
             is_public: z.boolean().optional().describe("Toggle public access"),
             public_port: z.number().optional().describe("New public port"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -195,7 +195,7 @@ export function registerDatabaseTools(server) {
                 .boolean()
                 .default(true)
                 .describe("Also delete data volumes (default: true)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,

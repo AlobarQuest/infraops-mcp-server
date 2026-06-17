@@ -7,7 +7,7 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 
 const ResourceSchema = z
@@ -58,7 +58,7 @@ export function registerScheduledTaskTools(server: McpServer): void {
         frequency: z.string().min(1).describe("Cron expression (e.g. '0 * * * *' for hourly)"),
         container: z.string().optional().describe("Container name to run the command in (for compose apps)"),
         is_enabled: z.boolean().default(true).describe("Whether the task is active (default: true)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -108,7 +108,7 @@ export function registerScheduledTaskTools(server: McpServer): void {
         frequency: z.string().optional().describe("New cron expression"),
         container: z.string().optional().describe("New container name"),
         is_enabled: z.boolean().optional().describe("Enable or disable the task"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -159,7 +159,7 @@ export function registerScheduledTaskTools(server: McpServer): void {
         resource: ResourceSchema,
         uuid: UuidSchema.describe("Resource UUID"),
         task_uuid: z.string().min(1).describe("Scheduled task UUID to delete"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },

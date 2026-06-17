@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 const ResourceSchema = z
     .enum(["application", "service"])
     .describe("Resource type that owns the scheduled task");
@@ -39,7 +39,7 @@ export function registerScheduledTaskTools(server) {
             frequency: z.string().min(1).describe("Cron expression (e.g. '0 * * * *' for hourly)"),
             container: z.string().optional().describe("Container name to run the command in (for compose apps)"),
             is_enabled: z.boolean().default(true).describe("Whether the task is active (default: true)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     }, async ({ resource, uuid, name, command, frequency, container, is_enabled, instance, }) => {
@@ -67,7 +67,7 @@ export function registerScheduledTaskTools(server) {
             frequency: z.string().optional().describe("New cron expression"),
             container: z.string().optional().describe("New container name"),
             is_enabled: z.boolean().optional().describe("Enable or disable the task"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     }, async ({ resource, uuid, task_uuid, name, command, frequency, container, is_enabled, instance, }) => {
@@ -98,7 +98,7 @@ export function registerScheduledTaskTools(server) {
             resource: ResourceSchema,
             uuid: UuidSchema.describe("Resource UUID"),
             task_uuid: z.string().min(1).describe("Scheduled task UUID to delete"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     }, async ({ resource, uuid, task_uuid, instance, }) => {

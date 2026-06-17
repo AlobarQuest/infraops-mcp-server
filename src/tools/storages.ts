@@ -7,7 +7,7 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 
 const ResourceSchema = z
@@ -56,7 +56,7 @@ export function registerStorageTools(server: McpServer): void {
         name: z.string().min(1).describe("Storage name"),
         mount_path: z.string().min(1).describe("Container mount path (e.g. /data)"),
         host_path: z.string().optional().describe("Host bind-mount path (omit for named volume)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -100,7 +100,7 @@ export function registerStorageTools(server: McpServer): void {
         name: z.string().optional().describe("New storage name"),
         mount_path: z.string().optional().describe("New container mount path"),
         host_path: z.string().optional().describe("New host bind-mount path"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
@@ -145,7 +145,7 @@ export function registerStorageTools(server: McpServer): void {
         resource: ResourceSchema,
         uuid: UuidSchema.describe("Resource UUID"),
         storage_uuid: z.string().min(1).describe("Storage UUID to delete"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },

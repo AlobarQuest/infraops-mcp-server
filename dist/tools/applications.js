@@ -9,7 +9,7 @@
 import { z } from "zod";
 import axios from "axios";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 export function registerApplicationTools(server) {
     // ── List Applications ────────────────────────────────────────────
     server.registerTool("coolify_list_applications", {
@@ -103,7 +103,7 @@ export function registerApplicationTools(server) {
                 .string()
                 .optional()
                 .describe("FQDN for the app (e.g. https://myapp.devonwatkins.com)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -175,7 +175,7 @@ export function registerApplicationTools(server) {
                 .default("8000")
                 .describe("Ports to expose (default: 8000)"),
             domains: z.string().optional().describe("FQDN for the app"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -233,7 +233,7 @@ export function registerApplicationTools(server) {
             description: z.string().optional().describe("Application description"),
             ports_exposes: z.string().default("8080").describe("Ports to expose"),
             domains: z.string().optional().describe("FQDN for the app"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -316,7 +316,7 @@ export function registerApplicationTools(server) {
                 .string()
                 .optional()
                 .describe("FQDN for single-container apps (not for dockercompose — use coolify_set_compose_config instead)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -401,7 +401,7 @@ export function registerApplicationTools(server) {
                 .string()
                 .optional()
                 .describe("FQDN for single-container apps (not for dockercompose — use coolify_set_compose_config instead)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -470,7 +470,7 @@ export function registerApplicationTools(server) {
                 .boolean()
                 .default(false)
                 .describe("Deploy immediately after creation (default: false)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -528,7 +528,7 @@ export function registerApplicationTools(server) {
                 .boolean()
                 .default(true)
                 .describe("Clear custom_labels so Coolify auto-generates from domain config (default: true)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -624,7 +624,7 @@ export function registerApplicationTools(server) {
                 .string()
                 .optional()
                 .describe("UUID of Coolify private key to link for Git access"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -685,7 +685,7 @@ export function registerApplicationTools(server) {
                 .boolean()
                 .default(true)
                 .describe("Also delete Docker volumes (default: true)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,

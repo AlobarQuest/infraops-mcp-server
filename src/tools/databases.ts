@@ -17,7 +17,7 @@ import {
   handleCoolifyError,
   type CoolifyInstance,
 } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyDatabase } from "../types.js";
 
 export function registerDatabaseTools(server: McpServer): void {
@@ -126,7 +126,7 @@ export function registerDatabaseTools(server: McpServer): void {
           .number()
           .optional()
           .describe("Public port if is_public=true"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -196,7 +196,7 @@ export function registerDatabaseTools(server: McpServer): void {
         image: z.string().optional().describe("New Docker image"),
         is_public: z.boolean().optional().describe("Toggle public access"),
         public_port: z.number().optional().describe("New public port"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -250,7 +250,7 @@ export function registerDatabaseTools(server: McpServer): void {
           .boolean()
           .default(true)
           .describe("Also delete data volumes (default: true)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,

@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 export function registerProjectTools(server) {
     // ── List Projects ────────────────────────────────────────────────
     server.registerTool("coolify_list_projects", {
@@ -72,7 +72,7 @@ export function registerProjectTools(server) {
                 .string()
                 .optional()
                 .describe("Optional project description"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -110,7 +110,7 @@ export function registerProjectTools(server) {
                 .string()
                 .optional()
                 .describe("New project description"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -143,7 +143,7 @@ export function registerProjectTools(server) {
     server.registerTool("coolify_delete_project", {
         title: "Delete Coolify Project",
         description: "Delete a project by UUID. WARNING: This will delete all environments and resources within the project.",
-        inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
+        inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceRequiredSchema },
         annotations: {
             readOnlyHint: false,
             destructiveHint: true,
@@ -217,7 +217,7 @@ export function registerProjectTools(server) {
                 .string()
                 .min(1)
                 .describe("Environment name (e.g. production, staging)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -252,7 +252,7 @@ export function registerProjectTools(server) {
                 .string()
                 .min(1)
                 .describe("Name of the environment to delete"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,

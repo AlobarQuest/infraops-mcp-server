@@ -15,7 +15,7 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { CoolifyService } from "../types.js";
 
@@ -115,7 +115,7 @@ export function registerServiceTools(server: McpServer): void {
             "Raw docker-compose.yml content (required if type is docker-compose)"
           ),
         domains: z.string().optional().describe("FQDN for the service"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -179,7 +179,7 @@ export function registerServiceTools(server: McpServer): void {
           .optional()
           .describe("Updated docker-compose.yml content"),
         domains: z.string().optional().describe("New FQDN"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -227,7 +227,7 @@ export function registerServiceTools(server: McpServer): void {
       title: "Delete Coolify Service",
       description:
         "Delete a service. WARNING: Stops all containers and removes the service definition.",
-      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceRequiredSchema },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,

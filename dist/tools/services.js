@@ -7,7 +7,7 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 export function registerServiceTools(server) {
     // ── List Services ────────────────────────────────────────────────
     server.registerTool("coolify_list_services", {
@@ -84,7 +84,7 @@ export function registerServiceTools(server) {
                 .optional()
                 .describe("Raw docker-compose.yml content (required if type is docker-compose)"),
             domains: z.string().optional().describe("FQDN for the service"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -134,7 +134,7 @@ export function registerServiceTools(server) {
                 .optional()
                 .describe("Updated docker-compose.yml content"),
             domains: z.string().optional().describe("New FQDN"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -170,7 +170,7 @@ export function registerServiceTools(server) {
     server.registerTool("coolify_delete_service", {
         title: "Delete Coolify Service",
         description: "Delete a service. WARNING: Stops all containers and removes the service definition.",
-        inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
+        inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceRequiredSchema },
         annotations: {
             readOnlyHint: false,
             destructiveHint: true,

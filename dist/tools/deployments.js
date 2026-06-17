@@ -5,7 +5,7 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, handleCoolifyError, } from "../services/coolify-client.js";
-import { CoolifyInstanceSchema } from "../schemas/common.js";
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 export function registerDeploymentTools(server) {
     // ── Deploy Application ───────────────────────────────────────────
     server.registerTool("coolify_deploy", {
@@ -25,7 +25,7 @@ export function registerDeploymentTools(server) {
                 .boolean()
                 .default(false)
                 .describe("Force rebuild even if no changes detected (default: false)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,

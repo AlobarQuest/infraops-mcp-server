@@ -14,7 +14,7 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { CoolifyEnvVar } from "../types.js";
 
@@ -89,7 +89,7 @@ export function registerEnvVarTools(server: McpServer): void {
           .boolean()
           .default(false)
           .describe("Only for preview deployments (default: false)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -149,7 +149,7 @@ export function registerEnvVarTools(server: McpServer): void {
         is_buildtime: z.boolean().optional().describe("Build-time availability"),
         is_runtime: z.boolean().optional().describe("Runtime availability"),
         is_preview: z.boolean().optional().describe("Preview-only flag"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -204,7 +204,7 @@ export function registerEnvVarTools(server: McpServer): void {
       inputSchema: {
         uuid: z.string().min(1).describe("Application UUID"),
         env_uuid: z.string().min(1).describe("Environment variable UUID"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -260,7 +260,7 @@ export function registerEnvVarTools(server: McpServer): void {
           )
           .min(1)
           .describe("Array of env vars to create or update"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -374,7 +374,7 @@ export function registerEnvVarTools(server: McpServer): void {
           .boolean()
           .default(false)
           .describe("Only for preview deployments (default: false)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -432,7 +432,7 @@ export function registerEnvVarTools(server: McpServer): void {
         is_buildtime: z.boolean().optional().describe("Build-time availability"),
         is_runtime: z.boolean().optional().describe("Runtime availability"),
         is_preview: z.boolean().optional().describe("Preview-only flag"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -487,7 +487,7 @@ export function registerEnvVarTools(server: McpServer): void {
       inputSchema: {
         uuid: z.string().min(1).describe("Service UUID"),
         env_uuid: z.string().min(1).describe("Environment variable UUID"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -540,7 +540,7 @@ export function registerEnvVarTools(server: McpServer): void {
           )
           .min(1)
           .describe("Array of env vars to create or update"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,

@@ -15,7 +15,7 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { CoolifyPrivateKey } from "../types.js";
 
@@ -77,7 +77,7 @@ export function registerPrivateKeyTools(server: McpServer): void {
           .string()
           .optional()
           .describe("Optional description of what this key is used for"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -146,7 +146,7 @@ export function registerPrivateKeyTools(server: McpServer): void {
         "Will fail with 422 if the key is still in use by an application or server.",
       inputSchema: {
         uuid: UuidSchema,
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,

@@ -66,10 +66,22 @@ Optional providers only register their tools when their env vars are set.
 
 ### Coolify Multi-Instance
 
-All Coolify tools accept an `instance` parameter (`"prod"` or `"dev"`, defaults to `"prod"`).
+All Coolify tools accept an `instance` parameter (`"prod"` or `"dev"`). **Read tools default to `"prod"`; mutating tools require it explicitly** (see the invariant below — a bare write can no longer silently hit prod).
 
 - **Prod**: `COOLIFY_PROD_BASE_URL` + `COOLIFY_PROD_API_TOKEN` (falls back to `COOLIFY_BASE_URL`/`COOLIFY_API_TOKEN`)
-- **Dev**: `COOLIFY_DEV_BASE_URL` + `COOLIFY_DEV_API_TOKEN` (optional — local OrbStack VM at `http://192.168.139.217:8000`)
+- **Dev**: `COOLIFY_DEV_BASE_URL` + `COOLIFY_DEV_API_TOKEN` (optional — local OrbStack VM at `http://192.168.139.217:8000`, a.k.a. `coolify-dev.local`)
+
+#### Coolify: which tool when (three overlapping paths, intentional)
+
+There are **three** MCP paths to Coolify, by design (redundancy/resilience — if one breaks, the other works):
+
+| Path | Instance selection | Use for |
+|------|--------------------|---------|
+| `infraops` `coolify_*` | `instance` **parameter** | Anything needing infraops' extras: cross-provider work, BWS-sourced secrets, the security-drift subsystem, compose helpers (`set_compose_config`, `reset_labels`), `audit_standards`. |
+| `coolify-1` MCP | **server identity = prod** | Pure prod Coolify work where you want the instance baked in (can't misroute). Tracks upstream `@masonator/coolify-mcp`; has `search_docs`. |
+| `coolify-dev` MCP | **server identity = dev** | Pure dev/OrbStack Coolify work; physically cannot touch prod. |
+
+Key safety difference: in `infraops` the target is a *parameter* (so mutations now require it explicitly), whereas the standalone `coolify-1`/`coolify-dev` encode the instance in the *server identity* (impossible to misroute). For a dev app like FacelessTT, `infraops coolify_deploy({uuid, instance: "dev"})` and `coolify-dev deploy` reach the **same** OrbStack instance.
 
 ### VPS Multi-Instance
 
@@ -115,6 +127,9 @@ For `dockercompose` build pack apps:
 4. Prefix all tool names with `<provider>_` to avoid collisions
 
 ## Known Non-obvious Invariants
+
+**Mutating `coolify_*` tools require an explicit `instance`; reads default to `prod`**
+The `instance` selector is split across two shared schemas in `src/schemas/common.ts`: read tools use `CoolifyInstanceSchema` (`.default("prod")`), while every mutating tool uses `CoolifyInstanceRequiredSchema` (no default). Classification follows each tool's `readOnlyHint` annotation — `readOnlyHint: false` ⇒ required. A bare mutating call (e.g. `coolify_deploy({uuid})` with no `instance`) is now **rejected at the Zod tool boundary**, by design: it used to silently default to prod (Hetzner) and could deploy a dev app to the wrong place. Reads keep the convenience default because a misrouted read is harmless. When adding a new mutating tool, wire its `instance` field to `CoolifyInstanceRequiredSchema`, not `CoolifyInstanceSchema` (guarded by `tests/instance-schema.test.ts`). Note: this only affects the MCP tool boundary — internal callers (e.g. `src/security-drift/*`) invoke the `coolifyGet/Post/...` client helpers directly with an explicit instance arg and are unaffected.
 
 **Service vs. Application env var endpoints are different**
 Coolify has two distinct resource types with separate env var APIs:

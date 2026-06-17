@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { CoolifyInstanceSchema } from "../schemas/common.js";
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 export function registerEnvVarTools(server) {
     // ── List Env Vars (Application) ──────────────────────────────────
     server.registerTool("coolify_list_app_envs", {
@@ -64,7 +64,7 @@ export function registerEnvVarTools(server) {
                 .boolean()
                 .default(false)
                 .describe("Only for preview deployments (default: false)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -106,7 +106,7 @@ export function registerEnvVarTools(server) {
             is_buildtime: z.boolean().optional().describe("Build-time availability"),
             is_runtime: z.boolean().optional().describe("Runtime availability"),
             is_preview: z.boolean().optional().describe("Preview-only flag"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -145,7 +145,7 @@ export function registerEnvVarTools(server) {
         inputSchema: {
             uuid: z.string().min(1).describe("Application UUID"),
             env_uuid: z.string().min(1).describe("Environment variable UUID"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -193,7 +193,7 @@ export function registerEnvVarTools(server) {
             }))
                 .min(1)
                 .describe("Array of env vars to create or update"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -273,7 +273,7 @@ export function registerEnvVarTools(server) {
                 .boolean()
                 .default(false)
                 .describe("Only for preview deployments (default: false)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -313,7 +313,7 @@ export function registerEnvVarTools(server) {
             is_buildtime: z.boolean().optional().describe("Build-time availability"),
             is_runtime: z.boolean().optional().describe("Runtime availability"),
             is_preview: z.boolean().optional().describe("Preview-only flag"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -352,7 +352,7 @@ export function registerEnvVarTools(server) {
         inputSchema: {
             uuid: z.string().min(1).describe("Service UUID"),
             env_uuid: z.string().min(1).describe("Environment variable UUID"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -397,7 +397,7 @@ export function registerEnvVarTools(server) {
             }))
                 .min(1)
                 .describe("Array of env vars to create or update"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,

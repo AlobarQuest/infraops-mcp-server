@@ -8,7 +8,7 @@ import { z } from "zod";
 import ssh2 from "ssh2";
 const { utils } = ssh2;
 import { coolifyGet, coolifyPost, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 export function registerPrivateKeyTools(server) {
     // ── List Private Keys ─────────────────────────────────────────────
     server.registerTool("coolify_list_private_keys", {
@@ -53,7 +53,7 @@ export function registerPrivateKeyTools(server) {
                 .string()
                 .optional()
                 .describe("Optional description of what this key is used for"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -100,7 +100,7 @@ export function registerPrivateKeyTools(server) {
             "Will fail with 422 if the key is still in use by an application or server.",
         inputSchema: {
             uuid: UuidSchema,
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,

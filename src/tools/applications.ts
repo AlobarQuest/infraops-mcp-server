@@ -17,7 +17,7 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { CoolifyApplication } from "../types.js";
 
@@ -136,7 +136,7 @@ export function registerApplicationTools(server: McpServer): void {
           .describe(
             "FQDN for the app (e.g. https://myapp.devonwatkins.com)"
           ),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -231,7 +231,7 @@ export function registerApplicationTools(server: McpServer): void {
           .default("8000")
           .describe("Ports to expose (default: 8000)"),
         domains: z.string().optional().describe("FQDN for the app"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -309,7 +309,7 @@ export function registerApplicationTools(server: McpServer): void {
         description: z.string().optional().describe("Application description"),
         ports_exposes: z.string().default("8080").describe("Ports to expose"),
         domains: z.string().optional().describe("FQDN for the app"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -411,7 +411,7 @@ export function registerApplicationTools(server: McpServer): void {
           .string()
           .optional()
           .describe("FQDN for single-container apps (not for dockercompose — use coolify_set_compose_config instead)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -518,7 +518,7 @@ export function registerApplicationTools(server: McpServer): void {
           .string()
           .optional()
           .describe("FQDN for single-container apps (not for dockercompose — use coolify_set_compose_config instead)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -609,7 +609,7 @@ export function registerApplicationTools(server: McpServer): void {
           .boolean()
           .default(false)
           .describe("Deploy immediately after creation (default: false)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -687,7 +687,7 @@ export function registerApplicationTools(server: McpServer): void {
           .boolean()
           .default(true)
           .describe("Clear custom_labels so Coolify auto-generates from domain config (default: true)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -802,7 +802,7 @@ export function registerApplicationTools(server: McpServer): void {
           .string()
           .optional()
           .describe("UUID of Coolify private key to link for Git access"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -873,7 +873,7 @@ export function registerApplicationTools(server: McpServer): void {
           .boolean()
           .default(true)
           .describe("Also delete Docker volumes (default: true)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,

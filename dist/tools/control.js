@@ -4,7 +4,7 @@
  * Works for applications, databases, and services.
  */
 import { z } from "zod";
-import { CoolifyInstanceSchema } from "../schemas/common.js";
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import { coolifyPost, coolifyGet, coolifyPatch, handleCoolifyError, } from "../services/coolify-client.js";
 const ResourceTypeSchema = z
     .enum(["applications", "databases", "services"])
@@ -22,7 +22,7 @@ export function registerControlTools(server) {
             resource_type: ResourceTypeSchema,
             uuid: z.string().min(1).describe("UUID of the resource"),
             action: ActionSchema,
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,
@@ -68,7 +68,7 @@ export function registerControlTools(server) {
                 .boolean()
                 .default(true)
                 .describe("Trigger a redeploy after clearing labels (default: true)"),
-            instance: CoolifyInstanceSchema,
+            instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
             readOnlyHint: false,

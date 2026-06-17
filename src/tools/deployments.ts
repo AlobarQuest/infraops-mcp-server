@@ -12,7 +12,7 @@ import {
   handleCoolifyError,
 } from "../services/coolify-client.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyDeployment } from "../types.js";
 
 export function registerDeploymentTools(server: McpServer): void {
@@ -38,7 +38,7 @@ export function registerDeploymentTools(server: McpServer): void {
           .boolean()
           .default(false)
           .describe("Force rebuild even if no changes detected (default: false)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,

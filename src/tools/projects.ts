@@ -14,7 +14,7 @@ import {
   coolifyDelete,
   handleCoolifyError,
 } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { CoolifyProject, CoolifyEnvironment } from "../types.js";
 
@@ -101,7 +101,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .optional()
           .describe("Optional project description"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -152,7 +152,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .optional()
           .describe("New project description"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -204,7 +204,7 @@ export function registerProjectTools(server: McpServer): void {
       title: "Delete Coolify Project",
       description:
         "Delete a project by UUID. WARNING: This will delete all environments and resources within the project.",
-      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
+      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceRequiredSchema },
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -292,7 +292,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .min(1)
           .describe("Environment name (e.g. production, staging)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -345,7 +345,7 @@ export function registerProjectTools(server: McpServer): void {
           .string()
           .min(1)
           .describe("Name of the environment to delete"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,

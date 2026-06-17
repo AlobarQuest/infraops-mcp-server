@@ -6,7 +6,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { CoolifyInstanceSchema } from "../schemas/common.js";
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import {
   coolifyPost,
   coolifyGet,
@@ -37,7 +37,7 @@ export function registerControlTools(server: McpServer): void {
         resource_type: ResourceTypeSchema,
         uuid: z.string().min(1).describe("UUID of the resource"),
         action: ActionSchema,
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
@@ -107,7 +107,7 @@ export function registerControlTools(server: McpServer): void {
           .boolean()
           .default(true)
           .describe("Trigger a redeploy after clearing labels (default: true)"),
-        instance: CoolifyInstanceSchema,
+        instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
         readOnlyHint: false,
