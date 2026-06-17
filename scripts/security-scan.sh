@@ -229,6 +229,30 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 13. Claude control-plane git drift (~/.claude tamper-evidence)
+#     ~/.claude is a git repo tracking the control-plane set (hooks, settings,
+#     .mcp.json, CLAUDE.md, RTK.md). An uncommitted/untracked change to the
+#     CRITICAL set => FAIL (deny-by-default URGENT escalation). settings.local.json
+#     is expected churn => WARN controlplane.local_churn, dropped by taxonomy
+#     (logged, never escalated). READ-ONLY: never commits.
+# ---------------------------------------------------------------------------
+CP="$HOME/.claude"
+if have git && [ -d "$CP/.git" ]; then
+  crit="$(git -C "$CP" status --porcelain -- settings.json .mcp.json CLAUDE.md RTK.md hooks/ statusline-command.sh 2>/dev/null)"
+  if [ -n "$crit" ]; then
+    while IFS= read -r l; do
+      [ -n "$l" ] && emit FAIL controlplane.drift "uncommitted/untracked control-plane change: ${l} (review + commit if intended)"
+    done <<< "$crit"
+  else
+    emit PASS controlplane.clean "control-plane critical set matches HEAD"
+  fi
+  if [ -n "$(git -C "$CP" status --porcelain -- settings.local.json 2>/dev/null)" ]; then
+    emit WARN controlplane.local_churn "settings.local.json changed since last commit (expected churn)"
+  fi
+else
+  emit FAIL controlplane.unmanaged "$CP is not a git repo — control-plane tamper-evidence inactive (run: git -C $CP init)"
+fi
+# ---------------------------------------------------------------------------
 echo "=== summary: PASS=$PASS WARN=$WARN FAIL=$FAIL ===" | tee -a "$LOG"
 [ "$FAIL" -gt 0 ] && { echo "DRIFT DETECTED ($FAIL fail)"; exit 1; }
 exit 0

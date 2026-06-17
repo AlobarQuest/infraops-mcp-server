@@ -80,7 +80,8 @@ The machine security detector is **repo-managed here** and deployed to `~/.claud
 
 - `scripts/security-scan.sh` — read-only detector (plaintext secrets in shell configs,
   over-permissive credential file modes, inlined secrets in MCP configs, `settings.json`
-  permission regressions, token-shape/supply-chain checks, read-guard health canary).
+  permission regressions, token-shape/supply-chain checks, read-guard health canary,
+  control-plane git drift (`~/.claude`)).
   Exit 0 = clean, 1 = drift.
 - `scripts/skills-security-scan.sh` — static lint of Claude Code agent skills + hooks.
 
