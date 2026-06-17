@@ -15,6 +15,8 @@ import {
   CoolifyInstance,
 } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { jsonResponse } from "../utils/response.js";
+import { summarize, toServerSummary } from "../utils/summaries.js";
 import type { CoolifyServer } from "../types.js";
 
 export function registerServerTools(server: McpServer): void {
@@ -25,8 +27,11 @@ export function registerServerTools(server: McpServer): void {
     {
       title: "List Coolify Servers",
       description:
-        "List all servers registered with Coolify. Returns name, IP, reachability status, and UUID for each.",
-      inputSchema: { instance: CoolifyInstanceSchema },
+        "List all servers registered with Coolify. Returns name, IP, reachability status, and UUID for each. Compact summary by default; pass summary:false for full objects.",
+      inputSchema: {
+        summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+        instance: CoolifyInstanceSchema,
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -34,14 +39,10 @@ export function registerServerTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ instance }: { instance: CoolifyInstance }) => {
+    async ({ summary, instance }: { summary: boolean; instance: CoolifyInstance }) => {
       try {
         const servers = await coolifyGet<CoolifyServer[]>("/servers", undefined, instance);
-        return {
-          content: [
-            { type: "text", text: JSON.stringify(servers, null, 2) },
-          ],
-        };
+        return jsonResponse(summarize(servers as any[], toServerSummary, summary));
       } catch (error) {
         return {
           isError: true,

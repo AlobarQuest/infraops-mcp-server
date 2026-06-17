@@ -7,26 +7,27 @@
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
+import { jsonResponse } from "../utils/response.js";
+import { summarize, toProjectSummary } from "../utils/summaries.js";
 export function registerProjectTools(server) {
     // ── List Projects ────────────────────────────────────────────────
     server.registerTool("coolify_list_projects", {
         title: "List Coolify Projects",
         description: "List all projects in the Coolify instance. Projects are the top-level organisational unit — each contains environments which in turn contain applications, databases, and services.",
-        inputSchema: { instance: CoolifyInstanceSchema },
+        inputSchema: {
+            summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+            instance: CoolifyInstanceSchema,
+        },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ instance }) => {
+    }, async ({ summary, instance }) => {
         try {
             const projects = await coolifyGet("/projects", undefined, instance);
-            return {
-                content: [
-                    { type: "text", text: JSON.stringify(projects, null, 2) },
-                ],
-            };
+            return jsonResponse(summarize(projects, toProjectSummary, summary));
         }
         catch (error) {
             return {

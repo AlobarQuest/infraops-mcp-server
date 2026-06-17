@@ -13,6 +13,7 @@ import {
 } from "../services/coolify-client.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
+import { jsonResponse } from "../utils/response.js";
 import type { CoolifyDeployment } from "../types.js";
 
 export function registerDeploymentTools(server: McpServer): void {
@@ -170,11 +171,46 @@ export function registerDeploymentTools(server: McpServer): void {
           undefined,
           instance
         );
+        return jsonResponse(deployment);
+      } catch (error) {
         return {
-          content: [
-            { type: "text", text: JSON.stringify(deployment, null, 2) },
-          ],
+          isError: true,
+          content: [{ type: "text", text: handleCoolifyError(error) }],
         };
+      }
+    }
+  );
+
+  // ── Cancel Deployment ────────────────────────────────────────────
+
+  server.registerTool(
+    "coolify_cancel_deployment",
+    {
+      title: "Cancel Deployment",
+      description:
+        "Cancel a running or queued deployment by its deployment UUID (not the application UUID).",
+      inputSchema: {
+        deployment_uuid: z
+          .string()
+          .min(1)
+          .describe("The deployment UUID to cancel (from coolify_deploy or coolify_list_deployments)"),
+        instance: CoolifyInstanceRequiredSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ deployment_uuid, instance }: { deployment_uuid: string; instance: CoolifyInstance }) => {
+      try {
+        const result = await coolifyPost<{ message?: string }>(
+          `/deployments/${deployment_uuid}/cancel`,
+          undefined,
+          instance
+        );
+        return jsonResponse(result);
       } catch (error) {
         return {
           isError: true,

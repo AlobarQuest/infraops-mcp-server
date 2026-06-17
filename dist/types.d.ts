@@ -119,6 +119,64 @@ export interface CoolifyPrivateKey {
     created_at?: string;
     updated_at?: string;
 }
+export interface CoolifyDatabaseBackup {
+    id: number;
+    uuid: string;
+    database_id?: number;
+    database_type?: string;
+    status?: string;
+    filename?: string;
+    size?: number;
+    frequency: string;
+    enabled: boolean;
+    save_s3?: boolean;
+    s3_storage_id?: number;
+    databases_to_backup?: string;
+    dump_all?: boolean;
+    created_at?: string;
+    updated_at?: string;
+}
+export interface CoolifyBackupExecution {
+    id: number;
+    uuid: string;
+    scheduled_database_backup_id?: number;
+    status?: string;
+    message?: string;
+    size?: number;
+    filename?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+export interface CoolifyGitHubApp {
+    id: number;
+    uuid: string;
+    name: string;
+    organization?: string | null;
+    api_url?: string;
+    html_url?: string;
+    custom_user?: string;
+    custom_port?: number;
+    app_id?: number | null;
+    installation_id?: number | null;
+    client_id?: string | null;
+    is_system_wide?: boolean;
+    is_public?: boolean;
+    private_key_id?: number | null;
+    team_id?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+export interface CoolifyGitHubRepository {
+    id: number;
+    name: string;
+    full_name: string;
+    private: boolean;
+    html_url: string;
+    default_branch: string;
+}
+export interface CoolifyGitHubBranch {
+    name: string;
+}
 export interface PaginatedResponse<T> {
     total: number;
     count: number;

@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { coolifyGet, coolifyPost, handleCoolifyError, } from "../services/coolify-client.js";
 import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
+import { jsonResponse } from "../utils/response.js";
 export function registerDeploymentTools(server) {
     // ── Deploy Application ───────────────────────────────────────────
     server.registerTool("coolify_deploy", {
@@ -119,11 +120,36 @@ export function registerDeploymentTools(server) {
     }, async ({ deployment_uuid, instance }) => {
         try {
             const deployment = await coolifyGet(`/deployments/${deployment_uuid}`, undefined, instance);
+            return jsonResponse(deployment);
+        }
+        catch (error) {
             return {
-                content: [
-                    { type: "text", text: JSON.stringify(deployment, null, 2) },
-                ],
+                isError: true,
+                content: [{ type: "text", text: handleCoolifyError(error) }],
             };
+        }
+    });
+    // ── Cancel Deployment ────────────────────────────────────────────
+    server.registerTool("coolify_cancel_deployment", {
+        title: "Cancel Deployment",
+        description: "Cancel a running or queued deployment by its deployment UUID (not the application UUID).",
+        inputSchema: {
+            deployment_uuid: z
+                .string()
+                .min(1)
+                .describe("The deployment UUID to cancel (from coolify_deploy or coolify_list_deployments)"),
+            instance: CoolifyInstanceRequiredSchema,
+        },
+        annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: false,
+            openWorldHint: true,
+        },
+    }, async ({ deployment_uuid, instance }) => {
+        try {
+            const result = await coolifyPost(`/deployments/${deployment_uuid}/cancel`, undefined, instance);
+            return jsonResponse(result);
         }
         catch (error) {
             return {

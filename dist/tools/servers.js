@@ -4,28 +4,30 @@
  * Manage the underlying servers (VPS instances) that host Coolify resources.
  * Devon currently runs a single Hetzner VPS.
  */
+import { z } from "zod";
 import { coolifyGet, handleCoolifyError, } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
+import { jsonResponse } from "../utils/response.js";
+import { summarize, toServerSummary } from "../utils/summaries.js";
 export function registerServerTools(server) {
     // ── List Servers ─────────────────────────────────────────────────
     server.registerTool("coolify_list_servers", {
         title: "List Coolify Servers",
-        description: "List all servers registered with Coolify. Returns name, IP, reachability status, and UUID for each.",
-        inputSchema: { instance: CoolifyInstanceSchema },
+        description: "List all servers registered with Coolify. Returns name, IP, reachability status, and UUID for each. Compact summary by default; pass summary:false for full objects.",
+        inputSchema: {
+            summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+            instance: CoolifyInstanceSchema,
+        },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ instance }) => {
+    }, async ({ summary, instance }) => {
         try {
             const servers = await coolifyGet("/servers", undefined, instance);
-            return {
-                content: [
-                    { type: "text", text: JSON.stringify(servers, null, 2) },
-                ],
-            };
+            return jsonResponse(summarize(servers, toServerSummary, summary));
         }
         catch (error) {
             return {

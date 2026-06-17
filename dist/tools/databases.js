@@ -9,24 +9,27 @@
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
+import { jsonResponse } from "../utils/response.js";
+import { summarize, toDatabaseSummary } from "../utils/summaries.js";
 export function registerDatabaseTools(server) {
     // ── List Databases ───────────────────────────────────────────────
     server.registerTool("coolify_list_databases", {
         title: "List Coolify Databases",
-        description: "List all database resources managed by Coolify. Includes PostgreSQL, MySQL, MariaDB, MongoDB, Redis, etc.",
-        inputSchema: { instance: CoolifyInstanceSchema },
+        description: "List all database resources managed by Coolify. Returns a compact summary by default; pass summary:false for full objects.",
+        inputSchema: {
+            summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+            instance: CoolifyInstanceSchema,
+        },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ instance }) => {
+    }, async ({ summary, instance }) => {
         try {
             const dbs = await coolifyGet("/databases", undefined, instance);
-            return {
-                content: [{ type: "text", text: JSON.stringify(dbs, null, 2) }],
-            };
+            return jsonResponse(summarize(dbs, toDatabaseSummary, summary));
         }
         catch (error) {
             return {
@@ -49,9 +52,7 @@ export function registerDatabaseTools(server) {
     }, async ({ uuid, instance }) => {
         try {
             const db = await coolifyGet(`/databases/${uuid}`, undefined, instance);
-            return {
-                content: [{ type: "text", text: JSON.stringify(db, null, 2) }],
-            };
+            return jsonResponse(db);
         }
         catch (error) {
             return {

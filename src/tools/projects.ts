@@ -16,6 +16,8 @@ import {
 } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
+import { jsonResponse } from "../utils/response.js";
+import { summarize, toProjectSummary } from "../utils/summaries.js";
 import type { CoolifyProject, CoolifyEnvironment } from "../types.js";
 
 export function registerProjectTools(server: McpServer): void {
@@ -27,7 +29,10 @@ export function registerProjectTools(server: McpServer): void {
       title: "List Coolify Projects",
       description:
         "List all projects in the Coolify instance. Projects are the top-level organisational unit — each contains environments which in turn contain applications, databases, and services.",
-      inputSchema: { instance: CoolifyInstanceSchema },
+      inputSchema: {
+        summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+        instance: CoolifyInstanceSchema,
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -35,14 +40,10 @@ export function registerProjectTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ instance }: { instance: CoolifyInstance }) => {
+    async ({ summary, instance }: { summary: boolean; instance: CoolifyInstance }) => {
       try {
         const projects = await coolifyGet<CoolifyProject[]>("/projects", undefined, instance);
-        return {
-          content: [
-            { type: "text", text: JSON.stringify(projects, null, 2) },
-          ],
-        };
+        return jsonResponse(summarize(projects as any[], toProjectSummary, summary));
       } catch (error) {
         return {
           isError: true,

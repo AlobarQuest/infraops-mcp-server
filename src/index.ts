@@ -51,6 +51,9 @@ import { registerDiagnosticTools } from "./tools/diagnostics.js";
 import { registerAuditTools } from "./tools/audit.js";
 import { registerStorageTools } from "./tools/storages.js";
 import { registerScheduledTaskTools } from "./tools/scheduled-tasks.js";
+import { registerDatabaseBackupTools } from "./tools/database-backups.js";
+import { registerGithubAppTools } from "./tools/github-apps.js";
+import { registerDocsTools } from "./tools/docs.js";
 
 // GitHub tools
 import { registerGithubTools } from "./tools/github.js";
@@ -114,6 +117,9 @@ registerDiagnosticTools(server);
 registerAuditTools(server);
 registerStorageTools(server);
 registerScheduledTaskTools(server);
+registerDatabaseBackupTools(server);
+registerGithubAppTools(server);
+registerDocsTools(server);
 
 // ── Register GitHub tools ──────────────────────────────────────────
 if (isGithubConfigured()) {

@@ -14,6 +14,15 @@ import {
   handleCoolifyError,
   CoolifyInstance,
 } from "../services/coolify-client.js";
+import { jsonResponse } from "../utils/response.js";
+import {
+  summarize,
+  toServerSummary,
+  toProjectSummary,
+  toApplicationSummary,
+  toDatabaseSummary,
+  toServiceSummary,
+} from "../utils/summaries.js";
 
 const ResourceTypeSchema = z
   .enum(["applications", "databases", "services"])
@@ -212,6 +221,13 @@ export function registerControlTools(server: McpServer): void {
         "Get a comprehensive snapshot of all servers, projects, applications, databases, and services. " +
         "This is the best starting point when you need to understand the current state of the infrastructure.",
       inputSchema: {
+        summary: z
+          .boolean()
+          .default(true)
+          .describe(
+            "Project each resource to its essential fields (default true). false returns full " +
+              "objects for every resource and can be very large."
+          ),
         instance: CoolifyInstanceSchema,
       },
       annotations: {
@@ -221,16 +237,16 @@ export function registerControlTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ instance }: { instance: CoolifyInstance }) => {
+    async ({ summary, instance }: { summary: boolean; instance: CoolifyInstance }) => {
       try {
         // Gather all top-level resources in parallel
         const [servers, projects, applications, databases, services] =
           await Promise.all([
-            coolifyGet<unknown[]>("/servers", undefined, instance).catch(() => []),
-            coolifyGet<unknown[]>("/projects", undefined, instance).catch(() => []),
-            coolifyGet<unknown[]>("/applications", undefined, instance).catch(() => []),
-            coolifyGet<unknown[]>("/databases", undefined, instance).catch(() => []),
-            coolifyGet<unknown[]>("/services", undefined, instance).catch(() => []),
+            coolifyGet<any[]>("/servers", undefined, instance).catch(() => []),
+            coolifyGet<any[]>("/projects", undefined, instance).catch(() => []),
+            coolifyGet<any[]>("/applications", undefined, instance).catch(() => []),
+            coolifyGet<any[]>("/databases", undefined, instance).catch(() => []),
+            coolifyGet<any[]>("/services", undefined, instance).catch(() => []),
           ]);
 
         const overview = {
@@ -241,18 +257,14 @@ export function registerControlTools(server: McpServer): void {
             databases: Array.isArray(databases) ? databases.length : 0,
             services: Array.isArray(services) ? services.length : 0,
           },
-          servers,
-          projects,
-          applications,
-          databases,
-          services,
+          servers: summarize(servers, toServerSummary, summary),
+          projects: summarize(projects, toProjectSummary, summary),
+          applications: summarize(applications, toApplicationSummary, summary),
+          databases: summarize(databases, toDatabaseSummary, summary),
+          services: summarize(services, toServiceSummary, summary),
         };
 
-        return {
-          content: [
-            { type: "text", text: JSON.stringify(overview, null, 2) },
-          ],
-        };
+        return jsonResponse(overview);
       } catch (error) {
         return {
           isError: true,

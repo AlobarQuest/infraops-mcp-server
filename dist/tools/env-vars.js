@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
 import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
+import { jsonResponse } from "../utils/response.js";
 export function registerEnvVarTools(server) {
     // ── List Env Vars (Application) ──────────────────────────────────
     server.registerTool("coolify_list_app_envs", {
@@ -418,6 +419,50 @@ export function registerEnvVarTools(server) {
                 content: [{ type: "text", text: handleCoolifyError(error) }],
             };
         }
+    });
+    // ── Set one env var across MANY applications ─────────────────────
+    // Distinct from coolify_bulk_create_app_envs (many keys, one app): this sets a
+    // single key/value across a list of apps — e.g. rotating a shared secret. Each
+    // app is upserted independently; one failure does not abort the others.
+    server.registerTool("coolify_bulk_set_app_env", {
+        title: "Set Env Var Across Multiple Applications",
+        description: "Upsert ONE environment variable (key/value) across many applications at once. " +
+            "Useful for rotating a shared secret. Returns a per-app success/failure summary; " +
+            "a failure on one app does not stop the others.",
+        inputSchema: {
+            app_uuids: z
+                .array(z.string().min(1))
+                .min(1)
+                .describe("Application UUIDs to update"),
+            key: z.string().min(1).describe("Variable name"),
+            value: z.string().describe("Variable value"),
+            is_buildtime: z.boolean().default(false).describe("Available at build time"),
+            is_runtime: z.boolean().default(true).describe("Available at runtime"),
+            instance: CoolifyInstanceRequiredSchema,
+        },
+        annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+        },
+    }, async ({ app_uuids, key, value, is_buildtime, is_runtime, instance, }) => {
+        const settled = await Promise.allSettled(app_uuids.map((uuid) => coolifyPatch(`/applications/${uuid}/envs`, { key, value, is_buildtime, is_runtime }, instance)));
+        const succeeded = [];
+        const failed = [];
+        settled.forEach((r, i) => {
+            if (r.status === "fulfilled") {
+                succeeded.push({ uuid: app_uuids[i] });
+            }
+            else {
+                failed.push({ uuid: app_uuids[i], error: handleCoolifyError(r.reason) });
+            }
+        });
+        return jsonResponse({
+            summary: { total: app_uuids.length, succeeded: succeeded.length, failed: failed.length },
+            succeeded,
+            failed,
+        });
     });
 }
 //# sourceMappingURL=env-vars.js.map

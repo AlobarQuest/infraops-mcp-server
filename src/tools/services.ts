@@ -17,6 +17,9 @@ import {
 } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
+import { jsonResponse } from "../utils/response.js";
+import { summarize, toServiceSummary } from "../utils/summaries.js";
+import { maskSensitive } from "../utils/masking.js";
 import type { CoolifyService } from "../types.js";
 
 export function registerServiceTools(server: McpServer): void {
@@ -27,8 +30,11 @@ export function registerServiceTools(server: McpServer): void {
     {
       title: "List Coolify Services",
       description:
-        "List all services (Docker Compose workloads) managed by Coolify.",
-      inputSchema: { instance: CoolifyInstanceSchema },
+        "List all services (Docker Compose workloads) managed by Coolify. Compact summary by default; pass summary:false for full objects.",
+      inputSchema: {
+        summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+        instance: CoolifyInstanceSchema,
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -36,14 +42,10 @@ export function registerServiceTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ instance }: { instance: CoolifyInstance }) => {
+    async ({ summary, instance }: { summary: boolean; instance: CoolifyInstance }) => {
       try {
         const services = await coolifyGet<CoolifyService[]>("/services", undefined, instance);
-        return {
-          content: [
-            { type: "text", text: JSON.stringify(services, null, 2) },
-          ],
-        };
+        return jsonResponse(summarize(services as any[], toServiceSummary, summary));
       } catch (error) {
         return {
           isError: true,
@@ -60,8 +62,12 @@ export function registerServiceTools(server: McpServer): void {
     {
       title: "Get Coolify Service",
       description:
-        "Get full details for a service by UUID — includes compose config, status, and resource mapping.",
-      inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
+        "Get full details for a service by UUID — includes compose config, status, and resource mapping. Webhook/basic-auth secrets are masked unless reveal:true.",
+      inputSchema: {
+        uuid: UuidSchema,
+        reveal: z.boolean().default(false).describe("Reveal masked webhook/basic-auth secrets (default false)"),
+        instance: CoolifyInstanceSchema,
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -69,12 +75,10 @@ export function registerServiceTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
+    async ({ uuid, reveal, instance }: { uuid: string; reveal: boolean; instance: CoolifyInstance }) => {
       try {
         const svc = await coolifyGet<CoolifyService>(`/services/${uuid}`, undefined, instance);
-        return {
-          content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
-        };
+        return jsonResponse(maskSensitive(svc as any, reveal));
       } catch (error) {
         return {
           isError: true,

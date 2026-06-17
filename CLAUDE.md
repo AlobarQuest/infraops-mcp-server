@@ -33,8 +33,9 @@ src/
 └── tools/                # Tool registration modules (registerXxxTools functions)
     ├── projects.ts, applications.ts, private-keys.ts,
     │   deployments.ts, env-vars.ts, databases.ts,
-    │   servers.ts, services.ts, control.ts,
-│   diagnostics.ts, storages.ts, scheduled-tasks.ts  # Coolify (67 tools)
+    │   servers.ts, services.ts, control.ts, diagnostics.ts,
+    │   storages.ts, scheduled-tasks.ts, database-backups.ts,
+    │   github-apps.ts, docs.ts                            # Coolify (~86 tools)
     ├── github.ts                                         # GitHub (4 tools)
     ├── hetzner-servers.ts, hetzner-networking.ts          # Hetzner (26 tools)
     ├── vps.ts                                             # VPS SSH (7 tools)
@@ -46,7 +47,7 @@ src/
         supabase-functions.ts, supabase-config.ts          # Supabase (28 tools)
 ```
 
-**195 tools total** across 7 providers.
+**~213 tools total** across 7 providers. (`src/utils/` holds the shared `response`/`summaries`/`masking` helpers used by the Coolify read tools.)
 
 See [RUNBOOK.md](./RUNBOOK.md) for provider configuration details (env vars, BWS secret IDs, `.claude.json` wiring, troubleshooting).
 
@@ -82,6 +83,21 @@ There are **three** MCP paths to Coolify, by design (redundancy/resilience — i
 | `coolify-dev` MCP | **server identity = dev** | Pure dev/OrbStack Coolify work; physically cannot touch prod. |
 
 Key safety difference: in `infraops` the target is a *parameter* (so mutations now require it explicitly), whereas the standalone `coolify-1`/`coolify-dev` encode the instance in the *server identity* (impossible to misroute). For a dev app like FacelessTT, `infraops coolify_deploy({uuid, instance: "dev"})` and `coolify-dev deploy` reach the **same** OrbStack instance.
+
+#### Ported capabilities (parity with the standalone MCP)
+
+These were ported from `@masonator/coolify-mcp` so agents can stay on the single audited `infraops` path:
+- **Database backups** (`coolify_{list,get}_database_backups`, `coolify_{list,get}_backup_executions`, `coolify_{create,update,delete}_database_backup`, `coolify_delete_backup_execution`) — `/databases/{uuid}/backups`.
+- **Deployment cancel** (`coolify_cancel_deployment`) — `POST /deployments/{uuid}/cancel`.
+- **Cross-app bulk env** (`coolify_bulk_set_app_env`) — sets ONE key/value across many app UUIDs (vs `coolify_bulk_create_app_envs` = many keys, one app); returns a per-app succeeded/failed summary.
+- **GitHub-App management** (`coolify_{list,get,create,update,delete}_github_app`, `coolify_list_github_app_repos`, `coolify_list_github_app_branches`) — Coolify's `/github-apps` resource, distinct from the `github_*` deploy-key provider.
+- **`coolify_search_docs`** — BM25 search over the official Coolify docs (lazy-cached fetch of `llms-full.txt`). **Instance-agnostic — takes no `instance` parameter.**
+
+#### Read-tool response conventions (token hygiene)
+
+- **`summary` (default `true`)** on `coolify_list_{applications,databases,services,servers,projects}` and `coolify_overview` returns a compact projection (essential fields only). Pass `summary: false` for full objects. This replaces the old behavior where lists were stringified in full and could flood context (`list_applications` once returned 185K chars). Projections live in `src/utils/summaries.ts`.
+- **`reveal` (default `false`)** on `coolify_list_applications` / `coolify_get_application` / `coolify_get_service`: webhook HMAC secrets (`manual_webhook_secret_*`) and `http_basic_auth_password` are masked unless `reveal: true` (`src/utils/masking.ts`). `null` is preserved (= "no secret set"). Env-var `value`/`real_value` masking is unchanged (env-vars.ts).
+- **`jsonResponse` (`src/utils/response.ts`)** enforces the `CHARACTER_LIMIT` (25K) budget — formerly dead config — truncating oversized payloads with an explicit marker. New tools and the retrofitted reads return through it; log tools (`coolify_application_logs`, `coolify_get_deployment`) additionally tail-truncate.
 
 ### VPS Multi-Instance
 

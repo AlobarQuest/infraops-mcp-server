@@ -10,24 +10,40 @@ import { z } from "zod";
 import axios from "axios";
 import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyError, } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
+import { jsonResponse, truncateLogs } from "../utils/response.js";
+import { CHARACTER_LIMIT } from "../constants.js";
+import { summarize, toApplicationSummary } from "../utils/summaries.js";
+import { maskSensitive, maskSensitiveList } from "../utils/masking.js";
 export function registerApplicationTools(server) {
     // ── List Applications ────────────────────────────────────────────
     server.registerTool("coolify_list_applications", {
         title: "List Coolify Applications",
-        description: "List all applications across the Coolify instance. Returns UUID, name, FQDN, status, and build pack for each app.",
-        inputSchema: { instance: CoolifyInstanceSchema },
+        description: "List all applications across the Coolify instance. Returns a compact summary " +
+            "(uuid, name, status, fqdn, git) by default — pass summary:false for full objects.",
+        inputSchema: {
+            summary: z
+                .boolean()
+                .default(true)
+                .describe("Compact projection (default true); false returns full app objects (large)"),
+            reveal: z
+                .boolean()
+                .default(false)
+                .describe("Reveal masked webhook/basic-auth secrets in full objects (default false)"),
+            instance: CoolifyInstanceSchema,
+        },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ instance }) => {
+    }, async ({ summary, reveal, instance }) => {
         try {
             const apps = await coolifyGet("/applications", undefined, instance);
-            return {
-                content: [{ type: "text", text: JSON.stringify(apps, null, 2) }],
-            };
+            const out = summary
+                ? summarize(apps, toApplicationSummary, true)
+                : maskSensitiveList(apps, reveal);
+            return jsonResponse(out);
         }
         catch (error) {
             return {
@@ -39,20 +55,22 @@ export function registerApplicationTools(server) {
     // ── Get Application ──────────────────────────────────────────────
     server.registerTool("coolify_get_application", {
         title: "Get Coolify Application",
-        description: "Get full details for a single application by UUID, including build config, health check settings, Git info, and deployment status.",
-        inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
+        description: "Get full details for a single application by UUID, including build config, health check settings, Git info, and deployment status. Webhook/basic-auth secrets are masked unless reveal:true.",
+        inputSchema: {
+            uuid: UuidSchema,
+            reveal: z.boolean().default(false).describe("Reveal masked webhook/basic-auth secrets (default false)"),
+            instance: CoolifyInstanceSchema,
+        },
         annotations: {
             readOnlyHint: true,
             destructiveHint: false,
             idempotentHint: true,
             openWorldHint: true,
         },
-    }, async ({ uuid, instance }) => {
+    }, async ({ uuid, reveal, instance }) => {
         try {
             const app = await coolifyGet(`/applications/${uuid}`, undefined, instance);
-            return {
-                content: [{ type: "text", text: JSON.stringify(app, null, 2) }],
-            };
+            return jsonResponse(maskSensitive(app, reveal));
         }
         catch (error) {
             return {
@@ -738,14 +756,9 @@ export function registerApplicationTools(server) {
     }, async ({ uuid, lines, instance }) => {
         try {
             const logs = await coolifyGet(`/applications/${uuid}/logs`, { lines }, instance);
-            return {
-                content: [
-                    {
-                        type: "text",
-                        text: typeof logs === "string" ? logs : JSON.stringify(logs, null, 2),
-                    },
-                ],
-            };
+            const text = typeof logs === "string" ? logs : JSON.stringify(logs, null, 2);
+            const capped = text.length > CHARACTER_LIMIT ? truncateLogs(text, lines, CHARACTER_LIMIT).logs : text;
+            return { content: [{ type: "text", text: capped }] };
         }
         catch (error) {
             // 400 = app is stopped/not running — informational, not a hard error

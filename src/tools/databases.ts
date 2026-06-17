@@ -18,6 +18,8 @@ import {
   type CoolifyInstance,
 } from "../services/coolify-client.js";
 import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
+import { jsonResponse } from "../utils/response.js";
+import { summarize, toDatabaseSummary } from "../utils/summaries.js";
 import type { CoolifyDatabase } from "../types.js";
 
 export function registerDatabaseTools(server: McpServer): void {
@@ -28,8 +30,11 @@ export function registerDatabaseTools(server: McpServer): void {
     {
       title: "List Coolify Databases",
       description:
-        "List all database resources managed by Coolify. Includes PostgreSQL, MySQL, MariaDB, MongoDB, Redis, etc.",
-      inputSchema: { instance: CoolifyInstanceSchema },
+        "List all database resources managed by Coolify. Returns a compact summary by default; pass summary:false for full objects.",
+      inputSchema: {
+        summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+        instance: CoolifyInstanceSchema,
+      },
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -37,12 +42,10 @@ export function registerDatabaseTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ instance }: { instance: CoolifyInstance }) => {
+    async ({ summary, instance }: { summary: boolean; instance: CoolifyInstance }) => {
       try {
         const dbs = await coolifyGet<CoolifyDatabase[]>("/databases", undefined, instance);
-        return {
-          content: [{ type: "text", text: JSON.stringify(dbs, null, 2) }],
-        };
+        return jsonResponse(summarize(dbs as any[], toDatabaseSummary, summary));
       } catch (error) {
         return {
           isError: true,
@@ -71,9 +74,7 @@ export function registerDatabaseTools(server: McpServer): void {
     async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const db = await coolifyGet<CoolifyDatabase>(`/databases/${uuid}`, undefined, instance);
-        return {
-          content: [{ type: "text", text: JSON.stringify(db, null, 2) }],
-        };
+        return jsonResponse(db);
       } catch (error) {
         return {
           isError: true,
