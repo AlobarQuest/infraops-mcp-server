@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { jsonResponse, truncateLogs } from "../src/utils/response.js";
+import { jsonResponse, truncateToLimit, truncateLogs } from "../src/utils/response.js";
+import { CHARACTER_LIMIT } from "../src/constants.js";
 import { summarize, toApplicationSummary } from "../src/utils/summaries.js";
 import { maskSensitive, maskSensitiveList } from "../src/utils/masking.js";
 
@@ -10,11 +11,23 @@ describe("jsonResponse", () => {
     expect(r.isError).toBeUndefined();
   });
 
-  it("truncates with a marker when over charLimit", () => {
-    const big = { blob: "x".repeat(5000) };
-    const r = jsonResponse(big, { charLimit: 500 });
-    expect(r.content[0].text.length).toBeLessThanOrEqual(500);
-    expect(r.content[0].text).toContain("[truncated");
+  it("jsonResponse serializes without truncating (wrapper owns truncation now)", () => {
+    const big = { blob: "x".repeat(CHARACTER_LIMIT + 5000) };
+    const r = jsonResponse(big);
+    expect(r.content[0].text.length).toBeGreaterThan(CHARACTER_LIMIT);
+    expect(r.content[0].text).not.toContain("truncated:");
+  });
+});
+
+describe("truncateToLimit", () => {
+  it("truncateToLimit truncates with an explicit marker", () => {
+    const t = truncateToLimit("y".repeat(CHARACTER_LIMIT + 5000));
+    expect(t.length).toBeLessThanOrEqual(CHARACTER_LIMIT);
+    expect(t).toContain("truncated:");
+  });
+
+  it("truncateToLimit leaves short text unchanged", () => {
+    expect(truncateToLimit("short")).toBe("short");
   });
 });
 

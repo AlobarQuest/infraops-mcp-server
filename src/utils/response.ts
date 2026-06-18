@@ -17,26 +17,28 @@ export interface ToolTextResponse {
   [key: string]: unknown;
 }
 
+/** Truncate text to `charLimit` with an explicit narrowing marker. */
+export function truncateToLimit(text: string, charLimit: number = CHARACTER_LIMIT): string {
+  if (text.length <= charLimit) return text;
+  const keep = Math.max(0, charLimit - 220);
+  const kb = Math.round(charLimit / 1000);
+  return (
+    text.slice(0, keep) +
+    `\n…[truncated: response exceeded ${kb}K chars — narrow it with summary:true, ` +
+    `pagination (page/per_page), or a more specific UUID/query]…`
+  );
+}
+
 /**
- * Build a JSON tool response, truncating with an explicit marker if it exceeds
- * `charLimit` (default `CHARACTER_LIMIT`). The marker tells the caller how to
- * narrow the result rather than silently dropping data.
+ * Build a JSON tool response. Serialize-only — truncation is applied centrally by
+ * the redaction wrapper (register-sanitized.ts) AFTER redaction, so a secret can
+ * never be split across the truncation boundary.
  */
 export function jsonResponse(
   data: unknown,
-  opts: { charLimit?: number } = {}
+  _opts: { charLimit?: number } = {}
 ): ToolTextResponse {
-  const charLimit = opts.charLimit ?? CHARACTER_LIMIT;
-  let text = JSON.stringify(data, null, 2);
-  if (text.length > charLimit) {
-    const keep = Math.max(0, charLimit - 220);
-    const kb = Math.round(charLimit / 1000);
-    text =
-      text.slice(0, keep) +
-      `\n…[truncated: response exceeded ${kb}K chars — narrow it with summary:true, ` +
-      `pagination (page/per_page), or a more specific UUID/query]…`;
-  }
-  return { content: [{ type: "text", text }] };
+  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
 }
 
 export interface TruncatedLogs {

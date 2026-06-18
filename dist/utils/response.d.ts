@@ -14,12 +14,14 @@ export interface ToolTextResponse {
     isError?: boolean;
     [key: string]: unknown;
 }
+/** Truncate text to `charLimit` with an explicit narrowing marker. */
+export declare function truncateToLimit(text: string, charLimit?: number): string;
 /**
- * Build a JSON tool response, truncating with an explicit marker if it exceeds
- * `charLimit` (default `CHARACTER_LIMIT`). The marker tells the caller how to
- * narrow the result rather than silently dropping data.
+ * Build a JSON tool response. Serialize-only — truncation is applied centrally by
+ * the redaction wrapper (register-sanitized.ts) AFTER redaction, so a secret can
+ * never be split across the truncation boundary.
  */
-export declare function jsonResponse(data: unknown, opts?: {
+export declare function jsonResponse(data: unknown, _opts?: {
     charLimit?: number;
 }): ToolTextResponse;
 export interface TruncatedLogs {
