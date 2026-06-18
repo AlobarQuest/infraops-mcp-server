@@ -134,6 +134,7 @@ For `dockercompose` build pack apps:
 - Namecheap uses a proxy service (`namecheap-proxy`) for IP whitelisting — not direct API
 - Coolify client functions accept an optional `instance` parameter as the last argument
 - SSH key generation uses `ssh2.utils.generateKeyPairSync('ed25519')` — zero additional deps
+- **Central secret redaction:** `installRedaction(server)` (`src/utils/register-sanitized.ts`) patches `registerTool` once so EVERY tool response is redacted by default (`src/utils/redaction.ts`: secret field-names + value-shapes — PEM keys, JWTs, token prefixes, connection-string passwords). Redaction precedes truncation (`jsonResponse` is serialize-only; the wrapper truncates). Opt out per-call with `reveal: true` (audited via high-power-audit-log); pure value-read tools (`vps_read_file`, `vps_exec`, `vps_docker_logs`, `cloudflare_get_kv_value`, `cloudflare_query_d1`, `namecheap_domains_get_contacts`) are in `ALWAYS_BYPASS`. Kill switch: `INFRAOPS_DISABLE_REDACTION=1`. Existing `masking.ts`/`env-vars.ts`/`private-keys.ts` masks stay as defense-in-depth.
 
 ## Adding a New Provider
 

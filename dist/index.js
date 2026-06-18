@@ -78,11 +78,15 @@ import { registerSupabaseDatabaseTools } from "./tools/supabase-database.js";
 import { registerSupabaseFunctionTools } from "./tools/supabase-functions.js";
 import { registerSupabaseConfigTools } from "./tools/supabase-config.js";
 import { isSupabaseConfigured } from "./services/supabase-client.js";
+// Secret redaction chokepoint
+import { installRedaction } from "./utils/register-sanitized.js";
 // ── Create server ────────────────────────────────────────────────────
 const server = new McpServer({
     name: "infraops-mcp-server",
     version: "3.4.0",
 });
+// Patch registerTool BEFORE any tool registers, so every tool is covered.
+installRedaction(server);
 // ── Register Coolify tools ───────────────────────────────────────────
 // Tools are always registered — instance selection happens at call time via the `instance` parameter.
 // At least one instance (prod) must be configured.
