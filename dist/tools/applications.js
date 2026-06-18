@@ -12,6 +12,7 @@ import { coolifyGet, coolifyPost, coolifyPatch, coolifyDelete, handleCoolifyErro
 import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
 import { jsonResponse, truncateLogs } from "../utils/response.js";
 import { CHARACTER_LIMIT } from "../constants.js";
+import { redactText } from "../utils/redaction.js";
 import { summarize, toApplicationSummary } from "../utils/summaries.js";
 import { maskSensitive, maskSensitiveList } from "../utils/masking.js";
 export function registerApplicationTools(server) {
@@ -757,7 +758,8 @@ export function registerApplicationTools(server) {
         try {
             const logs = await coolifyGet(`/applications/${uuid}/logs`, { lines }, instance);
             const text = typeof logs === "string" ? logs : JSON.stringify(logs, null, 2);
-            const capped = text.length > CHARACTER_LIMIT ? truncateLogs(text, lines, CHARACTER_LIMIT).logs : text;
+            const safeText = redactText(text);
+            const capped = safeText.length > CHARACTER_LIMIT ? truncateLogs(safeText, lines, CHARACTER_LIMIT).logs : safeText;
             return { content: [{ type: "text", text: capped }] };
         }
         catch (error) {

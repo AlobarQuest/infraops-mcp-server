@@ -4,6 +4,9 @@
  */
 const MASK = "***";
 // Field names whose VALUE is a secret. Checked only after the guard below.
+// Deliberate omission: `api_key` / `key` field NAMES are NOT listed here — their
+// secret VALUES (JWTs, PEMs, prefixed tokens) are caught by VALUE_SHAPES instead,
+// avoiding over-masking of benign `*_key` fields (e.g. cache_key, sort_key).
 const SECRET_NAME = /(password|secret|token|credentials|private_key|service_role|jwt_secret|tunnel_secret)/i;
 // Names that look secret-ish but are not — never redact by name (value-shape may still apply).
 const GUARD_NAME = /(?:^|_)(id|uuid|name|fingerprint|url|at|count|type|status|version|region|host|port)$|^public_key$|_key_name$|^key_name$/i;

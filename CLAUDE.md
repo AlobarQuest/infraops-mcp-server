@@ -97,7 +97,7 @@ These were ported from `@masonator/coolify-mcp` so agents can stay on the single
 
 - **`summary` (default `true`)** on `coolify_list_{applications,databases,services,servers,projects}` and `coolify_overview` returns a compact projection (essential fields only). Pass `summary: false` for full objects. This replaces the old behavior where lists were stringified in full and could flood context (`list_applications` once returned 185K chars). Projections live in `src/utils/summaries.ts`.
 - **`reveal` (default `false`)** on `coolify_list_applications` / `coolify_get_application` / `coolify_get_service`: webhook HMAC secrets (`manual_webhook_secret_*`) and `http_basic_auth_password` are masked unless `reveal: true` (`src/utils/masking.ts`). `null` is preserved (= "no secret set"). Env-var `value`/`real_value` masking is unchanged (env-vars.ts).
-- **`jsonResponse` (`src/utils/response.ts`)** enforces the `CHARACTER_LIMIT` (25K) budget — formerly dead config — truncating oversized payloads with an explicit marker. New tools and the retrofitted reads return through it; log tools (`coolify_application_logs`, `coolify_get_deployment`) additionally tail-truncate.
+- **`jsonResponse` (`src/utils/response.ts`)** is serialize-only; truncation (25K via `truncateToLimit`) and secret redaction are applied centrally by the `installRedaction` wrapper (`src/utils/register-sanitized.ts`) after serialization, so a secret is never split across a truncation boundary.
 
 ### VPS Multi-Instance
 

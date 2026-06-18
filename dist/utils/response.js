@@ -1,10 +1,10 @@
 /**
  * Shared response helpers for Coolify tools.
  *
- * Centralizes the `{ content: [{ type: "text", text }] }` shape and enforces
- * the `CHARACTER_LIMIT` budget that was previously declared but never applied —
- * large list/overview payloads used to be stringified in full and flood the
- * LLM context. New tools and the retrofitted read tools return via `jsonResponse`.
+ * Centralizes the `{ content: [{ type: "text", text }] }` shape. `jsonResponse`
+ * is serialize-only — truncation (CHARACTER_LIMIT, 25K) moved to `truncateToLimit`
+ * and is applied centrally by the redaction wrapper (register-sanitized.ts) after
+ * redaction, so a secret is never split across a truncation boundary.
  */
 import { CHARACTER_LIMIT } from "../constants.js";
 /** Truncate text to `charLimit` with an explicit narrowing marker. */

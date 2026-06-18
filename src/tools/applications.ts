@@ -21,6 +21,7 @@ import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from
 import type { CoolifyInstance } from "../services/coolify-client.js";
 import { jsonResponse, truncateLogs } from "../utils/response.js";
 import { CHARACTER_LIMIT } from "../constants.js";
+import { redactText } from "../utils/redaction.js";
 import { summarize, toApplicationSummary } from "../utils/summaries.js";
 import { maskSensitive, maskSensitiveList } from "../utils/masking.js";
 import type { CoolifyApplication } from "../types.js";
@@ -969,8 +970,9 @@ export function registerApplicationTools(server: McpServer): void {
           instance
         );
         const text = typeof logs === "string" ? logs : JSON.stringify(logs, null, 2);
+        const safeText = redactText(text);
         const capped =
-          text.length > CHARACTER_LIMIT ? truncateLogs(text, lines, CHARACTER_LIMIT).logs : text;
+          safeText.length > CHARACTER_LIMIT ? truncateLogs(safeText, lines, CHARACTER_LIMIT).logs : safeText;
         return { content: [{ type: "text", text: capped }] };
       } catch (error) {
         // 400 = app is stopped/not running — informational, not a hard error
