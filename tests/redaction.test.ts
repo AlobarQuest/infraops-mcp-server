@@ -29,6 +29,14 @@ describe("redactText (value-shape)", () => {
     const head = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA";
     expect(redactText(head)).not.toContain("MIIEpAIBAAKCAQEA");
   });
+  it("over-redacts to end-of-string when a truncated PEM is mid-string (err-safe, by design)", () => {
+    // A truncated PEM with no END block consumes everything after it. This is
+    // intentional over-redaction: a future maintainer must not "fix" this into a leak.
+    const out = redactText("key: -----BEGIN RSA PRIVATE KEY-----\nMIIEpA\nother field data: 42");
+    expect(out).not.toContain("MIIEpA");
+    expect(out).not.toContain("other field data: 42");
+    expect(out).toContain("***");
+  });
   it("redacts a JWT (Supabase service_role shape)", () => {
     const jwt = "eyJhbGciOiJIUzI1NiI.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.abc-_123";
     expect(redactText(`token=${jwt}`)).not.toContain(jwt);
