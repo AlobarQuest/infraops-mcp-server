@@ -217,3 +217,16 @@ hand-editing `~/.claude/bin/`.
 ## Secrets
 
 All secrets come from BWS (Bitwarden Secrets Manager) via start.sh. Never hardcode tokens.
+
+<!-- governance:start -->
+## Security & Governance
+
+<!-- Generated from governance-map.toml in security-standards. Do not hand-edit. -->
+<!-- Regenerate: cd ~/Projects/security-standards && make sync -->
+
+**Build-agent class:** tool-home — you open this repo to *develop* its tools.
+**Lane:** mutate (detect / mutate / approve).
+**Owns:** `infraops MCP server`, `drift-audit.sh`, `change-window.sh`, `security-drift subsystem`.
+**Deploy:** `make install`  •  **Verify:** `make verify`.
+**Consumers:** (none).
+<!-- governance:end -->
