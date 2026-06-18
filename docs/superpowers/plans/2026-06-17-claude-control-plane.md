@@ -265,7 +265,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Add Check 13 (control-plane git drift) to `security-scan.sh`
 
 **Files:**
-- Modify: `/Users/devon/Projects/infraops-mcp-server/scripts/security-scan.sh` (insert before the summary block at the end)
+- Modify: `/Users/devon/Projects/security-standards/scripts/security-scan.sh` (insert before the summary block at the end)
 
 **Interfaces:**
 - Consumes: the `~/.claude` git repo (Task 1), the `emit` function, the `have` helper.
@@ -273,7 +273,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Insert Check 13**
 
-In `scripts/security-scan.sh`, immediately BEFORE the final summary block (the line `# ---------------------------------------------------------------------------` that precedes `echo "=== summary:`), insert:
+In `security-standards/scripts/security-scan.sh`, immediately BEFORE the final summary block (the line `# ---------------------------------------------------------------------------` that precedes `echo "=== summary:`), insert:
 
 ```bash
 # ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ fi
 
 - [ ] **Step 2: Positive check — clean tree reports PASS**
 
-Run: `bash /Users/devon/Projects/infraops-mcp-server/scripts/security-scan.sh 2>&1 | grep controlplane`
+Run: `bash /Users/devon/Projects/security-standards/scripts/security-scan.sh 2>&1 | grep controlplane`
 Expected (with `~/.claude` committed clean from Task 1): `PASS controlplane.clean   control-plane critical set matches HEAD` and NO `FAIL controlplane.drift` line.
 
 - [ ] **Step 3: Negative check — dirtying a critical file reports FAIL (scratch, non-destructive)**
@@ -314,10 +314,10 @@ Run (uses a throwaway tracked file path, then reverts — does NOT leave drift):
 cd /Users/devon/Projects/infraops-mcp-server
 # simulate a critical-set change
 printf '\n# scan-test marker\n' >> "$HOME/.claude/CLAUDE.md"
-bash scripts/security-scan.sh 2>&1 | grep 'controlplane.drift' && echo "DETECTED" || echo "MISSED"
+bash /Users/devon/Projects/security-standards/scripts/security-scan.sh 2>&1 | grep 'controlplane.drift' && echo "DETECTED" || echo "MISSED"
 # revert the simulated change
 git -C "$HOME/.claude" checkout -- CLAUDE.md
-bash scripts/security-scan.sh 2>&1 | grep -q 'controlplane.clean' && echo "REVERTED-CLEAN"
+bash /Users/devon/Projects/security-standards/scripts/security-scan.sh 2>&1 | grep -q 'controlplane.clean' && echo "REVERTED-CLEAN"
 ```
 Expected: a `FAIL controlplane.drift ... CLAUDE.md ...` line then `DETECTED`, and after revert `REVERTED-CLEAN`.
 
@@ -331,7 +331,7 @@ In `/Users/devon/Projects/infraops-mcp-server/scripts/README.md`, in the "Standa
 
 ```bash
 cd /Users/devon/Projects/infraops-mcp-server
-git add scripts/security-scan.sh CLAUDE.md scripts/README.md
+git -C /Users/devon/Projects/security-standards add scripts/security-scan.sh && git add CLAUDE.md scripts/README.md
 git commit -q -m "feat(security-scan): Check 13 — control-plane git drift detection
 
 Reports ~/.claude tracked-file drift: critical set -> FAIL (URGENT),
@@ -344,7 +344,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ### Task 5: Deploy, integrate, and verify end-to-end
 
-**Files:** none (deploy + verification); uses `scripts/install-security-scan-launchd.sh`.
+**Files:** none (deploy + verification); uses `security-standards/scripts/install-security-scan-launchd.sh`.
 
 **Interfaces:**
 - Consumes: the committed `security-scan.sh` (Task 4) and taxonomy (Task 3).
@@ -352,12 +352,12 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 - [ ] **Step 1: Deploy the updated detector**
 
-Run: `bash /Users/devon/Projects/infraops-mcp-server/scripts/install-security-scan-launchd.sh`
+Run: `bash /Users/devon/Projects/security-standards/scripts/install-security-scan-launchd.sh`
 Expected: "Deployed scanners to /Users/devon/.claude/bin ... loaded com.devon.security-scan".
 
 - [ ] **Step 2: Confirm deployed == repo source**
 
-Run: `diff /Users/devon/Projects/infraops-mcp-server/scripts/security-scan.sh ~/.claude/bin/security-scan.sh && echo IN-SYNC`
+Run: `diff /Users/devon/Projects/security-standards/scripts/security-scan.sh ~/.claude/bin/security-scan.sh && echo IN-SYNC`
 Expected: `IN-SYNC`.
 
 - [ ] **Step 3: Note the expected one-time self-check URGENT**

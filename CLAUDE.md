@@ -167,9 +167,9 @@ This repo commits its compiled output: `dist/` is NOT gitignored, because the MC
 ## Security-Drift Subsystem (`src/security-drift/`)
 
 Feeds the security detector into the daily 3am drift job + the change-manager
-approval pipeline. The detector itself is **repo-managed** (`scripts/security-scan.sh`,
-plus the skills/hooks linter `scripts/skills-security-scan.sh`) and deployed to
-`~/.claude/bin/` by `scripts/install-security-scan-launchd.sh` — which also installs the
+approval pipeline. The detector itself is **repo-managed in `~/Projects/security-standards`** (detect lane) (`security-standards/scripts/security-scan.sh`,
+plus the skills/hooks linter `security-standards/scripts/skills-security-scan.sh`) and deployed to
+`~/.claude/bin/` by `security-standards/scripts/install-security-scan-launchd.sh` — which also installs the
 standalone weekly `com.devon.security-scan` LaunchAgent (Mon 09:00, logs-only). The runtime
 resolves the scanner at `~/.claude/bin/security-scan.sh` (`paths.ts`, env-overridable via
 `SECURITY_SCAN_PATH`). CLI entry: `dist/cli/security-drift-cli.js run` (chained into
@@ -204,10 +204,10 @@ symlink / hardlink / owner guards require operating on the open fd (the inode), 
 path-based `chmod` cannot do safely. The path-allowlist is deny-by-default (empty ⇒ nothing
 auto-fixes); a blocked guard re-tiers the finding to URGENT.
 
-**The detector lives in the repo but RUNS from `~/.claude/bin/`; editing it requires re-running the installer.**
-`scripts/security-scan.sh` is the source of truth, but both the embedded 3am CLI and the
+**The detector lives in `security-standards` but RUNS from `~/.claude/bin/`; editing it requires re-running the installer.**
+`security-standards/scripts/security-scan.sh` is the source of truth, but both the embedded 3am CLI and the
 standalone LaunchAgent execute the *deployed* `~/.claude/bin/security-scan.sh`. Editing the
-repo copy has NO effect until `scripts/install-security-scan-launchd.sh` redeploys it. The
+repo copy has NO effect until `security-standards/scripts/install-security-scan-launchd.sh` redeploys it. The
 self-check's runner-integrity gate (`self-check.ts`, step 3) sha256s the deployed scanner, so
 a redeploy surfaces exactly one `selfcheck.runner_integrity` URGENT ("scanner hash changed —
 verify intentional") on the next run, then records the new hash. This same gate is what catches
