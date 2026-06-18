@@ -70,6 +70,24 @@ describe("installRedaction", () => {
   it("ALWAYS_BYPASS holds the value-read tools", () => {
     for (const t of ["vps_read_file","vps_exec","vps_docker_logs","cloudflare_get_kv_value","cloudflare_query_d1","namecheap_domains_get_contacts"])
       expect(ALWAYS_BYPASS.has(t)).toBe(true);
+    expect(ALWAYS_BYPASS.size).toBe(6);
+  });
+
+  it("reveal:true bypasses redaction but still truncates", async () => {
+    const s = fakeServer(); installRedaction(s as any);
+    const big = "z".repeat(40000);
+    s.registerTool("coolify_get_application", { inputSchema: {} },
+      async () => ({ content: [{ type: "text", text: JSON.stringify({ blob: big }) }] }));
+    const r = await s.handlers["coolify_get_application"]({ reveal: true }, {});
+    expect(r.content[0].text).toContain("truncated:");
+  });
+
+  it("passes non-text content items through untouched", async () => {
+    const s = fakeServer(); installRedaction(s as any);
+    const img = { type: "image", data: "base64...", mimeType: "image/png" };
+    s.registerTool("coolify_get_application", { inputSchema: {} }, async () => ({ content: [img] }));
+    const r = await s.handlers["coolify_get_application"]({}, {});
+    expect(r.content[0]).toEqual(img);
   });
 
   it("does NOT truncate ALWAYS_BYPASS output (value-reads stay whole), but truncates others", async () => {
