@@ -67,6 +67,19 @@ describe("classify", () => {
     expect(c?.tier).toBe("URGENT");
   });
 
+  it("URGENTs an unverifiable deployed scanner and bypasses the FP filter (deny-by-default)", () => {
+    const c = classify(
+      f({
+        check: "selfcheck.runner_source_unresolved",
+        target: "/Users/x/.claude/bin/security-scan.sh",
+        detail: "blessed source unreadable at /Users/x/Projects/security-standards/scripts/security-scan.sh — cannot verify deployed artifact",
+      }),
+      { autoFixAllowlist: [], fpExtra: ["security-standards"] },
+    );
+    expect(c?.tier).toBe("URGENT");
+    expect(c && "manual" in c.remediation).toBe(true);
+  });
+
   it("escalates controlplane.drift even when the changed path contains an FP token like /test/", () => {
     const detail = "uncommitted/untracked control-plane change:  ?? hooks/test/evil.sh (review + commit if intended)";
     const c = classify(f({ check: "controlplane.drift", target: detail, detail }), { autoFixAllowlist: [] });
