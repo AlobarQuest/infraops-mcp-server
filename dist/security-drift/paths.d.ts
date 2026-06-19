@@ -2,6 +2,7 @@ export interface SecurityPaths {
     cfgDir: string;
     stateDir: string;
     scanPath: string;
+    scanSourcePath: string;
     baselineFile: string;
     emitStateFile: string;
     rollbackLog: string;
