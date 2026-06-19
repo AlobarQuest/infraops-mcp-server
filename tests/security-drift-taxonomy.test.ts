@@ -93,4 +93,17 @@ describe("classify", () => {
     );
     expect(c).toBeNull();
   });
+
+  it("URGENTs a scanner output-version skew and bypasses the FP filter (deny-by-default)", () => {
+    const c = classify(
+      f({
+        check: "scanner.output_version_skew",
+        target: "/Users/x/.claude/bin/security-scan.sh",
+        detail: "deployed scanner output version 2 != parser-expected 1 — run aborted. Reconcile with: ... make install",
+      }),
+      { autoFixAllowlist: [], fpExtra: ["security-scan"] },
+    );
+    expect(c?.tier).toBe("URGENT");
+    expect(c && "manual" in c.remediation).toBe(true);
+  });
 });

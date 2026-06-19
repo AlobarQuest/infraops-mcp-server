@@ -36,6 +36,7 @@ const URGENT_KEYS = new Set([
     "selfcheck.state_perms",
     "selfcheck.runner_integrity",
     "selfcheck.runner_source_unresolved",
+    "scanner.output_version_skew",
     // persistence classes the fast-follow watcher will feed in:
     "authorized_keys.changed",
     "launchagent.new",
