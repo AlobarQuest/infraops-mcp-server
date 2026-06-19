@@ -126,7 +126,7 @@ Two layers, both reusing existing machinery:
 | `~/.claude/.gitignore` | deny-by-default allow-list | — |
 | `~/.claude/README.md` | document repo purpose + tracked set | — |
 | `~/.claude` git repo + `AlobarQuest/claude-control-plane` remote | history, rollback, offsite backup | `gh` / `github_create_repo` |
-| new check in `scripts/security-scan.sh` (infraops) | detect control-plane drift, emit finding | the `~/.claude` repo existing |
+| new check in `security-standards/scripts/security-scan.sh` | detect control-plane drift, emit finding | the `~/.claude` repo existing |
 | existing security-drift pipeline | classify + escalate + email | unchanged |
 
 ## Bootstrap (one-time)
@@ -136,8 +136,8 @@ Two layers, both reusing existing machinery:
 3. `git add` the allow-list; verify nothing sensitive staged (`git status`, diff review)
 4. Initial commit
 5. Create private repo (`github_create_repo` → `AlobarQuest/claude-control-plane`), add remote, push
-6. Add the control-plane-drift check to `scripts/security-scan.sh`; redeploy via
-   `install-security-scan-launchd.sh`; confirm the self-check hash updates once (expected)
+6. Add the control-plane-drift check to `security-standards/scripts/security-scan.sh`; redeploy via
+   `security-standards/scripts/install-security-scan-launchd.sh`; confirm the self-check hash updates once (expected)
 
 ## Testing / verification
 
