@@ -13,6 +13,7 @@ function cfg(over: Partial<SelfCheckConfig> = {}): SelfCheckConfig {
     stateFiles: [],
     auditLog: path.join(dir, "audit.jsonl"),
     hwmFile: path.join(dir, "hwm.json"),
+    sourceVerifiedFiles: [],
     integrityFiles: [],
     hashFile: path.join(dir, "hashes.json"),
     now: "2026-06-15T03:00:00Z",
@@ -53,12 +54,51 @@ describe("runSelfCheck", () => {
     expect(runSelfCheck(cfg({ auditLog: audit }))).toHaveLength(0);
   });
 
-  it("seeds on first sight then flags a changed scanner/config file", () => {
-    const scan = path.join(dir, "security-scan.sh");
-    fs.writeFileSync(scan, "#original");
-    expect(runSelfCheck(cfg({ integrityFiles: [scan] }))).toHaveLength(0); // seed
-    fs.writeFileSync(scan, "#TAMPERED");
-    const findings = runSelfCheck(cfg({ integrityFiles: [scan] }));
+  it("change-tracked config (allowlist) seeds on first sight then flags on change", () => {
+    const conf = path.join(dir, "security-fp-allowlist.txt");
+    fs.writeFileSync(conf, "#original");
+    expect(runSelfCheck(cfg({ integrityFiles: [conf] }))).toHaveLength(0); // seed
+    fs.writeFileSync(conf, "#CHANGED");
+    const findings = runSelfCheck(cfg({ integrityFiles: [conf] }));
     expect(findings.map((x) => x.check)).toContain("selfcheck.runner_integrity");
+  });
+});
+
+describe("runSelfCheck — source-verified integrity", () => {
+  function pair() {
+    return {
+      deployed: path.join(dir, "bin-security-scan.sh"),
+      source: path.join(dir, "src-security-scan.sh"),
+    };
+  }
+
+  it("is silent when the deployed scanner byte-matches its blessed source", () => {
+    const { deployed, source } = pair();
+    fs.writeFileSync(deployed, "#!/bin/bash\necho blessed\n");
+    fs.writeFileSync(source, "#!/bin/bash\necho blessed\n");
+    expect(runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }))).toHaveLength(0);
+  });
+
+  it("flags runner_integrity when the deployed scanner differs from blessed source", () => {
+    const { deployed, source } = pair();
+    fs.writeFileSync(deployed, "#!/bin/bash\necho TAMPERED\n");
+    fs.writeFileSync(source, "#!/bin/bash\necho blessed\n");
+    const findings = runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }));
+    expect(findings.map((x) => x.check)).toContain("selfcheck.runner_integrity");
+  });
+
+  it("flags runner_source_unresolved when the blessed source is unreadable (fail loud, not open)", () => {
+    const { deployed, source } = pair();
+    fs.writeFileSync(deployed, "#!/bin/bash\necho blessed\n");
+    // source intentionally not written → unreadable
+    const findings = runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }));
+    expect(findings.map((x) => x.check)).toContain("selfcheck.runner_source_unresolved");
+  });
+
+  it("is silent when the deployed scanner does not exist yet (nothing to verify)", () => {
+    const { deployed, source } = pair();
+    fs.writeFileSync(source, "#!/bin/bash\necho blessed\n");
+    // deployed intentionally not written
+    expect(runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }))).toHaveLength(0);
   });
 });

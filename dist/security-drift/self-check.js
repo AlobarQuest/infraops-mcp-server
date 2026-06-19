@@ -5,7 +5,8 @@
 // Checks:
 //   1. state-file perms — baseline / emit-state / rollback must be 0600 + owned by us
 //   2. audit-log tamper — high-power-actions.jsonl must never SHRINK (append-only)
-//   3. runner integrity — security-scan.sh + allowlist files must not change unexpectedly
+//   3a. source integrity — deployed scanner must byte-match its blessed source
+//   3b. change integrity — allowlist config files must not change unexpectedly
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -60,7 +61,32 @@ export function runSelfCheck(cfg) {
     catch {
         // audit log absent → skip (not all machines have one yet)
     }
-    // 3. runner / config integrity
+    // 3a. source-verified integrity — a deployed artifact must byte-match its blessed
+    // source-of-truth. Stateless (no hash store): the steady state right after a legit
+    // `make install` (shutil.copyfile) is deployed == source. A mismatch means tamper or a
+    // stale/forgotten deploy; an unreadable source means we cannot verify — emit, never
+    // silently pass (deny-by-default).
+    for (const { deployed, source } of cfg.sourceVerifiedFiles) {
+        let deployedBuf;
+        try {
+            deployedBuf = fs.readFileSync(deployed);
+        }
+        catch {
+            continue; // not deployed yet — nothing to verify
+        }
+        let sourceBuf;
+        try {
+            sourceBuf = fs.readFileSync(source);
+        }
+        catch {
+            findings.push(fail("selfcheck.runner_source_unresolved", deployed, `blessed source unreadable at ${source} — cannot verify deployed artifact`));
+            continue;
+        }
+        if (!deployedBuf.equals(sourceBuf)) {
+            findings.push(fail("selfcheck.runner_integrity", deployed, `deployed scanner does not match blessed source ${source} — investigate tamper or stale deploy`));
+        }
+    }
+    // 3b. change-tracked integrity (config files with no source-of-truth repo)
     const recorded = readJson(cfg.hashFile) ?? {};
     const next = { ...recorded };
     for (const file of cfg.integrityFiles) {

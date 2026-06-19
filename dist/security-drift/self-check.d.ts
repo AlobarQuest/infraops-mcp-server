@@ -3,6 +3,10 @@ export interface SelfCheckConfig {
     stateFiles: string[];
     auditLog: string;
     hwmFile: string;
+    sourceVerifiedFiles: {
+        deployed: string;
+        source: string;
+    }[];
     integrityFiles: string[];
     hashFile: string;
     now: string;
