@@ -101,4 +101,15 @@ describe("runSelfCheck — source-verified integrity", () => {
     // deployed intentionally not written
     expect(runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }))).toHaveLength(0);
   });
+
+  it("flags runner_source_unresolved when the deployed scanner is present but unreadable (fail loud, not a silent skip)", () => {
+    // Real-world trigger: a deployed scanner left with bad perms by a botched deploy.
+    // A directory deterministically yields a non-ENOENT read error (EISDIR) regardless of uid.
+    const deployed = path.join(dir, "bin-unreadable");
+    const source = path.join(dir, "src-security-scan.sh");
+    fs.mkdirSync(deployed);
+    fs.writeFileSync(source, "#!/bin/bash\necho blessed\n");
+    const findings = runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }));
+    expect(findings.map((x) => x.check)).toContain("selfcheck.runner_source_unresolved");
+  });
 });

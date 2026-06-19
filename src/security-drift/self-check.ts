@@ -87,8 +87,11 @@ export function runSelfCheck(cfg: SelfCheckConfig): Finding[] {
     let deployedBuf: Buffer;
     try {
       deployedBuf = fs.readFileSync(deployed);
-    } catch {
-      continue; // not deployed yet — nothing to verify
+    } catch (e: any) {
+      if (e?.code === "ENOENT") continue; // not deployed yet — nothing to verify
+      // present but unreadable (bad perms, etc.) — fail loud, don't silently skip
+      findings.push(fail("selfcheck.runner_source_unresolved", deployed, `deployed scanner present but unreadable (${e?.code ?? "read error"}) — cannot verify`));
+      continue;
     }
     let sourceBuf: Buffer;
     try {
