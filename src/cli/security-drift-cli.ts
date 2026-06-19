@@ -14,6 +14,9 @@ import { runSecurityDrift } from "../security-drift/runner.js";
 import { sendUrgentEmail } from "../security-drift/notify.js";
 import { securityPaths } from "../security-drift/paths.js";
 import { runSelfCheck } from "../security-drift/self-check.js";
+import { classify } from "../security-drift/taxonomy.js";
+import { buildEscalations, type ClassifiedFinding } from "../security-drift/emit.js";
+import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION } from "../security-drift/scanner-version.js";
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
@@ -70,6 +73,38 @@ async function main(): Promise<void> {
     hashFile: p.hashFile,
     now,
   });
+
+  // --- Preflight: refuse to run on a scanner whose output contract this parser was not
+  // written for. On skew we MUST NOT reach runSecurityDrift's postSync — it posts the full
+  // current set and CM reconcile would false-resolve every open item against a garbage parse.
+  // Abort with a direct urgent email carrying the skew + this run's trustworthy self-check urgents.
+  const skew = scannerVersionGate(p.scanPath, EXPECTED_SCANNER_OUTPUT_VERSION);
+  if (skew) {
+    const classified: ClassifiedFinding[] = [];
+    for (const finding of [skew, ...selfCheckFindings]) {
+      const classification = classify(finding, { autoFixAllowlist: readList(p.autoFixAllowlistFile), fpExtra: readList(p.fpAllowlistFile) });
+      if (classification) classified.push({ finding, classification });
+    }
+    const { escalations } = buildEscalations(classified, now);
+    const urgent = escalations.filter((e) => e.urgent);
+    const emailed = await sendUrgentEmail(urgent, {
+      resendApiKey: process.env.RESEND_API_KEY,
+      from: process.env.INFRADRIFT_EMAIL_FROM ?? "infra@devonwatkins.com",
+      to: process.env.INFRADRIFT_EMAIL_TO ?? "devon.watkins@gmail.com",
+    });
+    const digest =
+      `# Security drift ${now.slice(0, 10)} — ABORTED (scanner output-version skew)\n\n` +
+      `🚨 ${skew.detail}\n\n` +
+      `Run aborted before parse/sync (reconcile-safe: open items untouched). ` +
+      `${urgent.length} urgent item(s), emailed=${emailed}.\n`;
+    if (reportDir) {
+      fs.mkdirSync(reportDir, { recursive: true });
+      fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security.md`), digest, "utf8");
+    }
+    process.stdout.write(digest + "\n");
+    process.stdout.write(`\nsecurity-drift: ABORTED scanner_version_skew urgent=${urgent.length} emailed=${emailed}\n`);
+    process.exit(1);
+  }
 
   const result = await runSecurityDrift(
     {
