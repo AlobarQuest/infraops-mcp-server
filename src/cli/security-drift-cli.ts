@@ -65,8 +65,8 @@ async function main(): Promise<void> {
     stateFiles: [p.baselineFile, p.emitStateFile, p.rollbackLog],
     auditLog: p.auditLog,
     hwmFile: p.hwmFile,
-    sourceVerifiedFiles: [], // Task 3 will populate with real paths
-    integrityFiles: [p.scanPath, p.autoFixAllowlistFile, p.fpAllowlistFile],
+    sourceVerifiedFiles: [{ deployed: p.scanPath, source: p.scanSourcePath }],
+    integrityFiles: [p.autoFixAllowlistFile, p.fpAllowlistFile],
     hashFile: p.hashFile,
     now,
   });

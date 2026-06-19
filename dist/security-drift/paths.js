@@ -13,6 +13,7 @@ export function securityPaths() {
         cfgDir,
         stateDir,
         scanPath: process.env.SECURITY_SCAN_PATH ?? path.join(home, ".claude", "bin", "security-scan.sh"),
+        scanSourcePath: process.env.SECURITY_SCAN_SOURCE_PATH ?? path.join(home, "Projects", "security-standards", "scripts", "security-scan.sh"),
         baselineFile: path.join(stateDir, "security-baseline.json"),
         emitStateFile: path.join(stateDir, "security-emit-state.json"),
         rollbackLog: path.join(stateDir, "security-rollback.jsonl"),
