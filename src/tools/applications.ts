@@ -814,7 +814,6 @@ export function registerApplicationTools(server: McpServer): void {
           .describe("Service-to-domain mapping for compose apps"),
         custom_labels: z
           .string()
-          .nullable()
           .optional()
           .describe("Custom Traefik labels (set to empty string to reset/auto-generate)"),
         private_key_uuid: z
