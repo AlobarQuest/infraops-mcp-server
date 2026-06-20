@@ -2,6 +2,7 @@ import { coolifyGet } from "../services/coolify-client.js";
 import { loadCoolifyChecks } from "./standards-source.js";
 import { evaluateCheck } from "./check-engine.js";
 import { resolveRemediation } from "./remediation-registry.js";
+import { loadBackupManifest, enrichWithBackupCoverage } from "./backup-manifest.js";
 /**
  * Audit a single Coolify instance against infra-brain standards.
  *
@@ -35,6 +36,15 @@ export async function auditInstance(instance, opts = {}) {
             apps = apps.filter(matchesScope);
         if (dbs)
             dbs = dbs.filter(matchesScope);
+    }
+    // Enrich databases with backup-coverage fields (backup_covered / backup_fresh)
+    // sourced from the vps-backup manifest, so rule #572 can assert on actual
+    // backup coverage rather than Coolify's unused native backup_configs field.
+    if (dbs && dbs.length > 0) {
+        const manifest = await loadBackupManifest();
+        const now = Date.now();
+        for (const db of dbs)
+            enrichWithBackupCoverage(db, manifest, now);
     }
     const appChecks = checks.filter((c) => c.resource === "coolify_application");
     const dbChecks = checks.filter((c) => c.resource === "coolify_database");

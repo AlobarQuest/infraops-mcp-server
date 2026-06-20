@@ -3,6 +3,7 @@ import type { CoolifyInstance } from "../services/coolify-client.js";
 import { loadCoolifyChecks } from "./standards-source.js";
 import { evaluateCheck } from "./check-engine.js";
 import { resolveRemediation } from "./remediation-registry.js";
+import { loadBackupManifest, enrichWithBackupCoverage } from "./backup-manifest.js";
 import type { Proposal, Risk } from "./check-engine.js";
 
 export interface AuditResult {
@@ -60,6 +61,15 @@ export async function auditInstance(
       String(r.name ?? "").toLowerCase().includes(s);
     if (apps) apps = apps.filter(matchesScope);
     if (dbs) dbs = dbs.filter(matchesScope);
+  }
+
+  // Enrich databases with backup-coverage fields (backup_covered / backup_fresh)
+  // sourced from the vps-backup manifest, so rule #572 can assert on actual
+  // backup coverage rather than Coolify's unused native backup_configs field.
+  if (dbs && dbs.length > 0) {
+    const manifest = await loadBackupManifest();
+    const now = Date.now();
+    for (const db of dbs) enrichWithBackupCoverage(db, manifest, now);
   }
 
   const appChecks = checks.filter((c) => c.resource === "coolify_application");
