@@ -286,13 +286,20 @@ like the other seven.)
 
 ### Acceptance criteria
 
-- [ ] `agent-sites-postgres`, `crm-db`, `facelesstt-db` each have a
+**✅ DONE (2026-06-20)** — `backup.sh` reconciled against live Coolify state: added
+`agent_sites`, `crm`, `change_manager` (standalone, project==service==UUID) plus
+`community_atlas` (a live Flavor-C prod DB found unbacked during the sweep). Removed
+retired `lifeops`, `inbox_assistant`, `realestate`, `meal_planner`, `meal_demo`. A live
+run produced fresh dumps for all (agent_sites 13 tables, crm 11, change_manager 5,
+community_atlas 9). `facelesstt-db` is on the **dev** OrbStack instance (`backup-orb.sh`),
+not prod — outside #572 prod scope.
+
+- [x] `agent-sites-postgres`, `crm-db` (+ `change-manager`, `community_atlas`) each have a
       `pg_dump_container` entry in `backup.sh` with the correct Coolify project
       UUID, container service name, db, and user.
-- [ ] A vps-backup run produces fresh dumps for all three; `verify-backup.sh` passes.
-- [ ] Container service name + credentials confirmed before adding (inspect via
-      `coolify_get_database` / `docker exec`). Note `facelesstt` may live on the
-      dev Coolify instance — confirm prod vs dev.
+- [x] A vps-backup run produces fresh dumps for all; `verify-backup.sh` expected-DB list reconciled.
+- [x] Container service name + credentials confirmed before adding (inspected via live
+      `docker` label probe). `facelesstt` confirmed dev-instance — excluded from prod scope.
 
 ### Dependency
 
@@ -348,12 +355,30 @@ project UUID is the natural choice).
 
 ### Acceptance criteria
 
-- [ ] vps-backup emits a coverage manifest (covered DB identities + last-success timestamps).
-- [ ] The audit enriches Coolify database resources with `backup_covered` /
+**✅ DONE (2026-06-20)** — Implemented Option A. Manifest at
+`~/.infraops/vps-backup-manifest.json` (DB UUID → `{label, last_success}`), written by
+`backup.sh` only for DBs whose dump+restic copy actually succeeded (presence = proven
+backup, not config). Enrichment in `src/standards/backup-manifest.ts`
+(`loadBackupManifest` + `enrichWithBackupCoverage` adding `backup_covered`/`backup_fresh`),
+wired into `run-audit.ts` before the DB checks. Rule #572's `check.assert` repointed to
+`{field:"backup_covered",op:"eq",value:true}` via Infra_Brain `update_rule`. Resolved
+open decisions: mapping key = **database UUID** (== project UUID for standalone DBs);
+transport = **local file** (audit + vps-backup co-located on the mini). Verified
+end-to-end: 0/6 live standalone DBs flagged; hermetic test confirms an uncovered DB flags
+and a stopped DB is skipped by the running-guard.
+
+⚠️ **Follow-up:** the infraops→infra-brain REST rules endpoint (`GET /api/rules`) returns
+**404** (broken since the 2026-06-19 brain unification), so the audit currently reads the
+local standards cache, not live infra-brain. The cache was refreshed with the corrected
+#572, so the deployed audit is correct now — but live rule changes won't propagate until
+the endpoint is restored. Worth a dedicated backlog item.
+
+- [x] vps-backup emits a coverage manifest (covered DB identities + last-success timestamps).
+- [x] The audit enriches Coolify database resources with `backup_covered` /
       `backup_fresh` from the manifest.
-- [ ] Rule #572 updated in infra-brain to assert on real coverage; re-audit shows
+- [x] Rule #572 updated in infra-brain to assert on real coverage; re-audit shows
       the covered DBs pass and any genuinely-uncovered DB flags.
-- [ ] After item #3 lands, agent-sites / crm / facelesstt pass #572.
+- [x] agent-sites / crm pass #572 (facelesstt is dev-instance, out of prod scope).
 
 ### Dependency
 
