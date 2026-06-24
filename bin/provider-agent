@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""Provider-agent wrapper: call this provider's Claude agent as a gated,
+stateful subprocess. Installed by the provider-agent-setup skill.
+
+Usage:
+    bin/provider-agent --session <name> "<complaint + context>"
+
+Reuse the same --session name to continue the same thread.
+
+The wrapper is intentionally boilerplate — identical across every provider,
+parametrized only by its own file location. Three behaviors beyond "run claude":
+
+  * timeout      — the call BLOCKS the consumer, so a hung agent is capped.
+  * recursion    — a provider agent must not call another provider agent.
+  * auto-commit  — the agent runs with acceptEdits, so its edits are applied
+                   to the working tree. Untrusted relayed text must never cause
+                   a SILENT mutation, so any edits this turn are committed onto
+                   a `provider-agent/<session>` review branch (never onto the
+                   provider's main branch) and the commit is reported. Edits
+                   are auditable, isolated, and rollback-able; main is untouched.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+BRIEF_PATH = REPO_ROOT / "provider-agent-brief.md"
+SESSIONS_DIR = REPO_ROOT / ".provider-agent" / "sessions"
+
+ALLOWED_TOOLS = "Read Edit Write Grep Glob Bash Skill"
+DISALLOWED_TOOLS = "mcp__infraops"
+PERMISSION_MODE = "acceptEdits"
+
+DEFAULT_TIMEOUT = 600          # seconds; override with --timeout or $PROVIDER_AGENT_TIMEOUT
+MAX_DEPTH = 1                  # a provider agent must not call another provider agent
+DEPTH_ENV = "PROVIDER_AGENT_DEPTH"
+
+
+def safe_name(name: str) -> str:
+    return "".join(c if c.isalnum() or c in "-_" else "_" for c in name)
+
+
+def session_file(name: str) -> Path:
+    return SESSIONS_DIR / f"{safe_name(name)}.json"
+
+
+def read_session_id(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text()).get("session_id")
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def write_session_id(path: Path, session_id: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"session_id": session_id}, indent=2))
+
+
+def build_claude_argv(prompt: str, brief_text: str, resume_id: str | None) -> list[str]:
+    argv = [
+        "claude", "-p", prompt,
+        "--output-format", "json",
+        "--append-system-prompt", brief_text,
+        "--allowedTools", ALLOWED_TOOLS,
+        "--disallowedTools", DISALLOWED_TOOLS,
+        "--permission-mode", PERMISSION_MODE,
+    ]
+    if resume_id:
+        argv += ["--resume", resume_id]
+    return argv
+
+
+def git(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True)
+
+
+def is_git_repo() -> bool:
+    return git("rev-parse", "--git-dir").returncode == 0
+
+
+# The wrapper's own state dir is never part of a review commit or the dirty check,
+# regardless of whether the provider gitignored it.
+EXCLUDE_OWN_STATE = (".", ":(exclude).provider-agent")
+
+
+def tree_dirty() -> bool:
+    return bool(git("status", "--porcelain", "--", *EXCLUDE_OWN_STATE).stdout.strip())
+
+
+def current_branch() -> str:
+    return git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+
+
+def branch_exists(name: str) -> bool:
+    return git("rev-parse", "--verify", "--quiet", name).returncode == 0
+
+
+def capture_edits(session: str, prompt: str, new_id: str | None) -> tuple[str, str, int] | None:
+    """Commit this turn's working-tree edits onto a review branch, leaving the
+    provider's original branch (e.g. main) untouched. Returns
+    (branch, short_sha, n_files) or None if there was nothing to commit.
+
+    Guarantees the edits are never silently dropped: if the named review branch
+    can't be reached cleanly, it falls back to a unique branch, and only as a
+    last resort commits on the current branch — but it always commits and
+    always reports where.
+    """
+    porcelain = git("status", "--porcelain", "--", *EXCLUDE_OWN_STATE).stdout.strip()
+    if not porcelain:
+        return None
+    n_files = len(porcelain.splitlines())
+
+    branch = f"provider-agent/{safe_name(session)}"
+    cur = current_branch()
+    if cur != branch:
+        if branch_exists(branch):
+            co = git("checkout", branch)
+        else:
+            co = git("checkout", "-b", branch)
+        if co.returncode != 0:
+            # working-tree edits conflicted with the review branch — never drop
+            # them; put them on a fresh, unique branch instead.
+            branch = f"provider-agent/{safe_name(session)}-{(new_id or 'x')[:8]}"
+            if git("checkout", "-b", branch).returncode != 0:
+                branch = cur  # last resort: commit where we are rather than lose work
+
+    git("add", "-A", "--", *EXCLUDE_OWN_STATE)
+    subject = next((ln for ln in prompt.strip().splitlines() if ln.strip()), "edits")[:60]
+    git("commit", "-m", f"provider-agent({safe_name(session)}): {subject}")
+    sha = git("rev-parse", "--short", "HEAD").stdout.strip()
+    return branch, sha, n_files
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Call this provider's agent.")
+    parser.add_argument("--session", required=True, help="Stable thread name.")
+    parser.add_argument(
+        "--timeout", type=int,
+        default=int(os.environ.get("PROVIDER_AGENT_TIMEOUT", DEFAULT_TIMEOUT)),
+        help="Seconds before the blocking call is aborted (default %(default)s).",
+    )
+    parser.add_argument("prompt", help="The request / complaint + context.")
+    args = parser.parse_args(argv)
+
+    depth = int(os.environ.get(DEPTH_ENV, "0") or "0")
+    if depth >= MAX_DEPTH:
+        print(
+            f"error: provider-agent recursion blocked ({DEPTH_ENV}={depth}); "
+            "a provider agent must not call another provider agent.",
+            file=sys.stderr,
+        )
+        return 3
+
+    if not BRIEF_PATH.exists():
+        print(f"error: missing brief at {BRIEF_PATH}", file=sys.stderr)
+        return 2
+    brief_text = BRIEF_PATH.read_text()
+
+    sfile = session_file(args.session)
+    resume_id = read_session_id(sfile)
+
+    # Auto-commit is only safe from a clean tree — otherwise it would sweep up
+    # pre-existing uncommitted work. Decide before the agent runs.
+    git_ok = is_git_repo()
+    pre_dirty = git_ok and tree_dirty()
+
+    child_env = {**os.environ, DEPTH_ENV: str(depth + 1)}
+    try:
+        proc = subprocess.run(
+            build_claude_argv(args.prompt, brief_text, resume_id),
+            cwd=REPO_ROOT, capture_output=True, text=True,
+            env=child_env, timeout=args.timeout,
+        )
+    except subprocess.TimeoutExpired:
+        sys.stderr.write(f"error: provider-agent timed out after {args.timeout}s\n")
+        print("STATUS: needs-devon")
+        print("RESOLUTION: the provider agent did not respond in time; escalate to Devon.")
+        print("ACTIONS_TAKEN: none")
+        print(f"PROPOSALS: investigate provider-agent timeout (>{args.timeout}s) "
+              f"for session '{args.session}'.")
+        return 124
+
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr)
+        return proc.returncode
+
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        sys.stderr.write(f"error: could not parse claude JSON output\n{proc.stdout}")
+        return 1
+
+    new_id = payload.get("session_id")
+    if new_id:
+        write_session_id(sfile, new_id)
+    result = payload.get("result")
+    if result:
+        print(result)
+
+    if git_ok and not pre_dirty:
+        committed = capture_edits(args.session, args.prompt, new_id)
+        if committed:
+            branch, sha, n = committed
+            print(f"\n[provider-agent] {n} file(s) committed to {branch} @ {sha}")
+    elif pre_dirty:
+        sys.stderr.write(
+            "warning: provider repo had uncommitted changes before this call; "
+            "auto-commit skipped — the agent's edits (if any) are loose in the "
+            "working tree and were NOT captured to a review branch.\n"
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
