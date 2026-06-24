@@ -3,3 +3,6 @@ node_modules/
 .env
 .env.*
 .DS_Store
+
+# provider-agent session state
+.provider-agent/sessions/

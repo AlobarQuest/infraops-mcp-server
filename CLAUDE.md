@@ -51,6 +51,26 @@ src/
 
 See [RUNBOOK.md](./RUNBOOK.md) for provider configuration details (env vars, BWS secret IDs, `.claude.json` wiring, troubleshooting).
 
+## This repo runs from the local checkout — keep `main` current
+
+There is **no remote deploy**: Claude Code launches this MCP as a subprocess from
+*this working checkout* via `start.sh` → `node dist/index.js`. So a stale local
+`main` (or a stale `dist/`) means **every build agent on this machine is using
+out-of-date infra tooling**. The `SessionStart` hook
+(`.claude/hooks/session-sync.sh`) fast-forwards `main` at session start *only when
+safe* (on `main`, clean, behind origin); otherwise it just notifies. It never
+switches branches, deletes, or blocks startup. After it syncs (or after you merge a
+PR and `git sync`), run `npm run build` so `dist/` reflects `main`.
+
+## Provider agent — escalation when the MCP isn't enough
+
+`bin/provider-agent` exposes this repo as a gated, stateful agent a consumer build
+agent can call when it needs a capability the infraops MCP does **not yet expose**
+(a missing tool, schema, or provider client). The provider agent may add/extend
+tools and verify with `npm run build` + `npx vitest run`, but must **not** run them
+against live infrastructure — see `provider-agent-brief.md` for the exact gate. Its
+edits land on a `provider-agent/<session>` review branch for you to review/merge.
+
 ## Providers
 
 | Provider | Prefix | Always On | Env Vars Required |
