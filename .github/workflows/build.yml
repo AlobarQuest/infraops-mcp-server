@@ -20,4 +20,18 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+
+      # dist/ is tracked and IS the runtime (start.sh -> node dist/index.js).
+      # Fail the PR if the committed dist/ does not match a fresh build, so a
+      # merged main always carries current compiled output. Without this, a green
+      # build+test still ships a stale dist/ (vitest transpiles src/ directly).
+      - name: Verify committed dist/ is up to date
+        run: |
+          if [ -n "$(git status --porcelain dist/)" ]; then
+            echo "::error::dist/ is stale — run 'npm run build' and commit dist/ in this PR."
+            git status --porcelain dist/
+            git --no-pager diff -- dist/ | head -200
+            exit 1
+          fi
+
       - run: npm test

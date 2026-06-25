@@ -59,8 +59,18 @@ There is **no remote deploy**: Claude Code launches this MCP as a subprocess fro
 out-of-date infra tooling**. The `SessionStart` hook
 (`.claude/hooks/session-sync.sh`) fast-forwards `main` at session start *only when
 safe* (on `main`, clean, behind origin); otherwise it just notifies. It never
-switches branches, deletes, or blocks startup. After it syncs (or after you merge a
-PR and `git sync`), run `npm run build` so `dist/` reflects `main`.
+switches branches, deletes, or blocks startup.
+
+**The full chain to make a code change live: PR → merge → `git sync` → `/mcp
+reconnect infraops`.** You do **not** need a local `npm run build`: `dist/` is
+tracked and the CI `Build` workflow fails any PR whose committed `dist/` does not
+match a fresh build (`git status --porcelain dist/`), so a merged `main` always
+carries current compiled output — `git sync` brings it down via git alone. The one
+remaining step is reloading the runtime: the MCP runs as a subprocess
+(`start.sh` → `node dist/index.js`) launched at session start, so a session that
+was already open is still executing the OLD `dist/`. Re-spawn it in place with
+`/mcp reconnect infraops` (lighter than a full session restart); the session-sync
+hook emits this reminder automatically when a fast-forward changed `dist/`.
 
 ## Provider agent — escalation when the MCP isn't enough
 

@@ -33,7 +33,14 @@ branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo DETACHED)"
 dirty=""; [ -n "$(git status --porcelain 2>/dev/null)" ] && dirty=" with uncommitted changes"
 
 if [ "$branch" = "main" ] && [ -z "$dirty" ]; then
+  before="$(git rev-parse HEAD 2>/dev/null)"
   if git merge --ff-only origin/main >/dev/null 2>&1; then
+    # dist/ IS the runtime (start.sh -> node dist/index.js). If the fast-forward
+    # moved dist/, the already-running infraops MCP is executing the OLD build;
+    # tell the agent to reload it in place (no full session restart needed).
+    if ! git diff --quiet "$before" HEAD -- dist/ 2>/dev/null; then
+      emit "[session-sync] main was ${behind} commit(s) behind origin; fast-forwarded to $(git rev-parse --short HEAD). dist/ changed — the running infraops MCP is on the OLD build; run '/mcp reconnect infraops' to load the new one before relying on infraops tools."
+    fi
     emit "[session-sync] main was ${behind} commit(s) behind origin; fast-forwarded to $(git rev-parse --short HEAD). Repo is current — safe to start."
   fi
   emit "[session-sync] main is ${behind} behind origin but fast-forward failed (diverged?). Run 'git sync' or inspect before coding."
