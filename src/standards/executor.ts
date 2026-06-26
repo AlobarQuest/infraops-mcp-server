@@ -102,42 +102,97 @@ export async function applyAction(
 
 export interface VerifyResult { ok: boolean; reason: string; }
 
+/** Result of an HTTP health probe: the status code (null on network error/timeout) + a human reason. */
+export interface ProbeResult { status: number | null; reason: string; }
+
+/** Injectable HTTP probe so verifySafe is testable without real network. */
+export type HealthProbe = (url: string, timeoutMs: number) => Promise<ProbeResult>;
+
+const PROBE_TIMEOUT_MS = 5000;
+
 /**
- * Pre-apply gate for safe remediations that could misfire. Currently only the
- * health-check enable: a Coolify health check pointed at /api/health is only safe
- * to auto-enable if the app already passes its Docker healthcheck (live status
- * running:healthy → it serves a working health endpoint). Otherwise the new check
- * could mark a working-but-non-conforming app unhealthy, so the proposal is
- * rerouted to escalation (a Sonnet plan) instead of auto-applied. Remediations
- * with no gate return ok without a network call.
- *
- * Keyed on the remediation_key (the proposal id prefix), not the tool name, so it
- * gates *only* enable_healthcheck — never some future safe use of the same tool.
- * Fails closed: an unreadable status escalates rather than applies.
+ * Default probe: GET with a hard timeout. Redirects are NOT followed — an SSO/forward-auth
+ * 302 must read as "not a 2xx health response" (→ escalate), never silently resolve to a
+ * login page that returns 200. A network error/timeout yields status=null.
  */
-export async function verifySafe(p: Proposal, instance: CoolifyInstance): Promise<VerifyResult> {
+export async function probeHealthPath(url: string, timeoutMs: number): Promise<ProbeResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { method: "GET", redirect: "manual", signal: ctrl.signal });
+    // An opaqueredirect (manual redirect) reports status 0 — surface it as a redirect, not "HTTP 0".
+    const status = res.status === 0 ? 302 : res.status;
+    return { status, reason: res.status === 0 ? "redirect (no direct 2xx — likely auth/SSO)" : `HTTP ${res.status}` };
+  } catch (e) {
+    return { status: null, reason: e instanceof Error ? e.message : String(e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Build the public health-probe URL: the first FQDN (https-normalized, trailing slash
+ * stripped) + the path. Returns null when there is no FQDN to probe.
+ */
+export function buildHealthProbeUrl(fqdn: unknown, path: string): string | null {
+  const first = String(fqdn ?? "").split(",")[0].trim();
+  if (!first) return null;
+  const base = /^https?:\/\//i.test(first) ? first : `https://${first}`;
+  return base.replace(/\/+$/, "") + (path.startsWith("/") ? path : `/${path}`);
+}
+
+/**
+ * Pre-apply gate for safe remediations that could misfire. Currently only the health-check
+ * enable: enabling a Coolify health check on an app that does not actually serve the health
+ * path would mark a working app unhealthy. We verify by HTTP-probing the app's PUBLIC health
+ * path — the exact path the remediation will set (so probe and config can never disagree).
+ * A 2xx means the app serves it → safe to auto-enable. Anything else (redirect/SSO, 4xx/5xx,
+ * timeout, or no FQDN) reroutes the proposal to escalation with a reason, where a human
+ * confirms the path and enables manually.
+ *
+ * This replaces the old running:healthy gate, which was a chicken-and-egg trap: an app can't
+ * report running:healthy until it already has a passing health check, so no app missing one
+ * could ever auto-remediate.
+ *
+ * Keyed on the remediation_key (the proposal id prefix), so it gates *only* enable_healthcheck.
+ * Fails closed: an unreadable app, a missing FQDN, or a non-2xx probe escalates rather than applies.
+ * `deps` is injectable for tests; production uses the real client + probe.
+ */
+export async function verifySafe(
+  p: Proposal,
+  instance: CoolifyInstance,
+  deps: { get?: typeof coolifyGet; probe?: HealthProbe } = {},
+): Promise<VerifyResult> {
   const remediationKey = p.id.split(":")[0];
   if (remediationKey !== "coolify.enable_healthcheck") {
     return { ok: true, reason: "no health-path gate for this remediation" };
   }
+  const get = deps.get ?? coolifyGet;
+  const probe = deps.probe ?? probeHealthPath;
+
+  // Probe the SAME path the remediation will enable (registry sets it per build_pack).
+  const path = String(
+    (p.planned_action?.args as Record<string, unknown> | undefined)?.health_check_path ?? "/api/health",
+  );
+
+  let app: Record<string, unknown>;
   try {
-    const app = await coolifyGet<Record<string, unknown>>(
-      `/applications/${p.target.uuid}`,
-      undefined,
-      instance,
-    );
-    const status = String(app.status ?? "");
-    const health = status.split(":")[1] ?? "";
-    if (health === "healthy") {
-      return { ok: true, reason: "running:healthy (Docker healthcheck passing — serves its health path)" };
-    }
-    return {
-      ok: false,
-      reason:
-        `status '${status || "unknown"}' is not running:healthy — the app may not serve /api/health, ` +
-        `so auto-enabling the check could mark it unhealthy. Confirm the health path/port, then enable manually.`,
-    };
+    app = await get<Record<string, unknown>>(`/applications/${p.target.uuid}`, undefined, instance);
   } catch (e) {
-    return { ok: false, reason: `could not verify live status: ${e instanceof Error ? e.message : String(e)}` };
+    return { ok: false, reason: `could not read app to probe: ${e instanceof Error ? e.message : String(e)}` };
   }
+
+  const url = buildHealthProbeUrl(app.fqdn, path);
+  if (!url) {
+    return { ok: false, reason: `app has no FQDN to probe ${path} — confirm the health path and enable manually` };
+  }
+
+  const r = await probe(url, PROBE_TIMEOUT_MS);
+  if (r.status !== null && r.status >= 200 && r.status < 300) {
+    return { ok: true, reason: `probe ${url} → HTTP ${r.status} (serves its health path; safe to auto-enable)` };
+  }
+  return {
+    ok: false,
+    reason: `probe ${url} → ${r.reason} (not 2xx — may be SSO-protected or serve a non-standard path; enable manually)`,
+  };
 }

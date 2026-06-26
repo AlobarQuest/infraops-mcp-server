@@ -40,6 +40,16 @@ describe("resolveRemediation", () => {
       expect(args.health_check_retries).toBeUndefined();
       expect(args.health_check_host).toBeUndefined();
     });
+
+    it("uses /api/health for a single-container app", () => {
+      const result = resolveRemediation("coolify.enable_healthcheck", { ...app, build_pack: "nixpacks" });
+      expect(result!.action.args.health_check_path).toBe("/api/health");
+    });
+
+    it("uses /health/ready for a dockercompose app", () => {
+      const result = resolveRemediation("coolify.enable_healthcheck", { ...app, build_pack: "dockercompose" });
+      expect(result!.action.args.health_check_path).toBe("/health/ready");
+    });
   });
 
   describe("coolify.force_https", () => {
