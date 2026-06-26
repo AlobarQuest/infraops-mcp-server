@@ -20,6 +20,10 @@ export const REMEDIATIONS = {
         }),
     },
 };
+/** The declared lane for a remediation key, defaulting to infra-config. */
+export function laneFor(key) {
+    return REMEDIATIONS[key]?.lane ?? "infra-config";
+}
 export function resolveRemediation(key, res) {
     const r = REMEDIATIONS[key];
     if (!r)
