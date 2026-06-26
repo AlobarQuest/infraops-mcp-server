@@ -107,6 +107,14 @@ if [ -f "$SEC_MD" ] && [ -f "$BODY_MD" ]; then
   { cat "$BODY_MD"; printf '\n\n---\n\n'; cat "$SEC_MD"; } > "$COMBINED" 2>/dev/null && BODY_MD="$COMBINED"
 fi
 
+# Prepend a deep link to the pending-review dashboard so the digest is actionable
+# — one click from the morning email to the approve queue. Best-effort: on any
+# failure BODY_MD is left unchanged and the digest still sends.
+if [ -f "$BODY_MD" ]; then
+  LINKED_BODY="$(mktemp -t infra-drift-linked)"
+  { printf '👉 Review & approve pending items: %s/?status=pending\n\n' "$CHANGE_MGR_API_BASE"; cat "$BODY_MD"; } > "$LINKED_BODY" 2>/dev/null && BODY_MD="$LINKED_BODY"
+fi
+
 # ── Email digest via Resend (best-effort) ──────────────────────────────────────
 if [ -n "$RESEND_API_KEY" ] && [ -f "$BODY_MD" ]; then
   # Build the JSON payload with python (safe escaping of the markdown body), send with
