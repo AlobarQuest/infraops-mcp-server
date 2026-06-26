@@ -7,6 +7,7 @@ import { applyAction, maxAutoApplies, verifySafe } from "../standards/executor.j
 import { planEscalation } from "../standards/remediation-plan.js";
 import { renderRemediationMarkdown } from "../standards/remediation-report.js";
 import { runRemediation } from "../standards/run-remediation.js";
+import { resolveApp, isAppbrainConfigured } from "../services/appbrain-client.js";
 import type { DriftReport } from "../standards/report.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 
@@ -89,6 +90,7 @@ async function main(): Promise<void> {
       apply: (p, inst, opts) => applyAction(p, inst, opts),
       plan: (p) => planEscalation(p, getAnthropic()),
       verify: (p, inst) => verifySafe(p, inst),
+      ...(isAppbrainConfigured() ? { appBrainResolve: (a: { coolifyAppUuid: string; fqdn: string | null }) => resolveApp(a) } : {}),
       maxAutoApplies: maxAutoApplies(),
       dryRun,
     },
