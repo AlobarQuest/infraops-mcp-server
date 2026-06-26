@@ -7,6 +7,7 @@ import { applyAction, maxAutoApplies, verifySafe } from "../standards/executor.j
 import { planEscalation } from "../standards/remediation-plan.js";
 import { renderRemediationMarkdown } from "../standards/remediation-report.js";
 import { runRemediation } from "../standards/run-remediation.js";
+import { resolveApp, isAppbrainConfigured } from "../services/appbrain-client.js";
 /**
  * Headless remediation pass. Reads the morning drift report for context, re-audits
  * live, auto-applies safe remediations, asks Sonnet to plan the rest, and writes
@@ -80,6 +81,7 @@ async function main() {
         apply: (p, inst, opts) => applyAction(p, inst, opts),
         plan: (p) => planEscalation(p, getAnthropic()),
         verify: (p, inst) => verifySafe(p, inst),
+        ...(isAppbrainConfigured() ? { appBrainResolve: (a) => resolveApp(a) } : {}),
         maxAutoApplies: maxAutoApplies(),
         dryRun,
     });

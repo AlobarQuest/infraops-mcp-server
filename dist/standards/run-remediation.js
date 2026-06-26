@@ -64,7 +64,7 @@ export async function runRemediation(instances, morning, generatedAt, sourceRepo
     const escalations = [];
     for (const t of toEscalate) {
         const plan = await deps.plan(t.proposal);
-        const { lane, handoff, handoff_brief } = await buildHandoff(t.proposal, t.probe, t.url, t.instance, deps.appBrainLookup ? { appBrainLookup: deps.appBrainLookup } : {});
+        const { lane, handoff, handoff_brief } = await buildHandoff(t.proposal, t.probe, t.url, t.instance, deps.appBrainResolve ? { appBrainResolve: deps.appBrainResolve } : {});
         escalations.push({
             proposal_id: t.proposal.id,
             instance: t.instance,

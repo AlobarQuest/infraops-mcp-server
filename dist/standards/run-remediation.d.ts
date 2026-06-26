@@ -4,6 +4,7 @@ import type { Proposal } from "./check-engine.js";
 import type { ApplyResult } from "./executor.js";
 import type { ProbeResult } from "./executor.js";
 import type { RemediationPlan } from "./remediation-plan.js";
+import type { AppResolution } from "../services/appbrain-client.js";
 import { type DriftReport } from "./report.js";
 import { type RemediationReport } from "./remediation-report.js";
 export interface RemediationDeps {
@@ -19,7 +20,10 @@ export interface RemediationDeps {
         probe?: ProbeResult;
         url?: string;
     }>;
-    appBrainLookup?: (repo: string) => Promise<boolean>;
+    appBrainResolve?: (args: {
+        coolifyAppUuid: string;
+        fqdn: string | null;
+    }) => Promise<AppResolution | null>;
     maxAutoApplies: number;
     dryRun: boolean;
 }
