@@ -54,6 +54,12 @@ export COOLIFY_DEV_API_TOKEN="$(get_secret_by_id "${BWS_DEV_COOLIFY_SECRET_ID:-8
 export INFRABRAIN_BASE_URL="${INFRABRAIN_BASE_URL:-https://infra-brain.devonwatkins.com}"
 export INFRABRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_INFRABRAIN_SECRET_ID:-45eb083f-4b05-4251-924d-b46700e5a643}")"
 
+# ── app-brain (repo+branch resolution for app-conformance handoffs) ─────────────
+# Shared MCP_ACCESS_KEY value as infra-brain for v1, via its own var so app-brain's
+# key can diverge later with no code change (default = infra-brain's secret UUID).
+export APPBRAIN_BASE_URL="${APPBRAIN_BASE_URL:-https://app-brain.devonwatkins.com}"
+export APPBRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_APPBRAIN_SECRET_ID:-45eb083f-4b05-4251-924d-b46700e5a643}")"
+
 RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
 # Anthropic key for remediation plan generation — fetched by stable UUID (BWS key
 # name "anthropic-api-key"), overridable via BWS_ANTHROPIC_SECRET_ID.

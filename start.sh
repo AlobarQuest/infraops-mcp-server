@@ -165,4 +165,8 @@ else
   echo "WARN: infra-brain access key not found in BWS — audit tool will degrade to cache/seed" >&2
 fi
 
+# ── app-brain (repo+branch resolution for app-conformance handoffs) ────
+export APPBRAIN_BASE_URL="${APPBRAIN_BASE_URL:-https://app-brain.devonwatkins.com}"
+export APPBRAIN_ACCESS_KEY=$(fetch_bws_secret "${BWS_APPBRAIN_SECRET_ID:-45eb083f-4b05-4251-924d-b46700e5a643}")
+
 exec node "$SCRIPT_DIR/dist/index.js"
