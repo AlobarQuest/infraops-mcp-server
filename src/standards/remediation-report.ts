@@ -13,6 +13,9 @@ export interface Escalation {
   plan: RemediationPlan;
   /** Why this was escalated rather than auto-applied (e.g. a verify gate held it). Absent for inherently-escalated items. */
   note?: string;
+  lane?: import("./remediation-registry.js").Lane;
+  handoff?: import("./handoff-brief.js").HandoffPackage;
+  handoff_brief?: string;
 }
 
 export interface RemediationReport {

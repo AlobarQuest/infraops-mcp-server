@@ -1,4 +1,5 @@
 import { isAutoApplicable } from "./executor.js";
+import { buildHandoff } from "./handoff-brief.js";
 import { proposalIdentity } from "./report.js";
 import { buildRemediationReport, } from "./remediation-report.js";
 /**
@@ -50,7 +51,7 @@ export async function runRemediation(instances, morning, generatedAt, sourceRepo
             if (v.ok)
                 toApply.push(t);
             else
-                verifyHeld.push({ ...t, note: v.reason });
+                verifyHeld.push({ ...t, note: v.reason, probe: v.probe, url: v.url });
         }
         toEscalate = [...escalateTagged, ...verifyHeld];
     }
@@ -63,6 +64,7 @@ export async function runRemediation(instances, morning, generatedAt, sourceRepo
     const escalations = [];
     for (const t of toEscalate) {
         const plan = await deps.plan(t.proposal);
+        const { lane, handoff, handoff_brief } = await buildHandoff(t.proposal, t.probe, t.url, t.instance, deps.appBrainLookup ? { appBrainLookup: deps.appBrainLookup } : {});
         escalations.push({
             proposal_id: t.proposal.id,
             instance: t.instance,
@@ -71,6 +73,9 @@ export async function runRemediation(instances, morning, generatedAt, sourceRepo
             kind: t.proposal.kind,
             reasoning: t.proposal.reasoning,
             plan,
+            lane,
+            ...(handoff ? { handoff } : {}),
+            ...(handoff_brief ? { handoff_brief } : {}),
             ...(t.note ? { note: t.note } : {}),
         });
     }
