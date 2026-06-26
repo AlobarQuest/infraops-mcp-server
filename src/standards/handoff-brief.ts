@@ -2,6 +2,22 @@ import type { Proposal } from "./check-engine.js";
 import type { ProbeResult } from "./executor.js";
 import type { Lane } from "./remediation-registry.js";
 
+/** Parse a bare host from a URL. http/https only; reject userinfo; return the lowercased hostname
+ *  (no port); null on any invalid/unsafe input. Coolify app fields are not a trust boundary. */
+export function hostFromUrl(url: string | null | undefined): string | null {
+  if (typeof url !== "string" || url.trim() === "") return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url.trim());
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  if (parsed.username || parsed.password) return null;
+  const host = parsed.hostname.toLowerCase();
+  return host === "" ? null : host;
+}
+
 /** Optional app-brain confirmation seam (not wired in v1 production → structural parse decides). */
 export interface HandoffDeps {
   appBrainLookup?: (repo: string) => Promise<boolean>;

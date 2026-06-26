@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyLane, resolveRepo, buildHandoffPackage, renderHandoffBrief, buildHandoff } from "../src/standards/handoff-brief.js";
+import { classifyLane, resolveRepo, buildHandoffPackage, renderHandoffBrief, buildHandoff, hostFromUrl } from "../src/standards/handoff-brief.js";
 
 describe("classifyLane", () => {
   it("404 → app-conformance", () => expect(classifyLane({ status: 404, reason: "HTTP 404" })).toBe("app-conformance"));
@@ -57,6 +57,25 @@ describe("renderHandoffBrief", () => {
     expect(md).toContain("booking-system");
     expect(md).toContain("main");
     expect(md).toContain("x");
+  });
+});
+
+describe("hostFromUrl", () => {
+  it("extracts lowercased hostname", () =>
+    expect(hostFromUrl("https://Booking.DevonWatkins.com/api/health")).toBe("booking.devonwatkins.com"));
+  it("drops a :port", () =>
+    expect(hostFromUrl("https://booking.devonwatkins.com:8443/api/health")).toBe("booking.devonwatkins.com"));
+  it("strips path / trailing slash", () =>
+    expect(hostFromUrl("https://booking.devonwatkins.com/")).toBe("booking.devonwatkins.com"));
+  it("rejects userinfo (credential spoofing) → null", () =>
+    expect(hostFromUrl("https://user:pass@booking.devonwatkins.com/x")).toBeNull());
+  it("rejects non-http scheme → null", () =>
+    expect(hostFromUrl("file:///etc/passwd")).toBeNull());
+  it("null / empty / garbage → null", () => {
+    expect(hostFromUrl(null)).toBeNull();
+    expect(hostFromUrl("")).toBeNull();
+    expect(hostFromUrl("not a url")).toBeNull();
+    expect(hostFromUrl("booking.devonwatkins.com, other.com")).toBeNull();
   });
 });
 
