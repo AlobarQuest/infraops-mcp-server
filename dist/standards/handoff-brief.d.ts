@@ -17,17 +17,33 @@ export declare function resolveRepo(resourceName: string, deps?: HandoffDeps): P
     repo: string | null;
     confirmed: boolean;
 }>;
-export declare function generateHandoffBrief(args: {
+/** The structured, machine-readable handoff package — single source of truth (see contract). */
+export interface HandoffPackage {
+    repo: string;
+    target_branch: string;
+    rule: string;
+    verified_gap: string;
+    required_change: string;
+    acceptance_check: string;
+    scope_guard: string;
+    do_nots: string[];
+}
+/** Parse the branch from resource_name (`<owner>/<repo>:<branch>`); default "main" when absent. */
+export declare function parseTargetBranch(resourceName: string): string;
+export declare function buildHandoffPackage(args: {
     repo: string | null;
-    resourceName: string;
-    instance: string;
+    targetBranch: string;
+    rule: string;
     path: string;
     url: string | null;
     probeReason: string;
-}): string;
-/** Classify a probe-guard hold and, when app-conformance, attach a generated brief. */
+}): HandoffPackage;
+/** Render the human copy/paste markdown FROM the structured package (so the two cannot drift). */
+export declare function renderHandoffBrief(pkg: HandoffPackage): string;
+/** Classify a probe-guard hold and, when app-conformance, build the structured package + rendered brief. */
 export declare function buildHandoff(proposal: Proposal, probe: ProbeResult | undefined, url: string | undefined, instance: string, deps?: HandoffDeps): Promise<{
     lane: Lane;
+    handoff?: HandoffPackage;
     handoff_brief?: string;
 }>;
 //# sourceMappingURL=handoff-brief.d.ts.map
