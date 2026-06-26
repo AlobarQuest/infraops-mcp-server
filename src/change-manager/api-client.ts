@@ -27,6 +27,10 @@ export interface ApprovedItem {
   status: string;
   source?: string;
   urgent?: boolean;
+  lane?: string;
+  handoff?: Record<string, unknown> | null;
+  handoff_brief?: string | null;
+  pr_url?: string | null;
 }
 export interface OutcomeBody {
   outcome: "done" | "failed" | "blocked" | "skipped_conformant";
