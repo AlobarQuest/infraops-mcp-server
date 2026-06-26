@@ -20,7 +20,7 @@ BWS + Healthchecks.io).
    - prod Coolify token (`prod-coolify-api-token`) — `BWS_PROD_COOLIFY_SECRET_ID`
    - dev Coolify token (`local-coolify-api`) — `BWS_DEV_COOLIFY_SECRET_ID`
    - infra-brain key (`INFRABRAIN_ACCESS_KEY`) — `BWS_INFRABRAIN_SECRET_ID`
-   - app-brain key (`APPBRAIN_ACCESS_KEY`) — `BWS_APPBRAIN_SECRET_ID` (shared with infra-brain for v1); base URL `APPBRAIN_BASE_URL`
+   - app-brain key (`APPBRAIN_ACCESS_KEY`) — `BWS_APPBRAIN_SECRET_ID` (app-brain's own distinct key); base URL `APPBRAIN_BASE_URL`
    - Resend key (`resend-api-key`) — `BWS_RESEND_SECRET_ID`
    - Anthropic key (`anthropic-api-key`) — `BWS_ANTHROPIC_SECRET_ID`
 

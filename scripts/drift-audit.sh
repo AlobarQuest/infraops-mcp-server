@@ -55,10 +55,11 @@ export INFRABRAIN_BASE_URL="${INFRABRAIN_BASE_URL:-https://infra-brain.devonwatk
 export INFRABRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_INFRABRAIN_SECRET_ID:-45eb083f-4b05-4251-924d-b46700e5a643}")"
 
 # ── app-brain (repo+branch resolution for app-conformance handoffs) ─────────────
-# Shared MCP_ACCESS_KEY value as infra-brain for v1, via its own var so app-brain's
-# key can diverge later with no code change (default = infra-brain's secret UUID).
+# app-brain has its OWN MCP_ACCESS_KEY, distinct from infra-brain's (verified 2026-06-26:
+# infra-brain's key 401s against app-brain). Its BWS secret UUID is the default below,
+# overridable via BWS_APPBRAIN_SECRET_ID.
 export APPBRAIN_BASE_URL="${APPBRAIN_BASE_URL:-https://app-brain.devonwatkins.com}"
-export APPBRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_APPBRAIN_SECRET_ID:-45eb083f-4b05-4251-924d-b46700e5a643}")"
+export APPBRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_APPBRAIN_SECRET_ID:-68733abe-682a-4597-b88f-b4750189a56a}")"
 
 RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
 # Anthropic key for remediation plan generation — fetched by stable UUID (BWS key
