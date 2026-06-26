@@ -138,11 +138,13 @@ export async function verifySafe(p, instance, deps = {}) {
     }
     const r = await probe(url, PROBE_TIMEOUT_MS);
     if (r.status !== null && r.status >= 200 && r.status < 300) {
-        return { ok: true, reason: `probe ${url} → HTTP ${r.status} (serves its health path; safe to auto-enable)` };
+        return { ok: true, reason: `probe ${url} → HTTP ${r.status} (serves its health path; safe to auto-enable)`, probe: r, url };
     }
     return {
         ok: false,
         reason: `probe ${url} → ${r.reason} (not 2xx — may be SSO-protected or serve a non-standard path; enable manually)`,
+        probe: r,
+        url,
     };
 }
 //# sourceMappingURL=executor.js.map
