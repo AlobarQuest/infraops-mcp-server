@@ -10,7 +10,7 @@ vi.mock("../src/services/coolify-client.js", () => ({
   coolifyPatch,
 }));
 
-import { wouldChange, isAutoApplicable, applyAction, maxAutoApplies, verifySafe } from "../src/standards/executor.js";
+import { wouldChange, isAutoApplicable, applyAction, maxAutoApplies, verifySafe, buildHealthProbeUrl } from "../src/standards/executor.js";
 import type { Proposal } from "../src/standards/check-engine.js";
 
 function makeProposal(overrides: Partial<Proposal> = {}): Proposal {
@@ -128,23 +128,68 @@ describe("maxAutoApplies", () => {
   });
 });
 
-describe("verifySafe", () => {
+describe("buildHealthProbeUrl", () => {
+  it("normalizes a bare fqdn to https + path", () => {
+    expect(buildHealthProbeUrl("app.devonwatkins.com", "/api/health")).toBe("https://app.devonwatkins.com/api/health");
+  });
+  it("keeps an existing scheme and takes the first of multiple comma-separated fqdns", () => {
+    expect(buildHealthProbeUrl("https://a.x.com,https://b.x.com", "/health/ready")).toBe("https://a.x.com/health/ready");
+  });
+  it("strips a trailing slash on the fqdn before appending the path", () => {
+    expect(buildHealthProbeUrl("https://app.x.com/", "/api/health")).toBe("https://app.x.com/api/health");
+  });
+  it("returns null when there is no fqdn", () => {
+    expect(buildHealthProbeUrl("", "/api/health")).toBeNull();
+    expect(buildHealthProbeUrl(null, "/api/health")).toBeNull();
+    expect(buildHealthProbeUrl(undefined, "/api/health")).toBeNull();
+  });
+});
+
+describe("verifySafe (probe-guarded enable_healthcheck)", () => {
   beforeEach(() => { coolifyGet.mockReset(); });
 
-  it("passes an enable_healthcheck when the app is running:healthy", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", status: "running:healthy" });
-    const r = await verifySafe(makeProposal(), "prod");
+  // The gate now probes the PUBLIC health path the remediation will set, rather than
+  // requiring running:healthy (impossible before a check exists — the chicken-and-egg bug).
+  const hcProposal = (args: Record<string, unknown> = { uuid: "u1", health_check_enabled: true, health_check_path: "/api/health" }) =>
+    makeProposal({ planned_action: { tool: "coolify_update_application", args } });
+
+  it("passes when the public health path probes 2xx (safe to auto-enable)", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", fqdn: "https://app1.devonwatkins.com", build_pack: "nixpacks" });
+    const r = await verifySafe(hcProposal(), "prod", { probe: async () => ({ status: 200, reason: "HTTP 200" }) });
+    expect(r.ok).toBe(true);
+    expect(r.reason).toContain("200");
+  });
+
+  it("probes the EXACT path the remediation will set (so probe and config can't disagree)", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", fqdn: "https://svc.devonwatkins.com", build_pack: "dockercompose" });
+    let probed = "";
+    const r = await verifySafe(
+      hcProposal({ uuid: "u1", health_check_enabled: true, health_check_path: "/health/ready" }),
+      "prod",
+      { probe: async (url) => { probed = url; return { status: 204, reason: "HTTP 204" }; } },
+    );
+    expect(probed).toBe("https://svc.devonwatkins.com/health/ready");
     expect(r.ok).toBe(true);
   });
 
-  it("fails (→ escalate) an enable_healthcheck when the app is running:unhealthy", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", status: "running:unhealthy" });
-    expect((await verifySafe(makeProposal(), "prod")).ok).toBe(false);
+  it("fails (→ escalate) on a redirect / SSO-protected app (non-2xx)", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", fqdn: "https://protected.devonwatkins.com", build_pack: "nixpacks" });
+    const r = await verifySafe(hcProposal(), "prod", { probe: async () => ({ status: 302, reason: "redirect" }) });
+    expect(r.ok).toBe(false);
   });
 
-  it("fails (→ escalate) an enable_healthcheck when the app is running:unknown", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", status: "running:unknown" });
-    expect((await verifySafe(makeProposal(), "prod")).ok).toBe(false);
+  it("fails (→ escalate) on a network error / timeout (status null)", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", fqdn: "https://down.devonwatkins.com" });
+    const r = await verifySafe(hcProposal(), "prod", { probe: async () => ({ status: null, reason: "AbortError" }) });
+    expect(r.ok).toBe(false);
+  });
+
+  it("fails (→ escalate) when the app has no FQDN, and never probes", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", fqdn: "" });
+    let called = false;
+    const r = await verifySafe(hcProposal(), "prod", { probe: async () => { called = true; return { status: 200, reason: "" }; } });
+    expect(r.ok).toBe(false);
+    expect(called).toBe(false);
   });
 
   it("does not gate a non-enable_healthcheck remediation (returns ok, no fetch)", async () => {
@@ -153,8 +198,9 @@ describe("verifySafe", () => {
     expect(coolifyGet).not.toHaveBeenCalled();
   });
 
-  it("fails closed when the live status fetch throws", async () => {
+  it("fails closed when the app fetch throws", async () => {
     coolifyGet.mockRejectedValue(new Error("boom"));
-    expect((await verifySafe(makeProposal(), "prod")).ok).toBe(false);
+    const r = await verifySafe(hcProposal(), "prod", { probe: async () => ({ status: 200, reason: "" }) });
+    expect(r.ok).toBe(false);
   });
 });

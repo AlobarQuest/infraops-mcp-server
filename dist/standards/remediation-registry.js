@@ -5,7 +5,9 @@ export const REMEDIATIONS = {
         buildArgs: (a) => ({
             uuid: a.uuid,
             health_check_enabled: true,
-            health_check_path: "/api/health",
+            // Compose apps serve readiness at /health/ready; single-container apps at /api/health
+            // (per the project health-check conventions). verifySafe probes whichever we set here.
+            health_check_path: a.build_pack === "dockercompose" ? "/health/ready" : "/api/health",
             health_check_start_period: 15,
         }),
     },
