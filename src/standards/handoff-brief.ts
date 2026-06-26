@@ -1,6 +1,8 @@
+import axios from "axios";
 import type { Proposal } from "./check-engine.js";
 import type { ProbeResult } from "./executor.js";
 import type { Lane } from "./remediation-registry.js";
+import type { AppResolution } from "../services/appbrain-client.js";
 
 /** Parse a bare host from a URL. http/https only; reject userinfo; return the lowercased hostname
  *  (no port); null on any invalid/unsafe input. Coolify app fields are not a trust boundary. */
@@ -18,10 +20,13 @@ export function hostFromUrl(url: string | null | undefined): string | null {
   return host === "" ? null : host;
 }
 
-/** Optional app-brain confirmation seam (not wired in v1 production → structural parse decides). */
+/** Injected app-brain resolver seam. Production wires the real resolveApp; tests inject a fake.
+ *  Returns the matched env (repo/branch may be null) or null on no-match. */
 export interface HandoffDeps {
-  appBrainLookup?: (repo: string) => Promise<boolean>;
+  appBrainResolve?: (args: { coolifyAppUuid: string; fqdn: string | null }) => Promise<AppResolution | null>;
 }
+
+const isNonEmpty = (v: string | null | undefined): v is string => typeof v === "string" && v.trim() !== "";
 
 /**
  * App-conformance iff the probe got a concrete client-error status that signals a path/route
@@ -36,23 +41,6 @@ export function classifyLane(probe: ProbeResult | undefined): Lane {
   return "infra-config";
 }
 
-/** Derive the target repo from resource_name (`<owner>/<repo>:<branch>` → `<repo>`), optionally
- * cross-checked with app-brain. Returns `{repo:null}` when it cannot be resolved confidently. */
-export async function resolveRepo(
-  resourceName: string,
-  deps: HandoffDeps = {},
-): Promise<{ repo: string | null; confirmed: boolean }> {
-  const noBranch = String(resourceName ?? "").trim().split(":")[0];
-  const candidate = noBranch.includes("/") ? (noBranch.split("/").pop() ?? "").trim() : "";
-  if (!candidate) return { repo: null, confirmed: false };
-  if (deps.appBrainLookup) {
-    let confirmed = false;
-    try { confirmed = await deps.appBrainLookup(candidate); } catch { confirmed = false; }
-    return confirmed ? { repo: candidate, confirmed: true } : { repo: null, confirmed: false };
-  }
-  return { repo: candidate, confirmed: false };
-}
-
 /** The structured, machine-readable handoff package — single source of truth (see contract). */
 export interface HandoffPackage {
   repo: string;            // resolved repo or "UNCONFIRMED"
@@ -65,24 +53,22 @@ export interface HandoffPackage {
   do_nots: string[];
 }
 
-/** Parse the branch from resource_name (`<owner>/<repo>:<branch>`); default "main" when absent. */
-export function parseTargetBranch(resourceName: string): string {
-  const seg = String(resourceName ?? "").split(":")[1];
-  const branch = (seg ?? "").trim();
-  return branch || "main";
-}
-
 export function buildHandoffPackage(args: {
-  repo: string | null; targetBranch: string; rule: string; path: string; url: string | null; probeReason: string;
+  repo: string | null; targetBranch: string | null; rule: string; path: string; url: string | null; probeReason: string;
 }): HandoffPackage {
   const { repo, targetBranch, rule, path, url, probeReason } = args;
+  // repo and branch travel together: if either is missing/unconfirmed, BOTH are UNCONFIRMED —
+  // a half-confirmed dispatch target must be unrepresentable (panel MED-5 / HIGH-1).
+  const confirmed = isNonEmpty(repo) && repo !== "UNCONFIRMED" && isNonEmpty(targetBranch) && targetBranch !== "UNCONFIRMED";
+  const finalRepo = confirmed ? (repo as string) : "UNCONFIRMED";
+  const finalBranch = confirmed ? (targetBranch as string) : "UNCONFIRMED";
   const target = url ?? `https://<fqdn>${path}`;
   return {
-    repo: repo ?? "UNCONFIRMED",
-    target_branch: targetBranch,
+    repo: finalRepo,
+    target_branch: finalBranch,
     rule,
     verified_gap: `Probe ${target} → ${probeReason}; the app does not serve the standard health path ${path}. The infra health-check enable was correctly held by the probe-guard.`,
-    required_change: `In repo ${repo ?? "UNCONFIRMED — confirm before dispatch"} (branch ${targetBranch}): add a handler serving ${path} returning 2xx (mirror the app's existing health response). Keep any existing health path working.`,
+    required_change: `In repo ${finalRepo}${finalRepo === "UNCONFIRMED" ? " — confirm before dispatch" : ""} (branch ${finalBranch}): add a handler serving ${path} returning 2xx (mirror the app's existing health response). Keep any existing health path working.`,
     acceptance_check: `GET ${target} returns 2xx. Once it does, the next drift scan's probe-guard passes and the infra health-check auto-enables; the change-manager item then auto-resolves.`,
     scope_guard: "App repo only. Open a PR; do NOT deploy. Do NOT use any infra/Coolify/secret tools.",
     do_nots: [
@@ -134,11 +120,37 @@ export async function buildHandoff(
   const path = String(
     (proposal.planned_action?.args as Record<string, unknown> | undefined)?.health_check_path ?? "/api/health",
   );
-  const { repo } = await resolveRepo(proposal.target.name, deps);
+
+  // Authoritative resolution via app-brain. PRIMARY key = the stable Coolify app UUID
+  // (proposal.target.uuid); FALLBACK = the host from the probe URL. Never the resource_name.
+  const coolifyAppUuid = String(proposal.target.uuid ?? "");
+  const fqdn = hostFromUrl(url);
+  let repo: string | null = null;
+  let targetBranch: string | null = null;
+  if (deps.appBrainResolve) {
+    try {
+      const r = await deps.appBrainResolve({ coolifyAppUuid, fqdn });
+      if (r === null) {
+        console.info(`[handoff] no app-brain match (uuid=${coolifyAppUuid} fqdn=${fqdn ?? "—"}) → UNCONFIRMED`);
+      } else if (isNonEmpty(r.github_repo) && isNonEmpty(r.branch)) {
+        repo = r.github_repo;
+        targetBranch = r.branch;
+      } else {
+        console.warn(`[handoff] app-brain matched (name=${r.name}) but repo/branch incomplete (repo=${r.github_repo ?? "null"} branch=${r.branch ?? "null"}) → UNCONFIRMED`);
+      }
+    } catch (e) {
+      const status = axios.isAxiosError(e) ? e.response?.status : undefined;
+      if (status === 401 || status === 403) {
+        console.error(`[handoff] app-brain auth rejected (HTTP ${status}) — check APPBRAIN_ACCESS_KEY → UNCONFIRMED`);
+      } else {
+        console.error(`[handoff] app-brain resolver unreachable (${e instanceof Error ? e.message : String(e)}) → UNCONFIRMED`);
+      }
+    }
+  } else {
+    console.info("[handoff] no app-brain resolver configured → UNCONFIRMED");
+  }
+
   const rule = proposal.id.split(":")[0];
-  const handoff = buildHandoffPackage({
-    repo, targetBranch: parseTargetBranch(proposal.target.name), rule,
-    path, url: url ?? null, probeReason: probe?.reason ?? "non-2xx",
-  });
+  const handoff = buildHandoffPackage({ repo, targetBranch, rule, path, url: url ?? null, probeReason: probe?.reason ?? "non-2xx" });
   return { lane, handoff, handoff_brief: renderHandoffBrief(handoff) };
 }

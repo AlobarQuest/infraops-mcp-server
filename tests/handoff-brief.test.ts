@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyLane, resolveRepo, buildHandoffPackage, renderHandoffBrief, buildHandoff, hostFromUrl } from "../src/standards/handoff-brief.js";
+import { classifyLane, buildHandoffPackage, renderHandoffBrief, buildHandoff, hostFromUrl } from "../src/standards/handoff-brief.js";
 
 describe("classifyLane", () => {
   it("404 → app-conformance", () => expect(classifyLane({ status: 404, reason: "HTTP 404" })).toBe("app-conformance"));
@@ -17,19 +17,6 @@ describe("classifyLane", () => {
   it("undefined probe → infra-config", () => expect(classifyLane(undefined)).toBe("infra-config"));
 });
 
-describe("resolveRepo", () => {
-  it("derives repo from owner/repo:branch", async () =>
-    expect(await resolveRepo("alobar-quest/booking-system:main")).toEqual({ repo: "booking-system", confirmed: false }));
-  it("UNCONFIRMED when no owner/repo structure", async () =>
-    expect(await resolveRepo("just-a-name")).toEqual({ repo: null, confirmed: false }));
-  it("confirms via app-brain lookup", async () =>
-    expect(await resolveRepo("o/booking-system:main", { appBrainLookup: async () => true }))
-      .toEqual({ repo: "booking-system", confirmed: true }));
-  it("UNCONFIRMED when app-brain denies", async () =>
-    expect(await resolveRepo("o/booking-system:main", { appBrainLookup: async () => false }))
-      .toEqual({ repo: null, confirmed: false }));
-});
-
 describe("buildHandoffPackage", () => {
   it("assembles the structured fields incl. target_branch and rule", () => {
     const p = buildHandoffPackage({ repo: "booking-system", targetBranch: "main", rule: "coolify.enable_healthcheck",
@@ -44,6 +31,7 @@ describe("buildHandoffPackage", () => {
   it("uses UNCONFIRMED when repo is null", () => {
     const p = buildHandoffPackage({ repo: null, targetBranch: "main", rule: "r", path: "/api/health", url: null, probeReason: "HTTP 404" });
     expect(p.repo).toBe("UNCONFIRMED");
+    expect(p.target_branch).toBe("UNCONFIRMED");
   });
 });
 
@@ -79,30 +67,75 @@ describe("hostFromUrl", () => {
   });
 });
 
-describe("buildHandoff", () => {
+describe("buildHandoffPackage normalization", () => {
+  it("repo null + branch 'main' → BOTH UNCONFIRMED (no half-confirmed target)", () => {
+    const p = buildHandoffPackage({ repo: null, targetBranch: "main", rule: "r", path: "/api/health", url: null, probeReason: "HTTP 404" });
+    expect(p.repo).toBe("UNCONFIRMED");
+    expect(p.target_branch).toBe("UNCONFIRMED");
+  });
+  it("repo set + branch null → BOTH UNCONFIRMED", () => {
+    const p = buildHandoffPackage({ repo: "AlobarQuest/booking-system", targetBranch: null, rule: "r", path: "/api/health", url: null, probeReason: "HTTP 404" });
+    expect(p.repo).toBe("UNCONFIRMED");
+    expect(p.target_branch).toBe("UNCONFIRMED");
+  });
+  it("both set → confirmed, verbatim (no lowercasing)", () => {
+    const p = buildHandoffPackage({ repo: "AlobarQuest/booking-system", targetBranch: "master", rule: "r", path: "/api/health", url: null, probeReason: "HTTP 404" });
+    expect(p.repo).toBe("AlobarQuest/booking-system");
+    expect(p.target_branch).toBe("master");
+  });
+});
+
+describe("buildHandoff resolution via app-brain", () => {
   const hc = (path = "/api/health") => ({
     id: "coolify.enable_healthcheck:u1",
-    target: { provider: "coolify", resource_type: "application", uuid: "u1", name: "alobar-quest/booking-system:main" },
+    target: { provider: "coolify", resource_type: "application", uuid: "hkw488ggssgcskk0ooc0ksk0", name: "alobar-quest/booking-system:main" },
     planned_action: { tool: "coolify_update_application", args: { health_check_path: path } },
   } as any);
+  const probe = { status: 404, reason: "HTTP 404" };
 
-  it("app path mismatch → structured handoff + rendered brief", async () => {
-    const out = await buildHandoff(hc(), { status: 404, reason: "HTTP 404" }, "https://booking/api/health", "prod");
+  it("confirmed: resolver returns repo+branch (uuid primary)", async () => {
+    const resolve = async () => ({ github_repo: "AlobarQuest/booking-system", name: "prod", branch: "master", url: "https://booking.devonwatkins.com" });
+    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod", { appBrainResolve: resolve });
     expect(out.lane).toBe("app-conformance");
-    expect(out.handoff?.repo).toBe("booking-system");
-    expect(out.handoff?.target_branch).toBe("main");
-    expect(out.handoff?.rule).toBe("coolify.enable_healthcheck");
-    expect(out.handoff_brief).toContain("booking-system");
+    expect(out.handoff?.repo).toBe("AlobarQuest/booking-system");
+    expect(out.handoff?.target_branch).toBe("master");
   });
-  it("timeout → infra-config, no handoff, no brief", async () => {
-    const out = await buildHandoff(hc(), { status: null, reason: "AbortError" }, undefined, "prod");
+  it("passes uuid + parsed fqdn to the resolver", async () => {
+    let seen: any;
+    const resolve = async (a: any) => { seen = a; return { github_repo: "o/r", name: "preview", branch: "preview", url: null }; };
+    await buildHandoff(hc(), probe, "https://preview.booking.devonwatkins.com/api/health", "prod", { appBrainResolve: resolve });
+    expect(seen).toEqual({ coolifyAppUuid: "hkw488ggssgcskk0ooc0ksk0", fqdn: "preview.booking.devonwatkins.com" });
+  });
+  it("404 (null) → UNCONFIRMED", async () => {
+    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod", { appBrainResolve: async () => null });
+    expect(out.handoff?.repo).toBe("UNCONFIRMED");
+    expect(out.handoff?.target_branch).toBe("UNCONFIRMED");
+  });
+  it("null branch → UNCONFIRMED (both)", async () => {
+    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod",
+      { appBrainResolve: async () => ({ github_repo: "AlobarQuest/booking-system", name: "prod", branch: null, url: null }) });
+    expect(out.handoff?.repo).toBe("UNCONFIRMED");
+    expect(out.handoff?.target_branch).toBe("UNCONFIRMED");
+  });
+  it("null github_repo → UNCONFIRMED (both)", async () => {
+    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod",
+      { appBrainResolve: async () => ({ github_repo: null, name: "prod", branch: "master", url: null }) });
+    expect(out.handoff?.repo).toBe("UNCONFIRMED");
+    expect(out.handoff?.target_branch).toBe("UNCONFIRMED");
+  });
+  it("resolver throws → UNCONFIRMED, no propagation", async () => {
+    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod",
+      { appBrainResolve: async () => { throw new Error("ECONNREFUSED"); } });
+    expect(out.handoff?.repo).toBe("UNCONFIRMED");
+  });
+  it("no resolver injected → UNCONFIRMED (never the resource_name parse)", async () => {
+    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod");
+    expect(out.handoff?.repo).toBe("UNCONFIRMED");
+    expect(out.handoff?.target_branch).toBe("UNCONFIRMED");
+  });
+  it("timeout → infra-config, no handoff", async () => {
+    const out = await buildHandoff(hc(), { status: null, reason: "AbortError" }, undefined, "prod", { appBrainResolve: async () => null });
     expect(out.lane).toBe("infra-config");
     expect(out.handoff).toBeUndefined();
-    expect(out.handoff_brief).toBeUndefined();
-  });
-  it("name without owner/repo → UNCONFIRMED repo in the package", async () => {
-    const p = hc(); p.target.name = "mystery-app";
-    const out = await buildHandoff(p, { status: 404, reason: "HTTP 404" }, "https://x/api/health", "prod");
-    expect(out.handoff?.repo).toBe("UNCONFIRMED");
   });
 });
