@@ -15,9 +15,10 @@ export interface BackupManifestEntry {
 }
 export type BackupManifest = Record<string, BackupManifestEntry>;
 /**
- * Load the coverage manifest. A missing or unreadable manifest is not an error:
- * it yields an empty map so every running DB reads as uncovered and the audit
- * still runs (fail-closed for the assertion, fail-open for the audit itself).
+ * Load and MERGE the coverage manifests. A missing or unreadable manifest is not an
+ * error: it contributes nothing, so a DB only reads as covered if some manifest
+ * actually proves it (fail-closed for the assertion, fail-open for the audit itself).
+ * Prod and dev DB UUIDs are disjoint keyspaces, so the merge order is immaterial.
  */
 export declare function loadBackupManifest(): Promise<BackupManifest>;
 /**
