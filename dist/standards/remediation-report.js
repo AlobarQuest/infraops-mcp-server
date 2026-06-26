@@ -51,6 +51,16 @@ export function renderRemediationMarkdown(r) {
             lines.push(`### ${e.target.resource_type} '${e.target.name}' (${e.risk}) — Plan by ${e.plan.generated_by}`);
             if (e.note)
                 lines.push(`- **Auto-fix held:** ${e.note}`);
+            if (e.lane === "app-conformance") {
+                lines.push(`- **🤝 Needs handoff (app-conformance):** this needs an app code change, not infra.`);
+                if (e.handoff_brief) {
+                    lines.push("");
+                    lines.push("<details><summary>Handoff brief</summary>");
+                    lines.push("");
+                    lines.push(e.handoff_brief);
+                    lines.push("</details>");
+                }
+            }
             lines.push(`- **Why:** ${e.reasoning}`);
             lines.push(`- **Root cause:** ${e.plan.root_cause}`);
             lines.push(`- **Steps:**`);

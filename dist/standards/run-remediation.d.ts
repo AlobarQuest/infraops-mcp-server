@@ -2,6 +2,7 @@ import type { CoolifyInstance } from "../services/coolify-client.js";
 import type { AuditResult } from "./run-audit.js";
 import type { Proposal } from "./check-engine.js";
 import type { ApplyResult } from "./executor.js";
+import type { ProbeResult } from "./executor.js";
 import type { RemediationPlan } from "./remediation-plan.js";
 import { type DriftReport } from "./report.js";
 import { type RemediationReport } from "./remediation-report.js";
@@ -15,7 +16,10 @@ export interface RemediationDeps {
     verify: (p: Proposal, inst: CoolifyInstance) => Promise<{
         ok: boolean;
         reason: string;
+        probe?: ProbeResult;
+        url?: string;
     }>;
+    appBrainLookup?: (repo: string) => Promise<boolean>;
     maxAutoApplies: number;
     dryRun: boolean;
 }

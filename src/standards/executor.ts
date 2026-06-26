@@ -100,7 +100,7 @@ export async function applyAction(
   }
 }
 
-export interface VerifyResult { ok: boolean; reason: string; }
+export interface VerifyResult { ok: boolean; reason: string; probe?: ProbeResult; url?: string; }
 
 /** Result of an HTTP health probe: the status code (null on network error/timeout) + a human reason. */
 export interface ProbeResult { status: number | null; reason: string; }
@@ -189,10 +189,12 @@ export async function verifySafe(
 
   const r = await probe(url, PROBE_TIMEOUT_MS);
   if (r.status !== null && r.status >= 200 && r.status < 300) {
-    return { ok: true, reason: `probe ${url} → HTTP ${r.status} (serves its health path; safe to auto-enable)` };
+    return { ok: true, reason: `probe ${url} → HTTP ${r.status} (serves its health path; safe to auto-enable)`, probe: r, url };
   }
   return {
     ok: false,
     reason: `probe ${url} → ${r.reason} (not 2xx — may be SSO-protected or serve a non-standard path; enable manually)`,
+    probe: r,
+    url,
   };
 }

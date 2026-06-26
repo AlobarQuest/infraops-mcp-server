@@ -3,7 +3,9 @@ import type { AuditResult } from "./run-audit.js";
 import type { Proposal } from "./check-engine.js";
 import type { ApplyResult } from "./executor.js";
 import { isAutoApplicable } from "./executor.js";
+import type { ProbeResult } from "./executor.js";
 import type { RemediationPlan } from "./remediation-plan.js";
+import { buildHandoff } from "./handoff-brief.js";
 import { proposalIdentity, type DriftReport } from "./report.js";
 import {
   buildRemediationReport,
@@ -16,7 +18,8 @@ export interface RemediationDeps {
   apply: (p: Proposal, inst: CoolifyInstance, opts: { dryRun?: boolean }) => Promise<ApplyResult>;
   plan: (p: Proposal) => Promise<RemediationPlan>;
   /** Pre-apply gate: returns ok=false (with a reason) to reroute a "safe" proposal to escalation. */
-  verify: (p: Proposal, inst: CoolifyInstance) => Promise<{ ok: boolean; reason: string }>;
+  verify: (p: Proposal, inst: CoolifyInstance) => Promise<{ ok: boolean; reason: string; probe?: ProbeResult; url?: string }>;
+  appBrainLookup?: (repo: string) => Promise<boolean>;
   maxAutoApplies: number;
   dryRun: boolean;
 }
@@ -26,6 +29,8 @@ interface Tagged {
   proposal: Proposal;
   /** Set when a verify gate held an otherwise-safe proposal back for review. */
   note?: string;
+  probe?: ProbeResult;
+  url?: string;
 }
 
 /**
@@ -81,7 +86,7 @@ export async function runRemediation(
     for (const t of safe) {
       const v = await deps.verify(t.proposal, t.instance);
       if (v.ok) toApply.push(t);
-      else verifyHeld.push({ ...t, note: v.reason });
+      else verifyHeld.push({ ...t, note: v.reason, probe: v.probe, url: v.url });
     }
     toEscalate = [...escalateTagged, ...verifyHeld];
   }
@@ -96,6 +101,10 @@ export async function runRemediation(
   const escalations: Escalation[] = [];
   for (const t of toEscalate) {
     const plan = await deps.plan(t.proposal);
+    const { lane, handoff, handoff_brief } = await buildHandoff(
+      t.proposal, t.probe, t.url, t.instance,
+      deps.appBrainLookup ? { appBrainLookup: deps.appBrainLookup } : {},
+    );
     escalations.push({
       proposal_id: t.proposal.id,
       instance: t.instance,
@@ -104,6 +113,9 @@ export async function runRemediation(
       kind: t.proposal.kind,
       reasoning: t.proposal.reasoning,
       plan,
+      lane,
+      ...(handoff ? { handoff } : {}),
+      ...(handoff_brief ? { handoff_brief } : {}),
       ...(t.note ? { note: t.note } : {}),
     });
   }

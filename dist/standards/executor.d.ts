@@ -38,6 +38,8 @@ export declare function applyAction(p: Proposal, instance: CoolifyInstance, opts
 export interface VerifyResult {
     ok: boolean;
     reason: string;
+    probe?: ProbeResult;
+    url?: string;
 }
 /** Result of an HTTP health probe: the status code (null on network error/timeout) + a human reason. */
 export interface ProbeResult {
