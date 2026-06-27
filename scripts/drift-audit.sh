@@ -69,6 +69,15 @@ export ANTHROPIC_API_KEY="$(get_secret_by_id "${BWS_ANTHROPIC_SECRET_ID:-b74bf8b
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; DATE="${NOW%%T*}"
 mkdir -p "$REPORT_DIR"
 
+# ── Refresh app-brain from live Coolify BEFORE the compare (best-effort, non-fatal) ─
+# Keeps the data the remediation handoff's repo+branch resolver reads current. Runs
+# the already-merged idempotent brain sync over a localhost-only ssh -L into the
+# brain-app-db container (reuses the existing Hetzner key — no new exposure). Dry-run
+# by default; set APPBRAIN_SYNC_APPLY=1 in $CONFIG to write. BWS_ACCESS_TOKEN (exported
+# above) is inherited for the script's Coolify-token fetch.
+bash "$REPO/scripts/appbrain-sync.sh" >>"$LOG_FILE" 2>&1 \
+  && log "app-brain sync ok" || log "WARN: app-brain sync failed (non-fatal)"
+
 # ── Run the audit (exit 1 only if EVERY instance hard-failed) ──────────────────
 node "$REPO/dist/cli/audit-cli.js" --instance prod,dev --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1
 RC=$?
