@@ -6,6 +6,7 @@ import { isAutoApplicable } from "./executor.js";
 import type { ProbeResult } from "./executor.js";
 import type { RemediationPlan } from "./remediation-plan.js";
 import { buildHandoff } from "./handoff-brief.js";
+import type { AppResolution } from "../services/appbrain-client.js";
 import { proposalIdentity, type DriftReport } from "./report.js";
 import {
   buildRemediationReport,
@@ -19,7 +20,7 @@ export interface RemediationDeps {
   plan: (p: Proposal) => Promise<RemediationPlan>;
   /** Pre-apply gate: returns ok=false (with a reason) to reroute a "safe" proposal to escalation. */
   verify: (p: Proposal, inst: CoolifyInstance) => Promise<{ ok: boolean; reason: string; probe?: ProbeResult; url?: string }>;
-  appBrainLookup?: (repo: string) => Promise<boolean>;
+  appBrainResolve?: (args: { coolifyAppUuid: string; fqdn: string | null }) => Promise<AppResolution | null>;
   maxAutoApplies: number;
   dryRun: boolean;
 }
@@ -103,7 +104,7 @@ export async function runRemediation(
     const plan = await deps.plan(t.proposal);
     const { lane, handoff, handoff_brief } = await buildHandoff(
       t.proposal, t.probe, t.url, t.instance,
-      deps.appBrainLookup ? { appBrainLookup: deps.appBrainLookup } : {},
+      deps.appBrainResolve ? { appBrainResolve: deps.appBrainResolve } : {},
     );
     escalations.push({
       proposal_id: t.proposal.id,

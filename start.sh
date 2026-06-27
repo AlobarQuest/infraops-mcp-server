@@ -165,4 +165,10 @@ else
   echo "WARN: infra-brain access key not found in BWS — audit tool will degrade to cache/seed" >&2
 fi
 
+# ── app-brain (repo+branch resolution for app-conformance handoffs) ────
+# app-brain has its OWN MCP_ACCESS_KEY (distinct from infra-brain's); its BWS secret UUID
+# is the default, overridable via BWS_APPBRAIN_SECRET_ID.
+export APPBRAIN_BASE_URL="${APPBRAIN_BASE_URL:-https://app-brain.devonwatkins.com}"
+export APPBRAIN_ACCESS_KEY=$(fetch_bws_secret "${BWS_APPBRAIN_SECRET_ID:-68733abe-682a-4597-b88f-b4750189a56a}")
+
 exec node "$SCRIPT_DIR/dist/index.js"
