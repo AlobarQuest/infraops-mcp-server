@@ -178,9 +178,12 @@ describe("verifySafe (probe-guarded enable_healthcheck)", () => {
     expect(r.ok).toBe(false);
   });
 
-  it("fails (→ escalate) on a network error / timeout (status null)", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", fqdn: "https://down.devonwatkins.com" });
-    const r = await verifySafe(hcProposal(), "prod", { probe: async () => ({ status: null, reason: "AbortError" }) });
+  it("fails (→ escalate) on a network error when the internal probe also can't confirm 2xx", async () => {
+    coolifyGet.mockResolvedValue({ uuid: "u1", fqdn: "https://down.devonwatkins.com", ports_exposes: "8000" });
+    const r = await verifySafe(hcProposal(), "prod", {
+      probe: async () => ({ status: null, reason: "AbortError" }),
+      internalProbe: async () => ({ status: null, reason: "no running container" }),
+    });
     expect(r.ok).toBe(false);
   });
 

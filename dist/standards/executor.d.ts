@@ -59,6 +59,39 @@ export declare function probeHealthPath(url: string, timeoutMs: number): Promise
  * stripped) + the path. Returns null when there is no FQDN to probe.
  */
 export declare function buildHealthProbeUrl(fqdn: unknown, path: string): string | null;
+/** Resolve the port to probe internally: the app's health_check_port, else the first exposed port. "" if neither. */
+export declare function internalProbePort(app: Record<string, unknown>): string;
+/**
+ * Inputs for a container-internal health probe: the live container is resolved by Coolify
+ * label, so only the instance + app uuid + port + path are needed (never a container name —
+ * names are ephemeral under rolling deploys).
+ */
+export interface InternalProbeArgs {
+    instance: CoolifyInstance;
+    uuid: string;
+    port: string;
+    path: string;
+}
+/** Injectable container-internal probe so verifySafe is testable without real SSH/orb. */
+export type InternalHealthProbe = (args: InternalProbeArgs, timeoutMs: number) => Promise<ProbeResult>;
+/**
+ * Pick the primary (web) container among the containers that match an app's `coolify.applicationId`
+ * label. A compose app's worker/scheduler sidecars carry the same label, and `docker ps` ordering
+ * is not guaranteed (observed live: the worker is listed first), so prefer a name that isn't a known
+ * sidecar; fall back to the first match. "" when there are no matches.
+ */
+export declare function pickAppContainer(names: string[]): string;
+/**
+ * Default container-internal probe — the fallback for internal-only apps whose public FQDN is
+ * unreachable (e.g. dev's Watchtower at watchtower.local). Resolves the app's CURRENT container
+ * by its Coolify label (`coolify.applicationId=<uuid>`) — never a cached/assumed name, since
+ * rolling deploys rename containers each run — then `docker exec`s a curl against
+ * `http://127.0.0.1:<port>/<path>`. Routes through the VPS dispatch: dev → orb (OrbStack VM),
+ * prod → ssh (Hetzner). A 2xx means the app serves its health path internally → safe to enable.
+ * No container, no curl, or a connection failure (curl http_code "000") yields status=null so the
+ * caller escalates rather than guessing.
+ */
+export declare function probeHealthPathInternal(args: InternalProbeArgs, timeoutMs: number): Promise<ProbeResult>;
 /**
  * Pre-apply gate for safe remediations that could misfire. Currently only the health-check
  * enable: enabling a Coolify health check on an app that does not actually serve the health
@@ -79,6 +112,7 @@ export declare function buildHealthProbeUrl(fqdn: unknown, path: string): string
 export declare function verifySafe(p: Proposal, instance: CoolifyInstance, deps?: {
     get?: typeof coolifyGet;
     probe?: HealthProbe;
+    internalProbe?: InternalHealthProbe;
 }): Promise<VerifyResult>;
 export {};
 //# sourceMappingURL=executor.d.ts.map

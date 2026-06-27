@@ -1,5 +1,6 @@
 import { coolifyGet, coolifyPatch } from "../services/coolify-client.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
+import { vpsExec, dockerCmdPrefix } from "../services/vps-dispatch.js";
 import type { Proposal } from "./check-engine.js";
 
 /**
@@ -141,6 +142,94 @@ export function buildHealthProbeUrl(fqdn: unknown, path: string): string | null 
   return base.replace(/\/+$/, "") + (path.startsWith("/") ? path : `/${path}`);
 }
 
+/** Resolve the port to probe internally: the app's health_check_port, else the first exposed port. "" if neither. */
+export function internalProbePort(app: Record<string, unknown>): string {
+  const hc = String(app.health_check_port ?? "").trim();
+  if (hc) return hc;
+  return String(app.ports_exposes ?? "").split(",")[0].trim();
+}
+
+/**
+ * Inputs for a container-internal health probe: the live container is resolved by Coolify
+ * label, so only the instance + app uuid + port + path are needed (never a container name —
+ * names are ephemeral under rolling deploys).
+ */
+export interface InternalProbeArgs {
+  instance: CoolifyInstance;
+  uuid: string;
+  port: string;
+  path: string;
+}
+
+/** Injectable container-internal probe so verifySafe is testable without real SSH/orb. */
+export type InternalHealthProbe = (args: InternalProbeArgs, timeoutMs: number) => Promise<ProbeResult>;
+
+/** Coolify sidecar container name prefixes — these share the app's `coolify.applicationId` label
+ * but don't serve the app's health path (the web container does). */
+const SIDECAR_PREFIXES = ["worker-", "scheduler-", "task-runners-", "task-", "cron-"];
+
+/**
+ * Pick the primary (web) container among the containers that match an app's `coolify.applicationId`
+ * label. A compose app's worker/scheduler sidecars carry the same label, and `docker ps` ordering
+ * is not guaranteed (observed live: the worker is listed first), so prefer a name that isn't a known
+ * sidecar; fall back to the first match. "" when there are no matches.
+ */
+export function pickAppContainer(names: string[]): string {
+  const primary = names.find((n) => !SIDECAR_PREFIXES.some((p) => n.startsWith(p)));
+  return primary ?? names[0] ?? "";
+}
+
+/**
+ * Default container-internal probe — the fallback for internal-only apps whose public FQDN is
+ * unreachable (e.g. dev's Watchtower at watchtower.local). Resolves the app's CURRENT container
+ * by its Coolify label (`coolify.applicationId=<uuid>`) — never a cached/assumed name, since
+ * rolling deploys rename containers each run — then `docker exec`s a curl against
+ * `http://127.0.0.1:<port>/<path>`. Routes through the VPS dispatch: dev → orb (OrbStack VM),
+ * prod → ssh (Hetzner). A 2xx means the app serves its health path internally → safe to enable.
+ * No container, no curl, or a connection failure (curl http_code "000") yields status=null so the
+ * caller escalates rather than guessing.
+ */
+export async function probeHealthPathInternal(args: InternalProbeArgs, timeoutMs: number): Promise<ProbeResult> {
+  const { instance, uuid, port, path } = args;
+  const docker = dockerCmdPrefix(instance);
+  const p = path.startsWith("/") ? path : `/${path}`;
+  const url = `http://127.0.0.1:${port}${p}`;
+
+  // Resolve the live container by Coolify label (ephemeral names → resolve every run).
+  let container: string;
+  try {
+    const ps = await vpsExec(
+      instance,
+      `${docker} ps --filter label=coolify.applicationId=${uuid} --format '{{.Names}}'`,
+      { allowFailure: true, timeout: timeoutMs },
+    );
+    container = pickAppContainer(ps.stdout.split("\n").map((s) => s.trim()).filter(Boolean));
+  } catch (e) {
+    return { status: null, reason: `container lookup failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (!container) {
+    return { status: null, reason: `no running container with label coolify.applicationId=${uuid}` };
+  }
+
+  // curl WITHOUT -f so an HTTP response (even 4xx/5xx) yields its real code; a connection
+  // failure prints "000" → status null → escalate.
+  const seconds = Math.max(1, Math.ceil(timeoutMs / 1000));
+  try {
+    const res = await vpsExec(
+      instance,
+      `${docker} exec ${container} curl -s -o /dev/null -w '%{http_code}' --max-time ${seconds} ${url}`,
+      { allowFailure: true, timeout: timeoutMs + 2000 },
+    );
+    const code = Number.parseInt(res.stdout.trim(), 10);
+    if (!Number.isInteger(code) || code === 0) {
+      return { status: null, reason: `internal probe ${url} unreachable (${res.stderr.trim() || res.stdout.trim() || "no curl / no http code"})` };
+    }
+    return { status: code, reason: `internal HTTP ${code}` };
+  } catch (e) {
+    return { status: null, reason: `internal probe failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
 /**
  * Pre-apply gate for safe remediations that could misfire. Currently only the health-check
  * enable: enabling a Coolify health check on an app that does not actually serve the health
@@ -161,7 +250,7 @@ export function buildHealthProbeUrl(fqdn: unknown, path: string): string | null 
 export async function verifySafe(
   p: Proposal,
   instance: CoolifyInstance,
-  deps: { get?: typeof coolifyGet; probe?: HealthProbe } = {},
+  deps: { get?: typeof coolifyGet; probe?: HealthProbe; internalProbe?: InternalHealthProbe } = {},
 ): Promise<VerifyResult> {
   const remediationKey = p.id.split(":")[0];
   if (remediationKey !== "coolify.enable_healthcheck") {
@@ -169,6 +258,7 @@ export async function verifySafe(
   }
   const get = deps.get ?? coolifyGet;
   const probe = deps.probe ?? probeHealthPath;
+  const internalProbe = deps.internalProbe ?? probeHealthPathInternal;
 
   // Probe the SAME path the remediation will enable (registry sets it per build_pack).
   const path = String(
@@ -191,6 +281,41 @@ export async function verifySafe(
   if (r.status !== null && r.status >= 200 && r.status < 300) {
     return { ok: true, reason: `probe ${url} → HTTP ${r.status} (serves its health path; safe to auto-enable)`, probe: r, url };
   }
+
+  // Fall back to a container-internal probe ONLY when the external probe was UNREACHABLE
+  // (status null — couldn't connect/resolve the host). This is the internal-only-app case:
+  // an app whose public FQDN doesn't resolve (e.g. dev's Watchtower at watchtower.local) but
+  // which serves its health path fine inside the container.
+  // CRITICAL: a DEFINITIVE external response (4xx/5xx/redirect) means the app IS reachable but
+  // doesn't serve 2xx at that path → genuine non-conformance → escalate, do NOT fall back
+  // (this preserves the behavior that correctly held booking before its /api/health fix).
+  if (r.status === null) {
+    const port = internalProbePort(app);
+    if (!port) {
+      return {
+        ok: false,
+        reason: `external probe ${url} unreachable (${r.reason}) and no exposed port to probe internally — confirm the health path and enable manually`,
+        probe: r,
+        url,
+      };
+    }
+    const ir = await internalProbe({ instance, uuid: String(p.target.uuid), port, path }, PROBE_TIMEOUT_MS);
+    if (ir.status !== null && ir.status >= 200 && ir.status < 300) {
+      return {
+        ok: true,
+        reason: `external ${url} unreachable (${r.reason}); internal http://127.0.0.1:${port}${path.startsWith("/") ? path : `/${path}`} → HTTP ${ir.status} (internal-only app serves its health path; safe to auto-enable)`,
+        probe: ir,
+        url,
+      };
+    }
+    return {
+      ok: false,
+      reason: `external ${url} unreachable (${r.reason}); internal probe → ${ir.reason} (no 2xx from any probe — confirm the health path and enable manually)`,
+      probe: ir,
+      url,
+    };
+  }
+
   return {
     ok: false,
     reason: `probe ${url} → ${r.reason} (not 2xx — may be SSO-protected or serve a non-standard path; enable manually)`,
