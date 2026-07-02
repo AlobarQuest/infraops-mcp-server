@@ -27,8 +27,12 @@ export interface RotationDeps {
         redeploy(instance: string, uuid: string): Promise<void>;
     };
     ghSecretSet(repo: string, name: string, value: string): Promise<void>;
-    /** HTTP status of the class-specific provider auth probe for `value` */
-    probe(kind: ProviderProbe, value: string): Promise<number>;
+    /** HTTP status of the class-specific provider auth probe for `value`. `opts` carries
+     *  Basic-auth context (email/workspace) for non-Bearer providers like bitbucket. */
+    probe(kind: ProviderProbe, value: string, opts?: {
+        email?: string;
+        workspace?: string;
+    }): Promise<number>;
     /** the standing gh CLI keeper still authenticates (keeper-verification discipline) */
     ghKeeperOk(): Promise<boolean>;
     state: {

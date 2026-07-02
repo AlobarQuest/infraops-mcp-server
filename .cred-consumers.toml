@@ -122,6 +122,46 @@ replacement_scope = "fine-grained: Contents:read + Metadata on owned repos (mirr
   date = "2026-07-02"
   source = "~/.codex logs (WS-0.5) + container logs (2026-06-20, CM rotation item)"
 
+# ── 3b. Bitbucket Atlassian API token (fp 894dd52f) — same app, same fixed vector ──
+# The github-to-bitbucket-mirror app's push credential. Leaked via the SAME container-
+# log vector as the GitHub PAT above (2026-06-20), now fixed+verified. Atlassian API
+# token → Basic auth (email:token), so class atlassian-api-token with a bitbucket probe
+# (GET /2.0/repositories/{workspace}). Sweep 2026-07-02: consumers are BWS 1078dcaf
+# (keeper) + the mirror's Coolify BITBUCKET_TOKEN; the old duplicate db06245e was
+# deleted (no longer a consumer, verified 2026-07-02).
+[[credential]]
+id = "bitbucket-mirror-token"
+class = "atlassian-api-token"
+fingerprint_sha256_8 = "894dd52f"
+provider = "bitbucket"
+provider_identity = "Atlassian account (id.atlassian.com → Security → API tokens); Bitbucket workspace alobarquest"
+bws_uuid = "1078dcaf-c1cd-48a0-a794-b4030100cf24"
+probe_email = "devon.watkins@gmail.com"
+probe_workspace = "alobarquest"
+consumers_verified = "2026-07-02"
+verified_by = "scripts/cred-consumer-sweep.py"
+disposition = "reissue"
+replacement_scope = "Repository: Read + Write on the alobarquest workspace (the mirror creates repos + pushes)"
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "1078dcaf-c1cd-48a0-a794-b4030100cf24"
+  note = "BITBUCKET_API_TOKEN (Ops / Platform)"
+
+  [[credential.consumer]]
+  kind = "coolify-env"
+  instance = "prod"
+  resource_type = "application"
+  uuid = "v04wc0wos0o0440k0ok8g08k"
+  key = "BITBUCKET_TOKEN"
+  redeploy = true
+  note = "github-to-bitbucket-mirror app"
+
+  [[credential.exposure]]
+  id = "container-log-2026-06-20"
+  date = "2026-06-20"
+  source = "github-to-bitbucket-mirror container logs (creds-in-git-URL + command tracing; vector fixed 2026-07-02)"
+
 # ── 4. OpenRouter generic key (leaked fp 57543baa) — THE CURRENT ACTIVE KEY ─────
 # Sweep 2026-07-02: BWS OPENROUTER_API_KEY + Keychain openrouter-api/devon (the
 # shell exports OPENROUTER_API_KEY from the Keychain item at init — no literal in

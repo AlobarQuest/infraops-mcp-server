@@ -20,6 +20,7 @@ describe("the repo's own .cred-consumers.toml", () => {
 
   it("parses and carries the 5 leaked-cred entries with attested consumer sets", () => {
     expect(specs.map((s) => s.id).sort()).toEqual([
+      "bitbucket-mirror-token",
       "github-classic-aihelper",
       "github-classic-lifeops",
       "github-finegrained-mirror",
@@ -32,7 +33,7 @@ describe("the repo's own .cred-consumers.toml", () => {
   it("routes every emitted finding to its registry-built classification, never the unplanned fallback", () => {
     const state = { resolvedExposures: {}, lastRotated: {} };
     const findings = credFindings(specs, state, "2026-07-02T03:00:00Z");
-    expect(findings.length).toBe(5); // one open exposure per credential
+    expect(findings.length).toBe(6); // one open exposure per credential
     const credClassifications = buildCredClassifications(specs, state);
     for (const f of findings) {
       const c = classify(f, { autoFixAllowlist: [], credClassifications });
@@ -52,6 +53,7 @@ describe("the repo's own .cred-consumers.toml", () => {
     expect(kindOf("github-classic-aihelper")).toBe("rotation");
     expect(kindOf("github-classic-lifeops")).toBe("rotation");
     expect(kindOf("github-finegrained-mirror")).toBe("rotation"); // mirror.py leak fixed+deployed → precondition cleared
+    expect(kindOf("bitbucket-mirror-token")).toBe("rotation"); // atlassian-api-token class + bitbucket probe
     expect(kindOf("openai-project")).toBe("manual"); // no BWS copy to probe
   });
 });

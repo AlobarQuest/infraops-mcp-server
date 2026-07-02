@@ -52,6 +52,9 @@ export interface CredentialSpec {
   verified_by?: string;
   disposition?: string;
   replacement_scope?: string;
+  /** Basic-auth probe context for non-Bearer providers (e.g. bitbucket). Non-secret. */
+  probe_email?: string;
+  probe_workspace?: string;
   created?: string;
   last_rotated?: string;
   rotation_preconditions: string[];

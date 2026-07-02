@@ -103,7 +103,7 @@ export async function runRotationPlan(plan, deps) {
                     steps.push(done);
             }
             // ── VERIFY: the new credential must authenticate at the provider ───────────
-            const status = await deps.probe(plan.providerProbe, newValue);
+            const status = await deps.probe(plan.providerProbe, newValue, { email: plan.probeEmail, workspace: plan.probeWorkspace });
             if (status !== 200) {
                 return finish("failed", `verify FAILED: new credential probe returned ${status} (expected 200) — check the staged value; nothing was revoked`);
             }
@@ -126,7 +126,7 @@ export async function runRotationPlan(plan, deps) {
         // ── REVOKE-CONFIRM: probe the OLD value; retire only a provably dead credential ─
         if (oldValue === null)
             return finish("blocked", "old value unavailable — confirm the provider revoke manually, then resolve-exposure");
-        const oldStatus = await deps.probe(plan.providerProbe, oldValue);
+        const oldStatus = await deps.probe(plan.providerProbe, oldValue, { email: plan.probeEmail, workspace: plan.probeWorkspace });
         if (oldStatus === 200) {
             return finish("blocked", `old credential still LIVE at the provider — complete the console revoke, then re-approve. Steps: ${plan.manualSteps.join(" → ")}`);
         }
@@ -210,7 +210,9 @@ function execCapture(cmd, opts = {}) {
         stdio: ["pipe", "pipe", "pipe"],
     });
 }
-const PROBE_URLS = {
+// Bearer-auth probe endpoints (200 = live, 401 = dead). Bitbucket is handled
+// separately (Basic auth email:token against a workspace-scoped endpoint).
+const BEARER_PROBE_URLS = {
     github: "https://api.github.com/user",
     openrouter: "https://openrouter.ai/api/v1/auth/key",
     openai: "https://api.openai.com/v1/models",
@@ -283,11 +285,26 @@ export function defaultRotationDeps(io) {
         async ghSecretSet(repo, name, value) {
             execCapture(["gh", "secret", "set", name, "-R", repo], { input: value });
         },
-        async probe(kind, value) {
-            const res = await fetch(PROBE_URLS[kind], {
+        async probe(kind, value, opts) {
+            let url;
+            let authHeader;
+            if (kind === "bitbucket") {
+                // Atlassian API token: Basic auth (email:token) against a workspace-scoped
+                // endpoint the repo-scoped token can actually read. 200 = live, 401 = dead.
+                if (!opts?.email || !opts?.workspace)
+                    return 400; // misconfigured plan → not "dead"
+                url = `https://api.bitbucket.org/2.0/repositories/${encodeURIComponent(opts.workspace)}?pagelen=1`;
+                authHeader = "Basic " + Buffer.from(`${opts.email}:${value}`, "utf8").toString("base64");
+            }
+            else {
+                url = BEARER_PROBE_URLS[kind];
+                authHeader = `Bearer ${value}`;
+            }
+            const res = await fetch(url, {
                 headers: {
-                    Authorization: `Bearer ${value}`,
+                    Authorization: authHeader,
                     "User-Agent": "infraops-cred-rotation",
+                    Accept: "application/json",
                     ...(kind === "github" ? { "X-GitHub-Api-Version": "2022-11-28" } : {}),
                 },
                 signal: AbortSignal.timeout(15_000),

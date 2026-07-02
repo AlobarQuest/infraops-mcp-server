@@ -1,7 +1,7 @@
 import type { Finding } from "./scan-parser.js";
 import type { Classification } from "./taxonomy.js";
 import type { ConsumerSpec, CredentialSpec } from "./cred-consumers.js";
-export type ProviderProbe = "github" | "openrouter" | "openai";
+export type ProviderProbe = "github" | "openrouter" | "openai" | "bitbucket";
 interface ClassPolicy {
     maxAgeDays: number;
     probe?: ProviderProbe;
@@ -49,6 +49,9 @@ export interface RotationPlanSpec {
     retireBwsUuids: string[];
     consumers: ConsumerSpec[];
     providerProbe: ProviderProbe;
+    /** Basic-auth probe context (bitbucket): the account email and workspace. Non-secret. */
+    probeEmail?: string;
+    probeWorkspace?: string;
     exposureIds: string[];
     /** Devon's console steps (create/revoke are ALWAYS human) — shown in change-manager */
     manualSteps: string[];
