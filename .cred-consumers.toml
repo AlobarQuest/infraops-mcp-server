@@ -1,0 +1,175 @@
+# .cred-consumers.toml — consumer inventory for credentials the WS-0.7 rotation
+# lane manages from this repo. Complements .bws-secrets.toml: that file declares
+# which secrets this repo CONSUMES; this file answers, per managed credential,
+# "if this credential is rotated, what must be updated and verified?"
+#
+# FAIL-SAFE (spec decision 1): the rotation lane REFUSES to revoke any credential
+# whose consumer set here is not attested (`consumers_verified` date set by a
+# fingerprint sweep). Values NEVER appear here — identity is sha256[:8] only.
+#
+# Consumer kinds understood by the executor (src/security-drift/cred-rotation.ts):
+#   bws-secret        { uuid }                              — keeper storage in BWS
+#   keychain          { service, account }                  — macOS login Keychain item
+#   coolify-env       { instance, resource_type, uuid, key, redeploy } — app/service env
+#   gh-actions-secret { repo, name }                        — write-only; deploy via `gh secret set`
+#   shell-export      { file, var }                         — literal export line in a shell file
+#   runtime-fetch     { repo, ref }                         — code fetches from BWS by UUID at runtime
+
+version = 1
+
+# Staging convention for reissued values: Devon parks the NEW provider-minted value
+# in the login Keychain item service="cred-rotation", account="<credential id>",
+# typed in a real Terminal (TTY prompt, never via `!`):
+#   security add-generic-password -U -s cred-rotation -a <id> -T /usr/bin/security -w
+# The 4am executor consumes it from there (store → deploy → verify → revoke-confirm)
+# and deletes the staging item once the old credential is confirmed dead.
+
+# ── 1. GitHub classic PAT — "AIHELPER" (leaked fp 26058655) ─────────────────────
+# Scopes: repo, workflow, read:org, project, read:packages, read:audit_log, read:user.
+# Sweep 2026-07-02: value lives ONLY in BWS (AIHELPER-GH-AUTH-TOKEN). No repo,
+# Coolify app, or Actions secret consumes it; no aihelper project exists locally.
+# Retired-project relic ⇒ least-privilege replacement is NO token: revoke + retire
+# the BWS secret. Class landmine: enumerate SSH/deploy keys before revoke.
+[[credential]]
+id = "github-classic-aihelper"
+class = "github-pat-classic"
+fingerprint_sha256_8 = "26058655"
+provider = "github"
+provider_identity = "AlobarQuest (classic PAT, Settings → Developer settings → PATs classic)"
+bws_uuid = "f548b632-879b-4c10-904e-b3a4010b6429"
+consumers_verified = "2026-07-02"
+verified_by = "scripts/cred-consumer-sweep.py"
+disposition = "revoke-no-replacement"
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "f548b632-879b-4c10-904e-b3a4010b6429"
+  note = "AIHELPER-GH-AUTH-TOKEN (Ops / Platform) — keeper storage only; retire after revoke"
+
+  [[credential.exposure]]
+  id = "codex-2026-07-02"
+  date = "2026-07-02"
+  source = "~/.codex logs (WS-0.5 scan) — probed LIVE 2026-07-02"
+
+# ── 2. GitHub classic PAT — "lifeops" (leaked fp 2d53ed7a) ──────────────────────
+# Scopes: repo, workflow, delete:packages, write:packages, notifications, project,
+# audit_log, write:discussion — broadest of the three. Sweep 2026-07-02: value lives
+# ONLY in BWS (lifeops-github-token); the lifeops-portal repo is ARCHIVED.
+# Retired-project relic ⇒ revoke + retire the BWS secret, no replacement.
+[[credential]]
+id = "github-classic-lifeops"
+class = "github-pat-classic"
+fingerprint_sha256_8 = "2d53ed7a"
+provider = "github"
+provider_identity = "AlobarQuest (classic PAT)"
+bws_uuid = "d0007bfe-0aad-420c-b256-b40900fb2da7"
+consumers_verified = "2026-07-02"
+verified_by = "scripts/cred-consumer-sweep.py"
+disposition = "revoke-no-replacement"
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "d0007bfe-0aad-420c-b256-b40900fb2da7"
+  note = "lifeops-github-token (Ops / Platform) — keeper storage only; retire after revoke"
+
+  [[credential.exposure]]
+  id = "codex-2026-07-02"
+  date = "2026-07-02"
+  source = "~/.codex logs (WS-0.5 scan) — probed LIVE 2026-07-02"
+
+# ── 3. GitHub fine-grained PAT — github-to-bitbucket-mirror (leaked fp 64b11252) ─
+# Same credential already tracked as pending-rotation (container-log leak, 2026-06-20;
+# change-manager rotation backlog). PRECONDITION before rotation: fix the mirror.py
+# leak vector (credentials embedded in git remote URLs + command tracing writes both
+# tokens to container logs every run) or the replacement re-leaks immediately.
+[[credential]]
+id = "github-finegrained-mirror"
+class = "github-pat-fine-grained"
+fingerprint_sha256_8 = "64b11252"
+provider = "github"
+provider_identity = "AlobarQuest (fine-grained PAT)"
+bws_uuid = "c85e33ad-1c18-4f53-9326-b40301077959"
+consumers_verified = "2026-07-02"
+verified_by = "scripts/cred-consumer-sweep.py"
+disposition = "reissue-least-privilege"
+replacement_scope = "fine-grained: Contents:read + Metadata on owned repos (mirror is read-from-GitHub only)"
+rotation_preconditions = [
+  "Fix github-to-bitbucket-mirror mirror.py credential logging (tokens in git URLs + traced commands) BEFORE deploying a replacement",
+]
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "c85e33ad-1c18-4f53-9326-b40301077959"
+  note = "github-mirror-bitbucket (Ops / Platform)"
+
+  [[credential.consumer]]
+  kind = "coolify-env"
+  instance = "prod"
+  resource_type = "application"
+  uuid = "v04wc0wos0o0440k0ok8g08k"
+  key = "GITHUB_TOKEN"
+  redeploy = true
+  note = "github-to-bitbucket-mirror app"
+
+  [[credential.exposure]]
+  id = "codex-2026-07-02"
+  date = "2026-07-02"
+  source = "~/.codex logs (WS-0.5) + container logs (2026-06-20, CM rotation item)"
+
+# ── 4. OpenRouter generic key (leaked fp 57543baa) — THE CURRENT ACTIVE KEY ─────
+# Sweep 2026-07-02: BWS OPENROUTER_API_KEY + Keychain openrouter-api/devon (the
+# shell exports OPENROUTER_API_KEY from the Keychain item at init — no literal in
+# any shell file). Brains use the SEPARATE BRAIN_OPENROUTER_API_KEY (39055caf…),
+# confirmed non-matching ⇒ no brain redeploy on rotation.
+[[credential]]
+id = "openrouter-generic"
+class = "openrouter-key"
+fingerprint_sha256_8 = "57543baa"
+provider = "openrouter"
+provider_identity = "OpenRouter → Keys, label sk-or-v1-1b7…2b3"
+bws_uuid = "9661da8f-ac66-4e97-a31f-b42500bb849c"
+consumers_verified = "2026-07-02"
+verified_by = "scripts/cred-consumer-sweep.py"
+disposition = "reissue"
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "9661da8f-ac66-4e97-a31f-b42500bb849c"
+  note = "OPENROUTER_API_KEY (Ops / Platform)"
+
+  [[credential.consumer]]
+  kind = "keychain"
+  service = "openrouter-api"
+  account = "devon"
+  note = "shell env OPENROUTER_API_KEY is exported from this item at shell init"
+
+  [[credential.exposure]]
+  id = "codex-2026-07-02"
+  date = "2026-07-02"
+  source = "~/.codex logs (WS-0.5 scan) — probed LIVE 2026-07-02"
+
+# ── 5. OpenAI project key (leaked fp cb3a0415) ──────────────────────────────────
+# Sweep 2026-07-02: NO consumer found on any scanned surface (Keychain, shell files,
+# ~/.config, LaunchAgents, git creds, BWS ×104, Coolify prod+dev envs ×854, process
+# env, GH Actions secret names). Orphaned key ⇒ revoke-only at the OpenAI console.
+[[credential]]
+id = "openai-project"
+class = "openai-key"
+fingerprint_sha256_8 = "cb3a0415"
+provider = "openai"
+provider_identity = "OpenAI → API keys (sk-proj-…, 120 models visible)"
+consumers_verified = "2026-07-02"
+verified_by = "scripts/cred-consumer-sweep.py"
+disposition = "revoke-no-replacement"
+
+  [[credential.exposure]]
+  id = "codex-2026-07-02"
+  date = "2026-07-02"
+  source = "~/.codex logs (WS-0.5 scan) — probed LIVE 2026-07-02"
+
+# ── Sweep blind spots (attested 2026-07-02) ─────────────────────────────────────
+# - GH Actions secret VALUES are write-only; NAMES enumerated across all AlobarQuest
+#   repos — none suggest any of the five (no PAT-named / OPENAI-named secrets).
+# - Account-level GitHub SSH keys not API-listable with the current keeper scope
+#   (needs admin:public_key) — pre-revoke enumeration is a Devon UI step.
+# - Surfaces off this Mac (other personal machines, browsers) not scanned.

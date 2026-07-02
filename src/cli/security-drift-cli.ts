@@ -17,6 +17,15 @@ import { runSelfCheck } from "../security-drift/self-check.js";
 import { classify } from "../security-drift/taxonomy.js";
 import { buildEscalations, type ClassifiedFinding } from "../security-drift/emit.js";
 import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION } from "../security-drift/scanner-version.js";
+import { loadCredConsumerFiles } from "../security-drift/cred-consumers.js";
+import {
+  buildCredClassifications,
+  credFindings,
+  loadRotationState,
+  saveRotationState,
+} from "../security-drift/cred-rotation.js";
+import type { Finding } from "../security-drift/scan-parser.js";
+import type { Classification } from "../security-drift/taxonomy.js";
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
@@ -51,9 +60,34 @@ function captureScan(scanPath: string): string {
   }
 }
 
+/** Record that Devon confirmed a provider-side revoke the executor cannot probe
+ *  (no BWS copy of the old value) — clears the cred.exposure-rotate finding. */
+function doResolveExposure(args: Record<string, string | boolean>): void {
+  const cred = typeof args.cred === "string" ? args.cred : "";
+  const exposure = typeof args.exposure === "string" ? args.exposure : "";
+  if (!cred || !exposure) throw new Error("resolve-exposure requires --cred <id> and --exposure <id>");
+  const p = securityPaths();
+  const state = loadRotationState(p.credRotationStateFile);
+  const key = `${cred}:${exposure}`;
+  if (state.resolvedExposures[key]) {
+    process.stdout.write(`already resolved: ${key} at ${state.resolvedExposures[key].ts}\n`);
+    return;
+  }
+  state.resolvedExposures[key] = {
+    ts: new Date().toISOString(),
+    detail: typeof args.note === "string" ? args.note : "manually confirmed revoked (resolve-exposure CLI)",
+  };
+  saveRotationState(p.credRotationStateFile, state);
+  process.stdout.write(`resolved: ${key} — the finding clears on the next 3am run\n`);
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  if (args.command !== "run") throw new Error(`unknown command: ${String(args.command)} (use: run)`);
+  if (args.command === "resolve-exposure") {
+    doResolveExposure(args);
+    return;
+  }
+  if (args.command !== "run") throw new Error(`unknown command: ${String(args.command)} (use: run | resolve-exposure)`);
   const now = typeof args.now === "string" ? args.now : new Date().toISOString();
   const reportDir = typeof args["report-dir"] === "string" ? args["report-dir"] : undefined;
 
@@ -106,6 +140,27 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // --- WS-0.7 credential-rotation registry: findings + pre-built classifications.
+  // A broken registry/state is itself escalated (cred.registry-error → URGENT manual
+  // via the taxonomy's deny-by-default cred.* fallback), never silently skipped.
+  let credExtraFindings: Finding[] = [];
+  let credClassifications: Record<string, Classification> | undefined;
+  try {
+    const credSpecs = loadCredConsumerFiles(readList(p.credConsumersList));
+    const credState = loadRotationState(p.credRotationStateFile);
+    credExtraFindings = credFindings(credSpecs, credState, now);
+    credClassifications = buildCredClassifications(credSpecs, credState);
+  } catch (e) {
+    credExtraFindings = [
+      {
+        severity: "FAIL",
+        check: "cred.registry-error",
+        target: "cred-consumers",
+        detail: `rotation registry unreadable: ${e instanceof Error ? e.message : String(e)}`,
+      },
+    ];
+  }
+
   const result = await runSecurityDrift(
     {
       scanStdout: captureScan(p.scanPath),
@@ -116,7 +171,8 @@ async function main(): Promise<void> {
       emitStateFile: p.emitStateFile,
       rollbackLog: p.rollbackLog,
       autoFixCap: Number.parseInt(process.env.SECURITY_AUTOFIX_CAP ?? "10", 10) || 10,
-      extraFindings: selfCheckFindings,
+      extraFindings: [...selfCheckFindings, ...credExtraFindings],
+      credClassifications,
     },
     {
       postSync: (body) => client.postSync(body),

@@ -22,6 +22,8 @@ export function securityPaths() {
         auditLog: process.env.SECURITY_AUDIT_LOG ?? path.join(home, ".claude", "audit", "high-power-actions.jsonl"),
         hwmFile: path.join(stateDir, "security-auditlog-hwm.json"),
         hashFile: path.join(stateDir, "security-runner-hashes.json"),
+        credConsumersList: path.join(cfgDir, "cred-consumers.list"),
+        credRotationStateFile: path.join(stateDir, "cred-rotation-state.json"),
     };
 }
 //# sourceMappingURL=paths.js.map

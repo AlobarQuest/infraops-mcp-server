@@ -16,7 +16,11 @@ export async function runSecurityDrift(config, deps) {
     ];
     const classifiedAll = [];
     for (const finding of findings) {
-        const classification = classify(finding, { autoFixAllowlist: config.autoFixAllowlist, fpExtra: config.fpExtra });
+        const classification = classify(finding, {
+            autoFixAllowlist: config.autoFixAllowlist,
+            fpExtra: config.fpExtra,
+            credClassifications: config.credClassifications,
+        });
         if (classification)
             classifiedAll.push({ finding, classification });
     }

@@ -213,6 +213,39 @@ churn is dropped by `taxonomy.ts`. The 4am verbatim executor is `security-execut
 file locations live in `paths.ts`. See `~/docs/security-audit/security-drift-taxonomy.md`
 for the authoritative tier rules.
 
+### Credential-rotation lane (WS-0.7)
+
+The same detect→approve→execute loop rotates credentials as a change-class
+(spec: `~/docs/software-delivery-system/2026-07-02-ws07-credential-rotation-spec.md`):
+
+- **Registry:** per-repo `.cred-consumers.toml` (this repo's covers the machine/ops-scope
+  creds) maps each managed credential → its consumers (BWS secret, Keychain item, Coolify
+  env, GH Actions secret). Files are listed in `~/.config/infra-drift/cred-consumers.list`
+  (deny-by-default: unlisted ⇒ unmanaged). Parsed by `cred-consumers.ts` (strict-subset
+  TOML parser, deliberately dependency-free in the 4am write path).
+- **Detect:** `cred-rotation.ts` emits `cred.exposure-rotate` (FAIL, one-shot until the
+  exposure is recorded resolved in the 0600 `cred-rotation-state.json`) and
+  `cred.rotation-age` (WARN past per-class max age; infra-brain rules #1031/#1032). Merged
+  into the 3am run via `extraFindings`; classifications are pre-built per credential and
+  routed through `taxonomy.ts`'s `cred.*` branch (no plan ⇒ URGENT manual, never guessed).
+- **Execute:** approved `{ rotation: RotationPlanSpec }` remediations run in
+  `rotation-executor.ts` (same plan-hash gate): store (quarantine old value under a
+  distinct BWS name, edit the keeper secret IN PLACE so by-UUID fetchers keep working) →
+  deploy (consumer updates, value moved by pipe/UUID, never argv where avoidable) →
+  verify (provider auth 200; gh keeper probe for GitHub classes) → revoke-confirm (probe
+  old value; retire the BWS copy ONLY on a strict 401 — 403/5xx is indeterminate and
+  refuses). Multi-night by design: "old still live" posts `blocked` until Devon's console
+  revoke, then a re-approve completes it.
+- **Devon-only steps:** CREATE (mint at the provider console) and provider REVOKE. Staged
+  handoff = Keychain item `cred-rotation/<cred-id>` filled in a real Terminal. Orphan
+  creds with no probe-able old value are closed via
+  `security-drift-cli.js resolve-exposure --cred <id> --exposure <id>`.
+- **Never in the lane:** Coolify PG passwords (volume-recreate only), BWS machine tokens
+  (console-only), brain MCP keys (claude.ai connector re-key — manual, paired reconfig).
+- **Consumer mapping:** `scripts/cred-consumer-sweep.py` — fingerprint (sha256) hash-compare
+  across Keychain/shell/config/BWS/Coolify surfaces; prints locations + hash prefixes only,
+  never values. Its attestation date goes in `consumers_verified`.
+
 ### Known Non-obvious Invariants (security-drift)
 
 **Security findings POST to the SAME `/api/sync` but with `source:"security"`; reconcile is source-scoped.**
@@ -228,6 +261,13 @@ recorded in the 0600 `security-emit-state.json` at emit time (keyed by the findi
 = `resource_uuid`). Mismatch / missing / tampered emit-state → refuse + alert, never execute.
 `manual:` remediations are tracked-only. The Coolify `run-window` excludes `source==="security"`
 so the Sonnet agent never receives a security item.
+
+**Rotation never revokes: the executor's "revoke" step only CONFIRMS death (strict 401) then retires the BWS copy.**
+Create and provider-revoke are ALWAYS Devon console actions (decision 2026-07-02). The executor
+refuses to touch any credential whose `.cred-consumers.toml` entry lacks a `consumers_verified`
+attestation (fail-safe #1), any class outside `CLASS_POLICY`'s `executor: true` set, and any
+old-value probe that isn't exactly 401. Verify-before-revoke is structural (sequential code with
+early returns), not plan-authored — a plan cannot express revoke-first.
 
 **Auto-fix is Node `O_NOFOLLOW` + `fchmod`-on-fd, not bash `chmod`.** The taxonomy's TOCTOU /
 symlink / hardlink / owner guards require operating on the open fd (the inode), which bash's

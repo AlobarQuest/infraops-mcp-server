@@ -7,8 +7,12 @@ import type { Finding } from "./scan-parser.js";
 
 export type Tier = "AUTO_FIX" | "URGENT" | "NORMAL";
 
-/** A remediation is EITHER a list of exact commands to run verbatim, OR human steps. */
-export type Remediation = { exec: string[][] } | { manual: string[] };
+/** A remediation is a list of exact commands to run verbatim, OR human steps, OR a
+ *  typed credential-rotation plan (WS-0.7) the rotation executor interprets. */
+export type Remediation =
+  | { exec: string[][] }
+  | { manual: string[] }
+  | { rotation: import("./cred-rotation.js").RotationPlanSpec };
 
 export interface Classification {
   tier: Tier;
@@ -23,6 +27,9 @@ export interface ClassifyOptions {
   autoFixAllowlist: string[];
   /** Extra false-positive path/detail substrings to drop, beyond the built-ins. */
   fpExtra?: string[];
+  /** Pre-built classifications for cred.* findings, keyed `${check}|${target}`
+   *  (built by cred-rotation.ts from the .cred-consumers.toml registry). */
+  credClassifications?: Record<string, Classification>;
 }
 
 // Built-in false-positive matchers (protect the approval gate from alert-fatigue).
@@ -108,6 +115,23 @@ export function classify(f: Finding, opts: ClassifyOptions): Classification | nu
   // patterns (test/, fixtures/, .pem, .pub) would otherwise match an embedded tracked
   // path and silently drop a real finding — a deny-by-default bypass.
   if (IGNORE_KEYS.has(f.check)) return null;
+
+  // cred.* findings carry their classification from the rotation registry
+  // (cred-rotation.ts), routed before the FP filter like other explicitly-keyed
+  // checks. A cred finding with no registry-built classification is URGENT manual
+  // triage — deny-by-default, never a guessed plan.
+  if (f.check.startsWith("cred.")) {
+    return (
+      opts.credClassifications?.[`${f.check}|${f.target}`] ?? {
+        tier: "URGENT",
+        kind: "question",
+        risk: "caution",
+        remediation: { manual: [`No rotation plan available for ${f.target} — triage: ${f.detail}`] },
+        title: `Credential rotation (unplanned): ${f.target}`,
+      }
+    );
+  }
+
   if (!URGENT_KEYS.has(f.check) && isFalsePositive(f, opts)) return null;
 
   const title = titleFor(f);

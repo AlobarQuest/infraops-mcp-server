@@ -1,10 +1,13 @@
 import type { Finding } from "./scan-parser.js";
 export type Tier = "AUTO_FIX" | "URGENT" | "NORMAL";
-/** A remediation is EITHER a list of exact commands to run verbatim, OR human steps. */
+/** A remediation is a list of exact commands to run verbatim, OR human steps, OR a
+ *  typed credential-rotation plan (WS-0.7) the rotation executor interprets. */
 export type Remediation = {
     exec: string[][];
 } | {
     manual: string[];
+} | {
+    rotation: import("./cred-rotation.js").RotationPlanSpec;
 };
 export interface Classification {
     tier: Tier;
@@ -18,6 +21,9 @@ export interface ClassifyOptions {
     autoFixAllowlist: string[];
     /** Extra false-positive path/detail substrings to drop, beyond the built-ins. */
     fpExtra?: string[];
+    /** Pre-built classifications for cred.* findings, keyed `${check}|${target}`
+     *  (built by cred-rotation.ts from the .cred-consumers.toml registry). */
+    credClassifications?: Record<string, Classification>;
 }
 /** True when a finding should be dropped as a known false positive. */
 export declare function isFalsePositive(f: Finding, opts: ClassifyOptions): boolean;
