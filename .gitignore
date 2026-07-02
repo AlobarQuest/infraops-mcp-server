@@ -6,3 +6,5 @@ node_modules/
 
 # provider-agent session state
 .provider-agent/sessions/
+__pycache__/
+.claude-octopus/

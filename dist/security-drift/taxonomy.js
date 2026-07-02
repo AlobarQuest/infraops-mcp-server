@@ -81,6 +81,19 @@ export function classify(f, opts) {
     // path and silently drop a real finding — a deny-by-default bypass.
     if (IGNORE_KEYS.has(f.check))
         return null;
+    // cred.* findings carry their classification from the rotation registry
+    // (cred-rotation.ts), routed before the FP filter like other explicitly-keyed
+    // checks. A cred finding with no registry-built classification is URGENT manual
+    // triage — deny-by-default, never a guessed plan.
+    if (f.check.startsWith("cred.")) {
+        return (opts.credClassifications?.[`${f.check}|${f.target}`] ?? {
+            tier: "URGENT",
+            kind: "question",
+            risk: "caution",
+            remediation: { manual: [`No rotation plan available for ${f.target} — triage: ${f.detail}`] },
+            title: `Credential rotation (unplanned): ${f.target}`,
+        });
+    }
     if (!URGENT_KEYS.has(f.check) && isFalsePositive(f, opts))
         return null;
     const title = titleFor(f);

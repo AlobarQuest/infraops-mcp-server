@@ -23,6 +23,8 @@ export interface RunnerConfig {
   emitStateMaxAgeDays?: number;
   /** extra findings to merge with the scan output (e.g. control-plane self-check) */
   extraFindings?: import("./scan-parser.js").Finding[];
+  /** pre-built cred.* classifications (WS-0.7), keyed `${check}|${target}` */
+  credClassifications?: Record<string, import("./taxonomy.js").Classification>;
 }
 
 export interface RunnerDeps {
@@ -49,7 +51,11 @@ export async function runSecurityDrift(config: RunnerConfig, deps: RunnerDeps): 
 
   const classifiedAll: ClassifiedFinding[] = [];
   for (const finding of findings) {
-    const classification = classify(finding, { autoFixAllowlist: config.autoFixAllowlist, fpExtra: config.fpExtra });
+    const classification = classify(finding, {
+      autoFixAllowlist: config.autoFixAllowlist,
+      fpExtra: config.fpExtra,
+      credClassifications: config.credClassifications,
+    });
     if (classification) classifiedAll.push({ finding, classification });
   }
 

@@ -1,4 +1,5 @@
 import type { ApprovedItem, OutcomeBody } from "../change-manager/api-client.js";
+import { type RotationDeps } from "./rotation-executor.js";
 export interface ExecResult {
     ok: boolean;
     detail: string;
@@ -13,6 +14,8 @@ export interface SecurityWindowDeps {
     maxChanges: number;
     /** injectable for tests; defaults to execFileSync (shell:false) */
     exec?: (cmd: string[]) => ExecResult;
+    /** deps for `{ rotation }` remediations (WS-0.7). Absent ⇒ rotation items are blocked. */
+    rotation?: RotationDeps;
     timeoutMs?: number;
 }
 export interface SecurityWindowSummary {

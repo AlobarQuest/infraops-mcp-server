@@ -9,6 +9,9 @@ import { renderWindowMarkdown } from "../change-manager/window-report.js";
 import { runSecurityWindow } from "../security-drift/security-executor.js";
 import { securityPaths } from "../security-drift/paths.js";
 import { sendAlertEmail } from "../security-drift/notify.js";
+import { defaultRotationDeps } from "../security-drift/rotation-executor.js";
+import { loadRotationState, saveRotationState } from "../security-drift/cred-rotation.js";
+import { coolifyGet, coolifyPatch, coolifyPost } from "../services/coolify-client.js";
 
 export function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
@@ -75,6 +78,16 @@ async function doRunSecurityWindow(reportDir: string | undefined, now: string): 
     },
     emitStateFile: p.emitStateFile,
     maxChanges: Number.parseInt(process.env.SECURITY_MAX_CHANGES ?? "10", 10) || 10,
+    rotation: defaultRotationDeps({
+      coolifyGet: (pth, instance) => coolifyGet(pth, undefined, (instance ?? "prod") as "prod" | "dev"),
+      coolifyPatch: (pth, body, instance) =>
+        coolifyPatch(pth, body as Record<string, unknown>, (instance ?? "prod") as "prod" | "dev"),
+      coolifyPost: (pth, body, instance) =>
+        coolifyPost(pth, body as Record<string, unknown> | undefined, (instance ?? "prod") as "prod" | "dev"),
+      loadState: () => loadRotationState(p.credRotationStateFile),
+      saveState: (s) => saveRotationState(p.credRotationStateFile, s),
+      now,
+    }),
   });
   const lines = [
     `# Security window — ${now}`,

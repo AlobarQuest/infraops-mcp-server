@@ -6,8 +6,7 @@
 // baseline. It is a MERGE store (entries persist across runs, pruned by age) so an
 // item approved on a later day can still be verified against the hash recorded when
 // it was emitted.
-import * as fs from "node:fs";
-import * as path from "node:path";
+import { loadValidated0600Json, saveValidated0600Json } from "./validated-store.js";
 export class EmitStateIntegrityError extends Error {
     constructor(message) {
         super(message);
@@ -16,32 +15,11 @@ export class EmitStateIntegrityError extends Error {
 }
 /** Load + validate. Missing file → {} (no recorded hashes; executor will block, which is safe). */
 export function loadEmitState(file) {
-    let st;
-    try {
-        st = fs.lstatSync(file);
-    }
-    catch (e) {
-        if (e?.code === "ENOENT")
-            return {};
-        throw e;
-    }
-    if (!st.isFile())
-        throw new EmitStateIntegrityError(`emit-state ${file} is not a regular file`);
-    if ((st.mode & 0o777) !== 0o600)
-        throw new EmitStateIntegrityError(`emit-state ${file} mode is ${(st.mode & 0o777).toString(8)}, expected 600`);
-    if (typeof process.getuid === "function" && st.uid !== process.getuid()) {
-        throw new EmitStateIntegrityError(`emit-state ${file} owned by uid ${st.uid}, expected ${process.getuid()}`);
-    }
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    return loadValidated0600Json(file, "emit-state", EmitStateIntegrityError) ?? {};
 }
 /** Atomic write with mode 0600. */
 export function saveEmitState(file, state) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const tmp = `${file}.tmp.${process.pid}`;
-    fs.writeFileSync(tmp, JSON.stringify(state, null, 2), { mode: 0o600 });
-    fs.chmodSync(tmp, 0o600);
-    fs.renameSync(tmp, file);
-    fs.chmodSync(file, 0o600);
+    saveValidated0600Json(file, state);
 }
 /** Drop entries older than maxAgeDays relative to `now` (ISO). */
 export function pruneEmitState(state, maxAgeDays, now) {

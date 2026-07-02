@@ -8,6 +8,7 @@
 import { execFileSync } from "node:child_process";
 import { planHash } from "./canonical.js";
 import { loadEmitState } from "./emit-state.js";
+import { runRotationPlan } from "./rotation-executor.js";
 function defaultExec(timeoutMs) {
     return (cmd) => {
         try {
@@ -65,6 +66,27 @@ export async function runSecurityWindow(deps) {
             continue;
         }
         const remediation = (item.plan?.remediation ?? {});
+        // Credential-rotation plans (WS-0.7): typed steps run by the rotation executor
+        // (store → deploy → verify → revoke-confirm), same plan-hash gate as exec plans.
+        if (remediation.rotation && typeof remediation.rotation === "object") {
+            if (!deps.rotation) {
+                summary.blocked++;
+                const detail = "rotation deps unavailable in this runner — cannot execute rotation plan";
+                summary.results.push({ name: item.resource_name, outcome: "blocked", detail });
+                await deps.postOutcome(item.id, { outcome: "blocked", detail }).catch(() => { });
+                continue;
+            }
+            const r = await runRotationPlan(remediation.rotation, deps.rotation);
+            if (r.outcome === "done")
+                summary.applied++;
+            else if (r.outcome === "failed")
+                summary.failed++;
+            else
+                summary.blocked++;
+            summary.results.push({ name: item.resource_name, outcome: r.outcome, detail: r.detail });
+            await deps.postOutcome(item.id, { outcome: r.outcome, detail: r.detail }).catch(() => { });
+            continue;
+        }
         // manual remediations are tracked, never executed.
         if (Array.isArray(remediation.manual) || !Array.isArray(remediation.exec)) {
             summary.blocked++;

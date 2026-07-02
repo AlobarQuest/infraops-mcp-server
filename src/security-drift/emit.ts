@@ -57,7 +57,9 @@ export function toEscalation(cf: ClassifiedFinding): SecurityEscalation {
     rollback:
       "exec" in classification.remediation
         ? "Prior file mode/owner recorded in the security-drift rollback log; restore from there."
-        : "n/a — manual remediation (human applies and verifies).",
+        : "rotation" in classification.remediation
+          ? "Old credential value stays quarantined in BWS until it provably probes dead (401); to roll back before revoke, re-deploy the quarantined value to the mapped consumers. After revoke there is no rollback — mint a fresh credential."
+          : "n/a — manual remediation (human applies and verifies).",
     source: "security",
     blind_spots: BLIND_SPOTS,
   };

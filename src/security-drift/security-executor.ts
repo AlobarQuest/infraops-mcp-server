@@ -10,6 +10,8 @@ import { execFileSync } from "node:child_process";
 import type { ApprovedItem, OutcomeBody } from "../change-manager/api-client.js";
 import { planHash } from "./canonical.js";
 import { loadEmitState, type EmitState } from "./emit-state.js";
+import type { RotationPlanSpec } from "./cred-rotation.js";
+import { runRotationPlan, type RotationDeps } from "./rotation-executor.js";
 
 export interface ExecResult {
   ok: boolean;
@@ -26,6 +28,8 @@ export interface SecurityWindowDeps {
   maxChanges: number;
   /** injectable for tests; defaults to execFileSync (shell:false) */
   exec?: (cmd: string[]) => ExecResult;
+  /** deps for `{ rotation }` remediations (WS-0.7). Absent ⇒ rotation items are blocked. */
+  rotation?: RotationDeps;
   timeoutMs?: number;
 }
 
@@ -52,6 +56,7 @@ function defaultExec(timeoutMs: number) {
 interface Remediation {
   exec?: string[][];
   manual?: string[];
+  rotation?: RotationPlanSpec;
 }
 
 export async function runSecurityWindow(deps: SecurityWindowDeps): Promise<SecurityWindowSummary> {
@@ -102,6 +107,25 @@ export async function runSecurityWindow(deps: SecurityWindowDeps): Promise<Secur
     }
 
     const remediation = (item.plan?.remediation ?? {}) as Remediation;
+
+    // Credential-rotation plans (WS-0.7): typed steps run by the rotation executor
+    // (store → deploy → verify → revoke-confirm), same plan-hash gate as exec plans.
+    if (remediation.rotation && typeof remediation.rotation === "object") {
+      if (!deps.rotation) {
+        summary.blocked++;
+        const detail = "rotation deps unavailable in this runner — cannot execute rotation plan";
+        summary.results.push({ name: item.resource_name, outcome: "blocked", detail });
+        await deps.postOutcome(item.id, { outcome: "blocked", detail }).catch(() => {});
+        continue;
+      }
+      const r = await runRotationPlan(remediation.rotation, deps.rotation);
+      if (r.outcome === "done") summary.applied++;
+      else if (r.outcome === "failed") summary.failed++;
+      else summary.blocked++;
+      summary.results.push({ name: item.resource_name, outcome: r.outcome, detail: r.detail });
+      await deps.postOutcome(item.id, { outcome: r.outcome, detail: r.detail }).catch(() => {});
+      continue;
+    }
 
     // manual remediations are tracked, never executed.
     if (Array.isArray(remediation.manual) || !Array.isArray(remediation.exec)) {
