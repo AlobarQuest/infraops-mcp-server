@@ -1,0 +1,30 @@
+# code-standards vendored .prettierignore. Edit upstream and `code-standards sync`.
+#
+# Prettier must NOT format two kinds of file:
+#   1. generated / build output — it isn't source.
+#   2. files code-standards vendors verbatim — reformatting them would drift them
+#      from their upstream template and trip `code-standards sync`.
+# Everything else (your real source) is yours to format: `prettier --write .`.
+
+# Generated / build output
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Python tooling artifacts (a TS repo may still carry these)
+.pytest_cache/
+__pycache__/
+
+# code-standards-vendored files (owned upstream; formatted there, not here)
+.github/workflows/quality.yml
+.pre-commit-config.yaml
+eslint.config.mjs
+.prettierrc
+tsconfig.base.json
+
+# portfolio-toolkit-managed (owned by project-standards, not code-standards) —
+# the backlog skill / `portfolio add` rewrite this; formatting it just starts a
+# tug-of-war the next portfolio write undoes.
+PROJECT.md
