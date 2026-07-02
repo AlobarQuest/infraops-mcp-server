@@ -51,7 +51,7 @@ describe("the repo's own .cred-consumers.toml", () => {
     expect(kindOf("openrouter-generic")).toBe("rotation");
     expect(kindOf("github-classic-aihelper")).toBe("rotation");
     expect(kindOf("github-classic-lifeops")).toBe("rotation");
-    expect(kindOf("github-finegrained-mirror")).toBe("manual"); // open mirror.py precondition
+    expect(kindOf("github-finegrained-mirror")).toBe("rotation"); // mirror.py leak fixed+deployed → precondition cleared
     expect(kindOf("openai-project")).toBe("manual"); // no BWS copy to probe
   });
 });
