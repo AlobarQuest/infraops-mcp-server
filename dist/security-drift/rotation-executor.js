@@ -58,7 +58,7 @@ export async function runRotationPlan(plan, deps) {
                 return finish("blocked", "reissue plan missing staging/quarantine coordinates");
             }
             const staged = scrub.add(await deps.keychain.read(plan.staging.service, plan.staging.account));
-            const quarantine = await deps.bws.findByName(plan.quarantineName);
+            const quarantine = await deps.bws.findByName(plan.quarantineName, plan.bwsProjectId);
             if (quarantine) {
                 quarantineUuid = quarantine.id;
                 scrub.add(quarantine.value);
@@ -144,8 +144,7 @@ export async function runRotationPlan(plan, deps) {
         if (plan.staging) {
             await deps.keychain.remove(plan.staging.service, plan.staging.account).catch(() => { });
         }
-        await deps.state.resolveExposures(plan.credId, plan.exposureIds, `revoke confirmed dead (401)`);
-        await deps.state.recordRotated(plan.credId);
+        await deps.state.completeRotation(plan.credId, plan.exposureIds, "revoke confirmed dead (401)");
         return finish("done", `rotation complete for ${plan.credId} — exposure(s) ${plan.exposureIds.join(", ") || "n/a"} closed`);
     }
     catch (e) {
@@ -228,9 +227,10 @@ export function defaultRotationDeps(io) {
                     return null;
                 }
             },
-            async findByName(name) {
-                const out = execCapture(["bws", "secret", "list", "--output", "json"]);
-                const all = JSON.parse(out);
+            async findByName(name, projectId) {
+                // scope to the project when known — an unscoped list fetches every secret's value
+                const cmd = ["bws", "secret", "list", ...(projectId ? [projectId] : []), "--output", "json"];
+                const all = JSON.parse(execCapture(cmd));
                 const hit = all.find((s) => s.key === name);
                 return hit ? { id: hit.id, value: hit.value } : null;
             },
@@ -271,7 +271,8 @@ export function defaultRotationDeps(io) {
                 await io.coolifyPatch(envPath(resourceType, uuid), { key, value }, instance);
             },
             async redeploy(instance, uuid) {
-                await io.coolifyGet(`/deploy?uuid=${uuid}`, instance);
+                // canonical trigger form, same as change-manager/tools.ts
+                await io.coolifyPost(`/deploy?uuid=${uuid}`, undefined, instance);
             },
         },
         async ghSecretSet(repo, name, value) {
@@ -300,14 +301,10 @@ export function defaultRotationDeps(io) {
             }
         },
         state: {
-            async resolveExposures(credId, exposureIds, detail) {
+            async completeRotation(credId, exposureIds, detail) {
                 const s = io.loadState();
                 for (const id of exposureIds)
                     s.resolvedExposures[`${credId}:${id}`] = { ts: io.now, detail };
-                io.saveState(s);
-            },
-            async recordRotated(credId) {
-                const s = io.loadState();
                 s.lastRotated[credId] = io.now;
                 io.saveState(s);
             },

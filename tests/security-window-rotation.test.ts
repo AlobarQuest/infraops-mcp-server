@@ -68,7 +68,7 @@ function rotationDeps(oldStatus: number): { deps: RotationDeps; removed: string[
       ghSecretSet: async () => {},
       probe: async () => oldStatus,
       ghKeeperOk: async () => true,
-      state: { resolveExposures: async () => {}, recordRotated: async () => {} },
+      state: { completeRotation: async () => {} },
     },
   };
 }

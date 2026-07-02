@@ -11,7 +11,7 @@ import { securityPaths } from "../security-drift/paths.js";
 import { sendAlertEmail } from "../security-drift/notify.js";
 import { defaultRotationDeps } from "../security-drift/rotation-executor.js";
 import { loadRotationState, saveRotationState } from "../security-drift/cred-rotation.js";
-import { coolifyGet, coolifyPatch } from "../services/coolify-client.js";
+import { coolifyGet, coolifyPatch, coolifyPost } from "../services/coolify-client.js";
 export function parseArgs(argv) {
     const args = {};
     if (argv[0] && !argv[0].startsWith("--"))
@@ -84,6 +84,7 @@ async function doRunSecurityWindow(reportDir, now) {
         rotation: defaultRotationDeps({
             coolifyGet: (pth, instance) => coolifyGet(pth, undefined, (instance ?? "prod")),
             coolifyPatch: (pth, body, instance) => coolifyPatch(pth, body, (instance ?? "prod")),
+            coolifyPost: (pth, body, instance) => coolifyPost(pth, body, (instance ?? "prod")),
             loadState: () => loadRotationState(p.credRotationStateFile),
             saveState: (s) => saveRotationState(p.credRotationStateFile, s),
             now,

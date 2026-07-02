@@ -98,10 +98,8 @@ function fakeDeps(s: FakeState): RotationDeps {
     probe: async (_kind, value) => s.probes[value] ?? 500,
     ghKeeperOk: async () => s.keeperOk,
     state: {
-      resolveExposures: async (credId, ids) => {
+      completeRotation: async (credId, ids) => {
         s.resolved.push(...ids.map((i) => `${credId}:${i}`));
-      },
-      recordRotated: async (credId) => {
         s.rotated.push(credId);
       },
     },

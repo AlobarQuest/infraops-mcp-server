@@ -64,7 +64,6 @@ export function parseCredConsumers(text) {
     const creds = [];
     let cred = null;
     let sub = null;
-    let subKind = null;
     const lines = text.split("\n");
     for (let i = 0; i < lines.length; i++) {
         const n = i + 1;
@@ -75,7 +74,6 @@ export function parseCredConsumers(text) {
             cred = { id: "", class: "", rotation_preconditions: [], consumers: [], exposures: [] };
             creds.push(cred);
             sub = null;
-            subKind = null;
             continue;
         }
         if (line === "[[credential.consumer]]" || line === "[[credential.exposure]]") {
@@ -84,12 +82,10 @@ export function parseCredConsumers(text) {
             if (line === "[[credential.consumer]]") {
                 sub = { kind: "" };
                 cred.consumers.push(sub);
-                subKind = "consumer";
             }
             else {
                 sub = { id: "", date: "" };
                 cred.exposures.push(sub);
-                subKind = "exposure";
             }
             continue;
         }
@@ -115,11 +111,11 @@ export function parseCredConsumers(text) {
         else {
             throw new CredConsumersParseError(`line ${n}: top-level key ${key} outside any table`);
         }
-        void subKind;
     }
     for (const c of creds) {
-        if (!c.id || !c.class)
-            throw new CredConsumersParseError(`credential missing id/class (id=${c.id || "?"})`);
+        if (typeof c.id !== "string" || typeof c.class !== "string" || !c.id || !c.class) {
+            throw new CredConsumersParseError(`credential missing string id/class (id=${String(c.id) || "?"})`);
+        }
         for (const consumer of c.consumers) {
             if (!consumer.kind)
                 throw new CredConsumersParseError(`credential ${c.id}: consumer missing kind`);

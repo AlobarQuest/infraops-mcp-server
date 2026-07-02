@@ -7,8 +7,8 @@ export interface RotationDeps {
     bws: {
         /** value of a secret by UUID; null when absent/unreadable */
         getValue(uuid: string): Promise<string | null>;
-        /** find a secret by exact key name; null when absent */
-        findByName(name: string): Promise<{
+        /** find a secret by exact key name (scoped to a project when given); null when absent */
+        findByName(name: string, projectId?: string): Promise<{
             id: string;
             value: string;
         } | null>;
@@ -32,14 +32,15 @@ export interface RotationDeps {
     /** the standing gh CLI keeper still authenticates (keeper-verification discipline) */
     ghKeeperOk(): Promise<boolean>;
     state: {
-        resolveExposures(credId: string, exposureIds: string[], detail: string): Promise<void>;
-        recordRotated(credId: string): Promise<void>;
+        /** one read-modify-write: mark exposures resolved AND record lastRotated */
+        completeRotation(credId: string, exposureIds: string[], detail: string): Promise<void>;
     };
 }
 export declare function runRotationPlan(plan: RotationPlanSpec, deps: RotationDeps): Promise<RotationOutcome>;
 export declare function defaultRotationDeps(io: {
     coolifyGet: <T>(path: string, instance?: string) => Promise<T>;
     coolifyPatch: <T>(path: string, body: unknown, instance?: string) => Promise<T>;
+    coolifyPost: <T>(path: string, body: unknown | undefined, instance?: string) => Promise<T>;
     loadState: () => import("./cred-rotation.js").RotationState;
     saveState: (s: import("./cred-rotation.js").RotationState) => void;
     now: string;
