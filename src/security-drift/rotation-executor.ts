@@ -247,12 +247,13 @@ async function deployConsumer(
 
 // ── Default (live) deps — child processes + fetch; injected fakes in tests ────────
 
-function execCapture(cmd: string[], opts: { input?: string; timeoutMs?: number } = {}): string {
+function execCapture(cmd: string[], opts: { input?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv } = {}): string {
   return execFileSync(cmd[0], cmd.slice(1), {
     shell: false,
     encoding: "utf8",
     timeout: opts.timeoutMs ?? 30_000,
     input: opts.input,
+    env: opts.env,
     stdio: ["pipe", "pipe", "pipe"],
   });
 }
@@ -270,14 +271,22 @@ export function defaultRotationDeps(io: {
   loadState: () => import("./cred-rotation.js").RotationState;
   saveState: (s: import("./cred-rotation.js").RotationState) => void;
   now: string;
+  /** Dedicated cred-rotation BWS access token (read+write). Used ONLY for the bws
+   *  child processes below — NOT the broad ambient BWS_ACCESS_TOKEN the rest of the
+   *  pipeline reads with. Isolates secret create/edit/delete to this one workload. */
+  bwsToken: string;
 }): RotationDeps {
   const envPath = (resourceType: string, uuid: string) =>
     `/${resourceType === "service" ? "services" : "applications"}/${uuid}/envs`;
+  // Every bws call runs with the rotation token in its own env, overriding whatever
+  // broad token the ambient process carries.
+  const bwsEnv: NodeJS.ProcessEnv = { ...process.env, BWS_ACCESS_TOKEN: io.bwsToken };
+  const bwsExec = (cmd: string[]) => execCapture(cmd, { env: bwsEnv });
   return {
     bws: {
       async getValue(uuid) {
         try {
-          const out = execCapture(["bws", "secret", "get", uuid, "--output", "json"]);
+          const out = bwsExec(["bws", "secret", "get", uuid, "--output", "json"]);
           return (JSON.parse(out) as { value?: string }).value ?? null;
         } catch {
           return null;
@@ -286,19 +295,19 @@ export function defaultRotationDeps(io: {
       async findByName(name, projectId) {
         // scope to the project when known — an unscoped list fetches every secret's value
         const cmd = ["bws", "secret", "list", ...(projectId ? [projectId] : []), "--output", "json"];
-        const all = JSON.parse(execCapture(cmd)) as Array<{ id: string; key: string; value: string }>;
+        const all = JSON.parse(bwsExec(cmd)) as Array<{ id: string; key: string; value: string }>;
         const hit = all.find((s) => s.key === name);
         return hit ? { id: hit.id, value: hit.value } : null;
       },
       async create(name, value, projectId) {
-        const out = execCapture(["bws", "secret", "create", name, value, projectId, "--output", "json"]);
+        const out = bwsExec(["bws", "secret", "create", name, value, projectId, "--output", "json"]);
         return (JSON.parse(out) as { id: string }).id;
       },
       async editValue(uuid, value) {
-        execCapture(["bws", "secret", "edit", uuid, "--value", value]);
+        bwsExec(["bws", "secret", "edit", uuid, "--value", value]);
       },
       async remove(uuid) {
-        execCapture(["bws", "secret", "delete", uuid]);
+        bwsExec(["bws", "secret", "delete", uuid]);
       },
     },
     keychain: {
