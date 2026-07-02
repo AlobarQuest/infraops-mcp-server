@@ -2,7 +2,25 @@ import type { CoolifyInstance } from "../services/coolify-client.js";
 export interface ToolCtx {
     instance: CoolifyInstance;
     rollback: Record<string, unknown>;
+    /** Epoch ms when the domains write happened — scopes the post-verify deployment poll to THIS change. */
+    domainsChangedAt?: number;
 }
+export type DeployVerdict = "success" | "failed" | "pending" | "unknown";
+/**
+ * Verdict on the newest deployment triggered at/after `sinceMs` for an app.
+ * `unknown` = no such deployment found OR a read error — the caller treats it as
+ * inconclusive (never a revert trigger on its own). Endpoint is the non-obvious
+ * `/deployments/applications/{uuid}` (see CLAUDE.md), returning `{ deployments: [] }`.
+ */
+export declare function deploymentSucceeded(uuid: string, sinceMs: number, instance: CoolifyInstance): Promise<DeployVerdict>;
+/**
+ * True iff a raw TLS handshake to `<domain>:443` completes with a chain Node's trust
+ * store accepts (`socket.authorized`). This is the live-cert proof the config check
+ * cannot give. TLS verification stays ON — a self-signed/expired/missing cert → false.
+ */
+export declare function httpsLive(domain: string, timeoutMs?: number): Promise<boolean>;
+/** First domain string on an app (for the live-cert probe). */
+export declare function firstDomain(app: Record<string, unknown>): string;
 /** JSON-schema tool definitions handed to the model. Read tools + the two write tools + control tools. */
 export declare const TOOLS: readonly [{
     readonly name: "get_application";

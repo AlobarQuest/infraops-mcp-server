@@ -1,6 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { coolifyGet } from "../services/coolify-client.js";
-import { TOOLS, runTool, httpsConformant, revertRollback } from "./tools.js";
+import { TOOLS, runTool, httpsConformant, revertRollback, deploymentSucceeded, httpsLive, firstDomain, } from "./tools.js";
+const defaultPostVerifyDeps = {
+    deploymentSucceeded, httpsLive, pollAttempts: 6, pollDelayMs: 10_000,
+    sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+};
 /** HTTPS-enable remediation rule keys (the one change-type we live pre/post-verify). */
 const HTTPS_RULE_KEYS = new Set(["coolify.force_https"]);
 /** Precise match: is this an HTTPS-enable remediation? */
@@ -25,26 +29,54 @@ async function preValidateConformant(item, ctx) {
  * Returns null to keep 'done'. A post-verify *read* error is inconclusive → keep 'done'
  * (don't revert a possibly-good change on a transient read failure).
  *
- * SCOPE: for HTTPS this confirms the domain *config* is all-https — the same thing the
- * drift standard (#571 `fqdn not_starts_with http://`) asserts. It does NOT confirm the
- * async redeploy/cert regeneration actually succeeded: `set_application_domains` sets the
- * config field synchronously, so this check passes even if `redeploy_application` errored.
- * Deterministic deploy-success / live-cert verification is BACKLOG.md #5.
+ * SCOPE (BACKLOG #5 — CLOSED): the HTTPS path now verifies three layers beyond the
+ * config field: (B) a `redeploy_application` call ran without error, (A) the deployment
+ * it triggered reached success (bounded poll), and the live TLS cert validates. A failed
+ * or never-run redeploy, a failed deployment, or an invalid cert now yields `failed` +
+ * revert instead of `done`. A *read*-side inconclusive (deployment status unknown/pending
+ * on a clean redeploy, or a transient fetch error) conservatively keeps `done` — we never
+ * revert a possibly-good change on a read failure.
  */
-async function postVerifyOrRevert(item, ctx, calls) {
+export async function postVerifyOrRevert(item, ctx, calls, deps = defaultPostVerifyDeps) {
     const checksDomains = ctx.rollback.domains !== undefined;
     const checksHealth = ctx.rollback.health_check_enabled !== undefined;
     if (!checksDomains && !checksHealth)
         return null;
+    const fail = async (detail) => {
+        await revertRollback(item.resource_uuid, ctx.rollback, ctx.instance).catch(() => { });
+        return { outcome: "failed", detail: `post-verify failed: ${detail}; reverted via rollback`, rollback: ctx.rollback, tool_calls: { calls } };
+    };
     try {
         const app = await coolifyGet(`/applications/${item.resource_uuid}`, undefined, ctx.instance);
-        if (checksDomains && (!app || !httpsConformant(app))) {
-            await revertRollback(item.resource_uuid, ctx.rollback, ctx.instance).catch(() => { });
-            return { outcome: "failed", detail: "post-verify failed: domains not https after change; reverted via rollback", rollback: ctx.rollback, tool_calls: { calls } };
+        if (checksDomains) {
+            // 1. config gate (unchanged): the domain field must actually be https now.
+            if (!app || !httpsConformant(app))
+                return await fail("domains not https after change");
+            // 2. (B) deterministic: a redeploy must have run without error — the async deploy is
+            //    what regenerates the Traefik route + Let's Encrypt cert. Never-run or errored
+            //    (e.g. the booking-preview redeploy 404) is a half-applied state, not `done`.
+            const redeploy = calls.find((c) => c.name === "redeploy_application");
+            if (!redeploy || redeploy.is_error)
+                return await fail("redeploy did not run or errored after domain change");
+            // 3. (A) confirm the deployment reached success, bounded poll; then probe the live cert.
+            const since = typeof ctx.domainsChangedAt === "number" ? ctx.domainsChangedAt : 0;
+            let verdict = await deps.deploymentSucceeded(item.resource_uuid, since, ctx.instance);
+            for (let i = 1; i < deps.pollAttempts && verdict === "pending"; i++) {
+                await deps.sleep(deps.pollDelayMs);
+                verdict = await deps.deploymentSucceeded(item.resource_uuid, since, ctx.instance);
+            }
+            if (verdict === "failed")
+                return await fail("deploy failed after domain change");
+            if (verdict === "success") {
+                const domain = firstDomain(app);
+                const live = domain ? await deps.httpsLive(domain) : true;
+                if (!live)
+                    return await fail("live cert not valid after deploy");
+            }
+            // verdict pending/unknown on a clean redeploy → inconclusive; keep `done` (conservative).
         }
         if (checksHealth && (!app || app.health_check_enabled !== true)) {
-            await revertRollback(item.resource_uuid, ctx.rollback, ctx.instance).catch(() => { });
-            return { outcome: "failed", detail: "post-verify failed: health check not enabled after change; reverted via rollback", rollback: ctx.rollback, tool_calls: { calls } };
+            return await fail("health check not enabled after change");
         }
     }
     catch {
@@ -124,7 +156,7 @@ export async function runChangeAgent(item, deps = {}) {
                     result = e instanceof Error ? e.message : String(e);
                     isError = true;
                 }
-                calls.push({ name: tu.name, input: tu.input, result });
+                calls.push({ name: tu.name, input: tu.input, result, is_error: isError });
                 toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: result, is_error: isError });
             }
             messages.push({ role: "user", content: toolResults });

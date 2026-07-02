@@ -442,9 +442,17 @@ audit won't catch it either: both verify config, not live cert health.
 
 ### Acceptance criteria
 
-- [ ] A failed/never-run redeploy on an approved HTTPS item results in `failed`
-      (with revert), not `done`.
-- [ ] (If A/C) the live cert is actually validated, not just the domain config field.
+- [x] A failed/never-run redeploy on an approved HTTPS item results in `failed`
+      (with revert), not `done`. — DONE 2026-07-02 (options A+B): post-verify requires a
+      non-errored `redeploy_application` call, then bound-polls `deploymentSucceeded`
+      (`GET /deployments/applications/{uuid}`) — a `failed` deployment reverts.
+- [x] (If A/C) the live cert is actually validated, not just the domain config field.
+      — DONE via `httpsLive` (raw TLS handshake to :443, `socket.authorized`); invalid
+      cert on a succeeded deploy reverts. `feat/postverify-deploy-cert`, +9 tests.
+
+**Remaining (option C, separate item):** re-point audit rule #571 at live TLS so the
+next-day audit (not just the executor) verifies cert health. Also the `reset_labels`
+latent-404 in `src/tools/control.ts` (noted above) is still open.
 
 ### Notes
 

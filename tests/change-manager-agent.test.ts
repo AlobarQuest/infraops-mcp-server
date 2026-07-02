@@ -108,20 +108,26 @@ describe("runChangeAgent", () => {
     expect(out.detail).toMatch(/without report/i);
   });
 
-  it("handles two tool_use blocks in one turn (write + report_done)", async () => {
+  it("handles two tool_use blocks in one turn (set_domains + redeploy), then done", async () => {
+    // Two write blocks in one turn (the multi-block path under test). The mocked
+    // coolifyGet returns the app object for /deployments too (no `.deployments`),
+    // so post-verify's deployment poll is `unknown` → conservatively keeps `done`
+    // without a live cert probe. A domain change now REQUIRES a redeploy call
+    // (BACKLOG #5): set-domains-then-done with no redeploy is a `failed`, by design.
     let domains = "http://x.com";
     coolifyGet.mockImplementation(async () => ({ uuid: "u1", domains, fqdn: domains }));
     coolifyPatch.mockImplementation(async (_p: string, body: any) => { if (body?.domains) domains = body.domains; return {}; });
+    coolifyPost.mockResolvedValue({});
     const twoBlockTurn = {
       stop_reason: "tool_use",
       content: [
         { type: "tool_use", id: "a", name: "set_application_domains", input: { uuid: "u1", domains: "https://x.com" } },
-        { type: "tool_use", id: "b", name: "report_done", input: { summary: "done in one turn" } },
+        { type: "tool_use", id: "b", name: "redeploy_application", input: { uuid: "u1" } },
       ],
     };
-    const client = fakeAnthropic([twoBlockTurn]);
+    const client = fakeAnthropic([twoBlockTurn, toolTurn("report_done", { summary: "done" })]);
     const out = await runChangeAgent(item(), { client, maxSteps: 10 });
     expect(out.outcome).toBe("done");
-    expect(out.tool_calls.calls.map((c: any) => c.name)).toEqual(["set_application_domains", "report_done"]);
+    expect(out.tool_calls.calls.map((c: any) => c.name)).toEqual(["set_application_domains", "redeploy_application", "report_done"]);
   });
 });
