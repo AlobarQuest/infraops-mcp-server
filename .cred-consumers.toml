@@ -98,7 +98,10 @@ consumers_verified = "2026-07-02"
 verified_by = "scripts/cred-consumer-sweep.py"
 disposition = "reissue-least-privilege"
 replacement_scope = "fine-grained: Contents:read + Metadata on owned repos (mirror is read-from-GitHub only)"
-rotation_preconditions = ["Fix github-to-bitbucket-mirror mirror.py credential logging (tokens in git URLs + traced commands) BEFORE deploying a replacement"]
+# Precondition CLEARED 2026-07-02: the mirror.py log-leak vector was fixed (GIT_ASKPASS
+# rewrite, PR #1) AND verified live in the deployed container — 48h of logs show every
+# git URL redacted (https://***@…) and zero token shapes, so a replacement PAT will not
+# be re-leaked. Executor-assisted rotation is now unblocked.
 
   [[credential.consumer]]
   kind = "bws-secret"
