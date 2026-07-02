@@ -1,7 +1,68 @@
+import * as tls from "node:tls";
 import { coolifyGet, coolifyPatch, coolifyPost } from "../services/coolify-client.js";
 import type { CoolifyInstance } from "../services/coolify-client.js";
 
-export interface ToolCtx { instance: CoolifyInstance; rollback: Record<string, unknown>; }
+export interface ToolCtx {
+  instance: CoolifyInstance;
+  rollback: Record<string, unknown>;
+  /** Epoch ms when the domains write happened — scopes the post-verify deployment poll to THIS change. */
+  domainsChangedAt?: number;
+}
+
+export type DeployVerdict = "success" | "failed" | "pending" | "unknown";
+
+/**
+ * Verdict on the newest deployment triggered at/after `sinceMs` for an app.
+ * `unknown` = no such deployment found OR a read error — the caller treats it as
+ * inconclusive (never a revert trigger on its own). Endpoint is the non-obvious
+ * `/deployments/applications/{uuid}` (see CLAUDE.md), returning `{ deployments: [] }`.
+ */
+export async function deploymentSucceeded(uuid: string, sinceMs: number, instance: CoolifyInstance): Promise<DeployVerdict> {
+  try {
+    const res = await coolifyGet<{ deployments?: Array<Record<string, unknown>> }>(`/deployments/applications/${uuid}`, undefined, instance);
+    const list = Array.isArray(res?.deployments) ? res.deployments : [];
+    const newest = list
+      .map((d) => ({
+        status: String(d.status ?? "").toLowerCase(),
+        at: Date.parse(String(d.created_at ?? d.started_at ?? d.finished_at ?? "")) || 0,
+      }))
+      .filter((d) => d.at >= sinceMs)
+      .sort((a, b) => b.at - a.at)[0];
+    if (!newest) return "unknown";
+    if (["finished", "success", "successful"].includes(newest.status)) return "success";
+    if (["failed", "error", "cancelled", "canceled"].includes(newest.status)) return "failed";
+    return "pending"; // queued / in_progress / running
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * True iff a raw TLS handshake to `<domain>:443` completes with a chain Node's trust
+ * store accepts (`socket.authorized`). This is the live-cert proof the config check
+ * cannot give. TLS verification stays ON — a self-signed/expired/missing cert → false.
+ */
+export async function httpsLive(domain: string, timeoutMs = 8000): Promise<boolean> {
+  const host = domain.replace(/^https?:\/\//, "").replace(/[/:].*$/, "").trim();
+  if (!host) return false;
+  return new Promise<boolean>((resolve) => {
+    let done = false;
+    const finish = (v: boolean) => { if (!done) { done = true; resolve(v); } };
+    const socket = tls.connect({ host, port: 443, servername: host, timeout: timeoutMs }, () => {
+      const ok = socket.authorized;
+      socket.end();
+      finish(ok);
+    });
+    socket.on("error", () => finish(false));
+    socket.on("timeout", () => { socket.destroy(); finish(false); });
+  });
+}
+
+/** First domain string on an app (for the live-cert probe). */
+export function firstDomain(app: Record<string, unknown>): string {
+  const raw = String(app.domains ?? app.fqdn ?? "");
+  return raw.split(",").map((s) => s.trim()).filter(Boolean)[0] ?? "";
+}
 
 /** JSON-schema tool definitions handed to the model. Read tools + the two write tools + control tools. */
 export const TOOLS = [
@@ -42,6 +103,7 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
       }
       const app = await coolifyGet<Record<string, unknown>>(`/applications/${uuid}`, undefined, ctx.instance);
       ctx.rollback.domains = app.domains ?? app.fqdn ?? null;  // capture original
+      ctx.domainsChangedAt = Date.now();  // scope the post-verify deployment poll to this change
       await coolifyPatch(`/applications/${uuid}`, { domains, force_domain_override: true }, ctx.instance);
       return `domains updated to ${domains}`;
     }
