@@ -21,7 +21,7 @@ import type { Finding } from "./scan-parser.js";
 import type { Classification, Remediation } from "./taxonomy.js";
 import type { ConsumerSpec, CredentialSpec } from "./cred-consumers.js";
 
-export type ProviderProbe = "github" | "openrouter" | "openai";
+export type ProviderProbe = "github" | "openrouter" | "openai" | "bitbucket";
 
 interface ClassPolicy {
   maxAgeDays: number;
@@ -53,6 +53,9 @@ export const CLASS_POLICY: Record<string, ClassPolicy> = {
   },
   "openrouter-key": { maxAgeDays: 365, probe: "openrouter", executor: true, landmines: [] },
   "openai-key": { maxAgeDays: 365, probe: "openai", executor: true, landmines: [] },
+  // Atlassian API token (Bitbucket): Basic auth (email:token), not Bearer. The probe
+  // needs probe_email + probe_workspace on the registry entry (below).
+  "atlassian-api-token": { maxAgeDays: 365, probe: "bitbucket", executor: true, landmines: [] },
   "brain-mcp-key": {
     maxAgeDays: 365,
     executor: false,
@@ -166,6 +169,9 @@ export interface RotationPlanSpec {
   retireBwsUuids: string[];
   consumers: ConsumerSpec[];
   providerProbe: ProviderProbe;
+  /** Basic-auth probe context (bitbucket): the account email and workspace. Non-secret. */
+  probeEmail?: string;
+  probeWorkspace?: string;
   exposureIds: string[];
   /** Devon's console steps (create/revoke are ALWAYS human) — shown in change-manager */
   manualSteps: string[];
@@ -239,6 +245,11 @@ function rotationClassification(spec: CredentialSpec, state: RotationState): Cla
   for (const c of unsupported) blockers.push(`consumer kind '${c.kind}' not supported by the executor`);
   if (!spec.bws_uuid) blockers.push("no BWS copy of the old value — executor cannot confirm provider revoke (401 probe)");
   if (policy && !policy.probe) blockers.push(`class ${spec.class} has no provider probe`);
+  // The bitbucket probe is Basic auth (email:token) against /repositories/{workspace};
+  // both are non-secret and required, else verify-before-revoke can't run.
+  if (policy?.probe === "bitbucket" && (!spec.probe_email || !spec.probe_workspace)) {
+    blockers.push("bitbucket probe requires probe_email + probe_workspace on the registry entry");
+  }
 
   if (blockers.length) return manualClassification(spec, blockers, steps);
 
@@ -252,6 +263,8 @@ function rotationClassification(spec: CredentialSpec, state: RotationState): Cla
     retireBwsUuids: reissue ? [] : [spec.bws_uuid!],
     consumers: spec.consumers,
     providerProbe: policy!.probe!,
+    ...(spec.probe_email ? { probeEmail: spec.probe_email } : {}),
+    ...(spec.probe_workspace ? { probeWorkspace: spec.probe_workspace } : {}),
     exposureIds: openExposures,
     manualSteps: [...policy!.landmines, ...steps],
     ...(reissue
