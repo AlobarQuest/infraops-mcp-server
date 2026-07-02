@@ -44,5 +44,9 @@ export declare function defaultRotationDeps(io: {
     loadState: () => import("./cred-rotation.js").RotationState;
     saveState: (s: import("./cred-rotation.js").RotationState) => void;
     now: string;
+    /** Dedicated cred-rotation BWS access token (read+write). Used ONLY for the bws
+     *  child processes below — NOT the broad ambient BWS_ACCESS_TOKEN the rest of the
+     *  pipeline reads with. Isolates secret create/edit/delete to this one workload. */
+    bwsToken: string;
 }): RotationDeps;
 //# sourceMappingURL=rotation-executor.d.ts.map

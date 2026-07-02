@@ -206,6 +206,7 @@ function execCapture(cmd, opts = {}) {
         encoding: "utf8",
         timeout: opts.timeoutMs ?? 30_000,
         input: opts.input,
+        env: opts.env,
         stdio: ["pipe", "pipe", "pipe"],
     });
 }
@@ -216,11 +217,15 @@ const PROBE_URLS = {
 };
 export function defaultRotationDeps(io) {
     const envPath = (resourceType, uuid) => `/${resourceType === "service" ? "services" : "applications"}/${uuid}/envs`;
+    // Every bws call runs with the rotation token in its own env, overriding whatever
+    // broad token the ambient process carries.
+    const bwsEnv = { ...process.env, BWS_ACCESS_TOKEN: io.bwsToken };
+    const bwsExec = (cmd) => execCapture(cmd, { env: bwsEnv });
     return {
         bws: {
             async getValue(uuid) {
                 try {
-                    const out = execCapture(["bws", "secret", "get", uuid, "--output", "json"]);
+                    const out = bwsExec(["bws", "secret", "get", uuid, "--output", "json"]);
                     return JSON.parse(out).value ?? null;
                 }
                 catch {
@@ -230,19 +235,19 @@ export function defaultRotationDeps(io) {
             async findByName(name, projectId) {
                 // scope to the project when known — an unscoped list fetches every secret's value
                 const cmd = ["bws", "secret", "list", ...(projectId ? [projectId] : []), "--output", "json"];
-                const all = JSON.parse(execCapture(cmd));
+                const all = JSON.parse(bwsExec(cmd));
                 const hit = all.find((s) => s.key === name);
                 return hit ? { id: hit.id, value: hit.value } : null;
             },
             async create(name, value, projectId) {
-                const out = execCapture(["bws", "secret", "create", name, value, projectId, "--output", "json"]);
+                const out = bwsExec(["bws", "secret", "create", name, value, projectId, "--output", "json"]);
                 return JSON.parse(out).id;
             },
             async editValue(uuid, value) {
-                execCapture(["bws", "secret", "edit", uuid, "--value", value]);
+                bwsExec(["bws", "secret", "edit", uuid, "--value", value]);
             },
             async remove(uuid) {
-                execCapture(["bws", "secret", "delete", uuid]);
+                bwsExec(["bws", "secret", "delete", uuid]);
             },
         },
         keychain: {
