@@ -7,8 +7,7 @@
 // URGENT control-plane finding rather than trusting a poisoned diff).
 
 import { createHash } from "node:crypto";
-import * as fs from "node:fs";
-import * as path from "node:path";
+import { loadValidated0600Json, saveValidated0600Json } from "./validated-store.js";
 import type { Finding } from "./scan-parser.js";
 import type { Classification, Tier } from "./taxonomy.js";
 
@@ -36,29 +35,12 @@ export function fingerprint(check: string, target: string): string {
  * A present file MUST be a regular file, mode 0600, owned by the current user.
  */
 export function loadBaseline(file: string): Baseline | null {
-  let st: fs.Stats;
-  try {
-    st = fs.lstatSync(file);
-  } catch (e: any) {
-    if (e?.code === "ENOENT") return null;
-    throw e;
-  }
-  if (!st.isFile()) throw new BaselineIntegrityError(`baseline ${file} is not a regular file`);
-  if ((st.mode & 0o777) !== 0o600) throw new BaselineIntegrityError(`baseline ${file} mode is ${(st.mode & 0o777).toString(8)}, expected 600`);
-  if (typeof process.getuid === "function" && st.uid !== process.getuid()) {
-    throw new BaselineIntegrityError(`baseline ${file} owned by uid ${st.uid}, expected ${process.getuid()}`);
-  }
-  return JSON.parse(fs.readFileSync(file, "utf8")) as Baseline;
+  return loadValidated0600Json<Baseline>(file, "baseline", BaselineIntegrityError);
 }
 
 /** Atomically write the baseline with mode 0600. */
 export function saveBaseline(file: string, baseline: Baseline): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp.${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(baseline, null, 2), { mode: 0o600 });
-  fs.chmodSync(tmp, 0o600);
-  fs.renameSync(tmp, file);
-  fs.chmodSync(file, 0o600);
+  saveValidated0600Json(file, baseline);
 }
 
 export interface DiffItem {
