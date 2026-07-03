@@ -8,10 +8,14 @@ version: 3.4.0
 version_source: package.json
 updated: '2026-06-26'
 foundation: true
+foundation_contract: 1
 applicable_standards:
-- project
-- security
-- code
+  project: '1.0'
+  security: '1.0'
+  code: '1.0'
+required_checks:
+- id: quality
+  executor: github-actions:quality.yml
 ---
 
 ## Backlog
