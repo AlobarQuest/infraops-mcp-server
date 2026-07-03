@@ -40,7 +40,7 @@ export interface OutcomeBody {
 }
 
 export class ChangeMgrClient {
-  constructor(private base: string, private token: string) {}
+  constructor(private base: string, private token: string, private actor: string = "executor") {}
 
   private async req<T>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(`${this.base}${path}`, {
@@ -64,10 +64,10 @@ export class ChangeMgrClient {
     return this.req<ApprovedItem[]>(`/api/items?status=approved&source=${encodeURIComponent(source)}`);
   }
   claim(id: number): Promise<ApprovedItem> {
-    return this.req<ApprovedItem>(`/api/items/${id}/claim`, { method: "POST" });
+    return this.req<ApprovedItem>(`/api/items/${id}/claim`, { method: "POST", body: JSON.stringify({ actor: this.actor }) });
   }
   postOutcome(id: number, body: OutcomeBody): Promise<unknown> {
-    return this.req(`/api/items/${id}/outcome`, { method: "POST", body: JSON.stringify(body) });
+    return this.req(`/api/items/${id}/outcome`, { method: "POST", body: JSON.stringify({ ...body, actor: this.actor }) });
   }
   startWindow(startedAt: string): Promise<{ id: number }> {
     return this.req<{ id: number }>("/api/window-runs", { method: "POST", body: JSON.stringify({ started_at: startedAt }) });
