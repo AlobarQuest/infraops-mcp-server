@@ -35,4 +35,27 @@ describe("ChangeMgrClient", () => {
     const c = new ChangeMgrClient("https://cm.example", "tok");
     await expect(c.claim(1)).rejects.toThrow(/409/);
   });
+
+  it("claim sends the declared actor in the body", async () => {
+    fetchMock.mockResolvedValue(ok({ id: 1, status: "in_progress" }));
+    const c = new ChangeMgrClient("https://cm.example", "tok", "security-executor");
+    await c.claim(1);
+    const [, opts] = fetchMock.mock.calls[0];
+    expect(JSON.parse(opts.body)).toEqual({ actor: "security-executor" });
+  });
+
+  it("postOutcome merges the declared actor into the body", async () => {
+    fetchMock.mockResolvedValue(ok({ id: 1 }));
+    const c = new ChangeMgrClient("https://cm.example", "tok", "change-window-agent");
+    await c.postOutcome(1, { outcome: "done", detail: "applied" });
+    const [, opts] = fetchMock.mock.calls[0];
+    expect(JSON.parse(opts.body)).toEqual({ outcome: "done", detail: "applied", actor: "change-window-agent" });
+  });
+
+  it("defaults the actor to executor for backward compatibility", async () => {
+    fetchMock.mockResolvedValue(ok({ id: 1 }));
+    const c = new ChangeMgrClient("https://cm.example", "tok");
+    await c.claim(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ actor: "executor" });
+  });
 });

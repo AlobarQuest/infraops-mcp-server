@@ -1,9 +1,11 @@
 export class ChangeMgrClient {
     base;
     token;
-    constructor(base, token) {
+    actor;
+    constructor(base, token, actor = "executor") {
         this.base = base;
         this.token = token;
+        this.actor = actor;
     }
     async req(path, init = {}) {
         const res = await fetch(`${this.base}${path}`, {
@@ -26,10 +28,10 @@ export class ChangeMgrClient {
         return this.req(`/api/items?status=approved&source=${encodeURIComponent(source)}`);
     }
     claim(id) {
-        return this.req(`/api/items/${id}/claim`, { method: "POST" });
+        return this.req(`/api/items/${id}/claim`, { method: "POST", body: JSON.stringify({ actor: this.actor }) });
     }
     postOutcome(id, body) {
-        return this.req(`/api/items/${id}/outcome`, { method: "POST", body: JSON.stringify(body) });
+        return this.req(`/api/items/${id}/outcome`, { method: "POST", body: JSON.stringify({ ...body, actor: this.actor }) });
     }
     startWindow(startedAt) {
         return this.req("/api/window-runs", { method: "POST", body: JSON.stringify({ started_at: startedAt }) });

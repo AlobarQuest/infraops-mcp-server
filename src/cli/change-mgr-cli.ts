@@ -48,11 +48,11 @@ export function parseArgs(argv: string[]): Record<string, string | boolean> {
   return args;
 }
 
-function client(): ChangeMgrClient {
+function client(actor: string = "executor"): ChangeMgrClient {
   const base = process.env.CHANGE_MGR_API_BASE ?? "";
   const token = process.env.CHANGE_MGR_M2M_TOKEN ?? "";
   if (!base || !token) throw new Error("CHANGE_MGR_API_BASE and CHANGE_MGR_M2M_TOKEN must be set");
-  return new ChangeMgrClient(base, token);
+  return new ChangeMgrClient(base, token, actor);
 }
 
 async function doSync(reportDir: string, now: string): Promise<void> {
@@ -64,7 +64,7 @@ async function doSync(reportDir: string, now: string): Promise<void> {
 }
 
 async function doRunWindow(reportDir: string | undefined, now: string): Promise<void> {
-  const c = client();
+  const c = client("change-window-agent");
   const anthropic = new Anthropic();
   const wr = await c.startWindow(now);
   const summary = await runWindow({
@@ -83,7 +83,7 @@ async function doRunWindow(reportDir: string | undefined, now: string): Promise<
 }
 
 async function doRunSecurityWindow(reportDir: string | undefined, now: string): Promise<void> {
-  const c = client();
+  const c = client("security-executor");
   const p = securityPaths();
   const rotationToken = credRotationBwsToken();
   const notifyDeps = {

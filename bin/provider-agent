@@ -171,7 +171,12 @@ def main(argv: list[str] | None = None) -> int:
     git_ok = is_git_repo()
     pre_dirty = git_ok and tree_dirty()
 
-    child_env = {**os.environ, DEPTH_ENV: str(depth + 1)}
+    child_env = {
+        **os.environ,
+        DEPTH_ENV: str(depth + 1),
+        # WS-1.2: the spawned session's high-power records carry the provider identity
+        "FACTORY_AGENT_ID": f"{REPO_ROOT.name}-provider-agent",
+    }
     try:
         proc = subprocess.run(
             build_claude_argv(args.prompt, brief_text, resume_id),

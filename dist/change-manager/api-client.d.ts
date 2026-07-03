@@ -41,7 +41,8 @@ export interface OutcomeBody {
 export declare class ChangeMgrClient {
     private base;
     private token;
-    constructor(base: string, token: string);
+    private actor;
+    constructor(base: string, token: string, actor?: string);
     private req;
     postSync(body: SyncBody): Promise<SyncSummary>;
     getApproved(): Promise<ApprovedItem[]>;
