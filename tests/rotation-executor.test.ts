@@ -162,14 +162,20 @@ describe("runRotationPlan — reissue path (store → deploy → verify → revo
     expect(s.rotated).toEqual(["openrouter-generic"]);
   });
 
-  it("verify failure (new value does not authenticate) → failed, old value never probed/retired", async () => {
+  it("verify failure (bad staged value) → failed BEFORE any write: keeper/consumers/quarantine untouched", async () => {
     const s = baseState();
     s.keychain.set("cred-rotation/openrouter-generic", NEW_VAL);
+    s.keychain.set("openrouter-api/devon", OLD_VAL); // consumer currently holds the OLD (working) value
     s.probes[NEW_VAL] = 401; // bad staged value
-    s.probes[OLD_VAL] = 401; // even though old is dead, we must not touch it
+    s.probes[OLD_VAL] = 401;
     const r = await runRotationPlan(reissuePlan(), fakeDeps(s));
     expect(r.outcome).toBe("failed");
     expect(r.detail).toMatch(/verify FAILED/);
+    expect(r.detail).toMatch(/nothing was written/);
+    // verify-before-deploy: NOTHING was written — a bad token never reaches a live consumer.
+    expect(s.bws.get("keeper-uuid")!.value).toBe(OLD_VAL); // keeper untouched
+    expect(s.keychain.get("openrouter-api/devon")).toBe(OLD_VAL); // consumer untouched (not broken)
+    expect([...s.bws.keys()]).not.toContain("created-openrouter-generic-pre-rotation-quarantine"); // no quarantine created
     expect(s.removedBws).toEqual([]);
     expect(s.resolved).toEqual([]);
   });
@@ -190,6 +196,7 @@ describe("runRotationPlan — reissue path (store → deploy → verify → revo
     const s = baseState();
     s.bws.set("keeper-uuid", { name: "OPENROUTER_API_KEY", value: NEW_VAL });
     s.keychain.set("cred-rotation/openrouter-generic", NEW_VAL);
+    s.probes[NEW_VAL] = 200; // new value verifies; the block is the missing-quarantine guard, not verify
     const r = await runRotationPlan(reissuePlan(), fakeDeps(s));
     expect(r.outcome).toBe("blocked");
     expect(r.detail).toMatch(/no quarantined old value/);
@@ -276,6 +283,7 @@ describe("runRotationPlan — structural guards", () => {
   it("scrubs secret values out of error details", async () => {
     const s = baseState();
     s.keychain.set("cred-rotation/openrouter-generic", NEW_VAL);
+    s.probes[NEW_VAL] = 200; // pass verify so the keeper-edit (which throws below) is reached
     const deps = fakeDeps(s);
     deps.bws.editValue = async () => {
       throw new Error(`boom: refused to write ${NEW_VAL} somewhere`);
