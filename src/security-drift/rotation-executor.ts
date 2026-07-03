@@ -94,7 +94,7 @@ export async function runRotationPlan(plan: RotationPlanSpec, deps: RotationDeps
     let quarantineUuid: string | null = null;
 
     if (plan.keeperBwsUuid) {
-      // ── STORE (reissue path): quarantine old value, then edit keeper in place ──
+      // ── reissue path ──
       if (!plan.staging || !plan.quarantineName || !plan.bwsProjectId) {
         return finish("blocked", "reissue plan missing staging/quarantine coordinates");
       }
@@ -104,10 +104,33 @@ export async function runRotationPlan(plan: RotationPlanSpec, deps: RotationDeps
         quarantineUuid = quarantine.id;
         scrub.add(quarantine.value);
       }
+      const keeperCurrent = scrub.add(await deps.bws.getValue(plan.keeperBwsUuid));
+      if (keeperCurrent === null) return finish("failed", `keeper secret ${plan.keeperBwsUuid} unreadable`);
 
+      // Determine the NEW value WITHOUT writing anything yet: staged (fresh) or, on a
+      // resume where staging was already consumed, the keeper (which holds the new value).
       if (staged) {
-        const keeperCurrent = scrub.add(await deps.bws.getValue(plan.keeperBwsUuid));
-        if (keeperCurrent === null) return finish("failed", `keeper secret ${plan.keeperBwsUuid} unreadable`);
+        newValue = staged;
+      } else if (quarantine) {
+        newValue = keeperCurrent;
+        steps.push("store: staged value already consumed on a prior window");
+      } else {
+        return finish(
+          "blocked",
+          `new value not staged — mint it at the provider, then (real Terminal): security add-generic-password -U -s ${plan.staging.service} -a ${plan.staging.account} -T /usr/bin/security -w`,
+        );
+      }
+
+      // ── VERIFY the new value BEFORE any write, so a bad staged credential can never
+      //    reach (and break) a live consumer. Nothing has been quarantined/stored/deployed yet.
+      const status = await deps.probe(plan.providerProbe, newValue, { email: plan.probeEmail, workspace: plan.probeWorkspace });
+      if (status !== 200) {
+        return finish("failed", `verify FAILED: new credential probe returned ${status} (expected 200) — check the staged value; nothing was written or revoked`);
+      }
+      steps.push("verify: new credential authenticates (200)");
+
+      // ── STORE: quarantine the old value, then point the keeper at the new value ──
+      if (staged) {
         if (!quarantine) {
           if (keeperCurrent === staged) {
             // Keeper already carries the new value but the old value was never
@@ -126,32 +149,14 @@ export async function runRotationPlan(plan: RotationPlanSpec, deps: RotationDeps
         } else {
           steps.push("store: keeper already carries the staged value");
         }
-        newValue = staged;
-      } else if (quarantine) {
-        // Staged value already consumed on a prior night; keeper holds the new value.
-        newValue = scrub.add(await deps.bws.getValue(plan.keeperBwsUuid));
-        if (newValue === null) return finish("failed", `keeper secret ${plan.keeperBwsUuid} unreadable`);
-        steps.push("store: already completed on a prior window");
-      } else {
-        return finish(
-          "blocked",
-          `new value not staged — mint it at the provider, then (real Terminal): security add-generic-password -U -s ${plan.staging.service} -a ${plan.staging.account} -T /usr/bin/security -w`,
-        );
       }
       oldValue = quarantine ? quarantine.value : scrub.add(quarantineUuid ? await deps.bws.getValue(quarantineUuid) : null);
 
-      // ── DEPLOY: push the new value to every mapped consumer ────────────────────
+      // ── DEPLOY: push the (verified) new value to every mapped consumer ──────────
       for (const consumer of plan.consumers) {
         const done = await deployConsumer(consumer, plan, newValue, deps, scrub);
         if (done) steps.push(done);
       }
-
-      // ── VERIFY: the new credential must authenticate at the provider ───────────
-      const status = await deps.probe(plan.providerProbe, newValue, { email: plan.probeEmail, workspace: plan.probeWorkspace });
-      if (status !== 200) {
-        return finish("failed", `verify FAILED: new credential probe returned ${status} (expected 200) — check the staged value; nothing was revoked`);
-      }
-      steps.push(`verify: new credential authenticates (200)`);
     } else {
       // ── revoke-no-replacement path: nothing to store or deploy ─────────────────
       if (!plan.retireBwsUuids.length) return finish("blocked", "no old-value source (retireBwsUuids empty) — cannot confirm revoke");
