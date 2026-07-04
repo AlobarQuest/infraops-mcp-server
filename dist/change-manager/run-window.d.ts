@@ -1,5 +1,5 @@
-import type { ApprovedItem, OutcomeBody } from "./api-client.js";
-import type { ChangeOutcome } from "./agent.js";
+import type { ApprovedItem, OutcomeBody } from './api-client.js';
+import type { ChangeOutcome } from './agent.js';
 export interface WindowDeps {
     getApproved: () => Promise<ApprovedItem[]>;
     claim: (id: number) => Promise<void>;

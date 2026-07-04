@@ -1,8 +1,8 @@
-import { coolifyGet } from "../services/coolify-client.js";
-import { loadCoolifyChecks } from "./standards-source.js";
-import { evaluateCheck } from "./check-engine.js";
-import { resolveRemediation } from "./remediation-registry.js";
-import { loadBackupManifest, enrichWithBackupCoverage } from "./backup-manifest.js";
+import { coolifyGet } from '../services/coolify-client.js';
+import { loadCoolifyChecks } from './standards-source.js';
+import { evaluateCheck } from './check-engine.js';
+import { resolveRemediation } from './remediation-registry.js';
+import { loadBackupManifest, enrichWithBackupCoverage } from './backup-manifest.js';
 /**
  * Audit a single Coolify instance against infra-brain standards.
  *
@@ -16,22 +16,24 @@ export async function auditInstance(instance, opts = {}) {
     const { scope } = opts;
     const { checks, source } = await loadCoolifyChecks();
     const [appsRes, dbsRes] = await Promise.allSettled([
-        coolifyGet("/applications", undefined, instance),
-        coolifyGet("/databases", undefined, instance),
+        coolifyGet('/applications', undefined, instance),
+        coolifyGet('/databases', undefined, instance),
     ]);
     const errors = [];
     function extract(result, label) {
-        if (result.status === "fulfilled")
+        if (result.status === 'fulfilled')
             return result.value;
         errors.push(`${label}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
         return null;
     }
-    let apps = extract(appsRes, "applications");
-    let dbs = extract(dbsRes, "databases");
+    let apps = extract(appsRes, 'applications');
+    let dbs = extract(dbsRes, 'databases');
     if (scope) {
         const s = scope.toLowerCase();
-        const matchesScope = (r) => String(r.uuid ?? "").toLowerCase() === s ||
-            String(r.name ?? "").toLowerCase().includes(s);
+        const matchesScope = (r) => String(r.uuid ?? '').toLowerCase() === s ||
+            String(r.name ?? '')
+                .toLowerCase()
+                .includes(s);
         if (apps)
             apps = apps.filter(matchesScope);
         if (dbs)
@@ -46,8 +48,8 @@ export async function auditInstance(instance, opts = {}) {
         for (const db of dbs)
             enrichWithBackupCoverage(db, manifest, now);
     }
-    const appChecks = checks.filter((c) => c.resource === "coolify_application");
-    const dbChecks = checks.filter((c) => c.resource === "coolify_database");
+    const appChecks = checks.filter((c) => c.resource === 'coolify_application');
+    const dbChecks = checks.filter((c) => c.resource === 'coolify_database');
     const proposals = [];
     for (const app of apps ?? []) {
         for (const c of appChecks) {

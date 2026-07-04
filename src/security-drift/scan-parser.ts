@@ -8,7 +8,7 @@
 // parser must never reconstruct or widen a secret value — it only ever splits the
 // line the scanner already produced.
 
-export type Severity = "FAIL" | "WARN" | "PASS";
+export type Severity = 'FAIL' | 'WARN' | 'PASS';
 
 export interface Finding {
   severity: Severity;
@@ -30,7 +30,7 @@ const LINE = /^(FAIL|WARN|PASS)\s+(\S+)\s+(.*)$/;
  */
 export function extractTarget(detail: string): string {
   // "<path> (mode 644) ..." — robust even when the path contains spaces.
-  const modeIdx = detail.indexOf(" (mode ");
+  const modeIdx = detail.indexOf(' (mode ');
   if (modeIdx > 0) return detail.slice(0, modeIdx).trim();
 
   // "<file>: <rest>" — shell/mcp/tiktok forms. Require the left side to look like a path/file.
@@ -48,7 +48,7 @@ export function extractTarget(detail: string): string {
 /** Parse scanner stdout into findings. Non-matching lines (headers, summary) are skipped. */
 export function parseScan(stdout: string): Finding[] {
   const findings: Finding[] = [];
-  for (const raw of stdout.split("\n")) {
+  for (const raw of stdout.split('\n')) {
     const m = raw.match(LINE);
     if (!m) continue;
     const detail = m[3].trim();

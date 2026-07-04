@@ -7,91 +7,103 @@
  * browse the repos/branches it can see.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import {
   coolifyGet,
   coolifyPost,
   coolifyPatch,
   coolifyDelete,
   handleCoolifyError,
-} from "../services/coolify-client.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
-import { jsonResponse } from "../utils/response.js";
-import { toGitHubAppSummary } from "../utils/summaries.js";
-import type {
-  CoolifyGitHubApp,
-  CoolifyGitHubRepository,
-  CoolifyGitHubBranch,
-} from "../types.js";
+} from '../services/coolify-client.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from '../schemas/common.js';
+import { jsonResponse } from '../utils/response.js';
+import { toGitHubAppSummary } from '../utils/summaries.js';
+import type { CoolifyGitHubApp, CoolifyGitHubRepository, CoolifyGitHubBranch } from '../types.js';
 
 export function registerGithubAppTools(server: McpServer): void {
   // ── List GitHub Apps ─────────────────────────────────────────────
   server.registerTool(
-    "coolify_list_github_apps",
+    'coolify_list_github_apps',
     {
-      title: "List Coolify GitHub Apps",
+      title: 'List Coolify GitHub Apps',
       description:
-        "List GitHub-App source integrations configured in Coolify. Returns id, uuid, name, organization. Use coolify_get_github_app for full detail.",
+        'List GitHub-App source integrations configured in Coolify. Returns id, uuid, name, organization. Use coolify_get_github_app for full detail.',
       inputSchema: {
-        summary: z.boolean().default(true).describe("Return a compact projection (default true); false for full objects"),
+        summary: z
+          .boolean()
+          .default(true)
+          .describe('Return a compact projection (default true); false for full objects'),
         instance: CoolifyInstanceSchema,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ summary, instance }: { summary: boolean; instance: CoolifyInstance }) => {
       try {
-        const apps = await coolifyGet<CoolifyGitHubApp[]>("/github-apps", undefined, instance);
+        const apps = await coolifyGet<CoolifyGitHubApp[]>('/github-apps', undefined, instance);
         const out = summary && Array.isArray(apps) ? apps.map((a) => toGitHubAppSummary(a)) : apps;
         return jsonResponse(out);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Get one GitHub App (filter list client-side by id) ───────────
   server.registerTool(
-    "coolify_get_github_app",
+    'coolify_get_github_app',
     {
-      title: "Get Coolify GitHub App",
-      description: "Get a single GitHub-App integration by its numeric id.",
+      title: 'Get Coolify GitHub App',
+      description: 'Get a single GitHub-App integration by its numeric id.',
       inputSchema: {
-        id: z.number().int().describe("GitHub App id"),
+        id: z.number().int().describe('GitHub App id'),
         instance: CoolifyInstanceSchema,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ id, instance }: { id: number; instance: CoolifyInstance }) => {
       try {
-        const apps = await coolifyGet<CoolifyGitHubApp[]>("/github-apps", undefined, instance);
+        const apps = await coolifyGet<CoolifyGitHubApp[]>('/github-apps', undefined, instance);
         const app = Array.isArray(apps) ? apps.find((a) => a.id === id) : undefined;
         if (!app) {
-          return { isError: true, content: [{ type: "text", text: `Error: No GitHub App found with id ${id}.` }] };
+          return {
+            isError: true,
+            content: [{ type: 'text', text: `Error: No GitHub App found with id ${id}.` }],
+          };
         }
         return jsonResponse(app);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Create GitHub App ────────────────────────────────────────────
   server.registerTool(
-    "coolify_create_github_app",
+    'coolify_create_github_app',
     {
-      title: "Create Coolify GitHub App",
-      description: "Register a GitHub App as a Coolify deployment source.",
+      title: 'Create Coolify GitHub App',
+      description: 'Register a GitHub App as a Coolify deployment source.',
       inputSchema: {
         name: z.string().min(1),
-        api_url: z.string().min(1).describe("GitHub API URL, e.g. https://api.github.com"),
-        html_url: z.string().min(1).describe("GitHub base URL, e.g. https://github.com"),
+        api_url: z.string().min(1).describe('GitHub API URL, e.g. https://api.github.com'),
+        html_url: z.string().min(1).describe('GitHub base URL, e.g. https://github.com'),
         app_id: z.number().int(),
         installation_id: z.number().int(),
         client_id: z.string().min(1),
         client_secret: z.string().min(1),
-        private_key_uuid: z.string().min(1).describe("UUID of a Coolify private key"),
+        private_key_uuid: z.string().min(1).describe('UUID of a Coolify private key'),
         organization: z.string().optional(),
         custom_user: z.string().optional(),
         custom_port: z.number().int().optional(),
@@ -99,27 +111,32 @@ export function registerGithubAppTools(server: McpServer): void {
         is_system_wide: z.boolean().optional(),
         instance: CoolifyInstanceRequiredSchema,
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async (params: { instance: CoolifyInstance } & Record<string, unknown>) => {
       try {
         const { instance, ...body } = params;
-        const app = await coolifyPost<CoolifyGitHubApp>("/github-apps", body, instance);
+        const app = await coolifyPost<CoolifyGitHubApp>('/github-apps', body, instance);
         return jsonResponse(app);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Update GitHub App ────────────────────────────────────────────
   server.registerTool(
-    "coolify_update_github_app",
+    'coolify_update_github_app',
     {
-      title: "Update Coolify GitHub App",
-      description: "Update fields of a GitHub-App integration. Only supplied fields change.",
+      title: 'Update Coolify GitHub App',
+      description: 'Update fields of a GitHub-App integration. Only supplied fields change.',
       inputSchema: {
-        id: z.number().int().describe("GitHub App id"),
+        id: z.number().int().describe('GitHub App id'),
         name: z.string().optional(),
         organization: z.string().optional(),
         api_url: z.string().optional(),
@@ -135,7 +152,12 @@ export function registerGithubAppTools(server: McpServer): void {
         is_system_wide: z.boolean().optional(),
         instance: CoolifyInstanceRequiredSchema,
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (params: { id: number; instance: CoolifyInstance } & Record<string, unknown>) => {
       try {
@@ -143,89 +165,113 @@ export function registerGithubAppTools(server: McpServer): void {
         const result = await coolifyPatch<{ message?: string; data?: CoolifyGitHubApp }>(
           `/github-apps/${id}`,
           body,
-          instance
+          instance,
         );
         return jsonResponse(result);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Delete GitHub App ────────────────────────────────────────────
   server.registerTool(
-    "coolify_delete_github_app",
+    'coolify_delete_github_app',
     {
-      title: "Delete Coolify GitHub App",
-      description: "Delete a GitHub-App integration by id.",
+      title: 'Delete Coolify GitHub App',
+      description: 'Delete a GitHub-App integration by id.',
       inputSchema: {
-        id: z.number().int().describe("GitHub App id"),
+        id: z.number().int().describe('GitHub App id'),
         instance: CoolifyInstanceRequiredSchema,
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async ({ id, instance }: { id: number; instance: CoolifyInstance }) => {
       try {
         const result = await coolifyDelete<{ message?: string }>(`/github-apps/${id}`, instance);
         return jsonResponse(result);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── List repositories visible to the App ─────────────────────────
   server.registerTool(
-    "coolify_list_github_app_repos",
+    'coolify_list_github_app_repos',
     {
-      title: "List GitHub App Repositories",
-      description: "List repositories the GitHub App can access (name, full_name, default_branch, private).",
+      title: 'List GitHub App Repositories',
+      description:
+        'List repositories the GitHub App can access (name, full_name, default_branch, private).',
       inputSchema: {
-        id: z.number().int().describe("GitHub App id"),
+        id: z.number().int().describe('GitHub App id'),
         instance: CoolifyInstanceSchema,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ id, instance }: { id: number; instance: CoolifyInstance }) => {
       try {
-        const result = await coolifyGet<{ repositories?: CoolifyGitHubRepository[] } | CoolifyGitHubRepository[]>(
-          `/github-apps/${id}/repositories`,
-          undefined,
-          instance
-        );
-        const repos = Array.isArray(result) ? result : result?.repositories ?? [];
+        const result = await coolifyGet<
+          { repositories?: CoolifyGitHubRepository[] } | CoolifyGitHubRepository[]
+        >(`/github-apps/${id}/repositories`, undefined, instance);
+        const repos = Array.isArray(result) ? result : (result?.repositories ?? []);
         return jsonResponse(repos);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── List branches for a repo ─────────────────────────────────────
   server.registerTool(
-    "coolify_list_github_app_branches",
+    'coolify_list_github_app_branches',
     {
-      title: "List GitHub App Repository Branches",
-      description: "List branches for a repo the GitHub App can access.",
+      title: 'List GitHub App Repository Branches',
+      description: 'List branches for a repo the GitHub App can access.',
       inputSchema: {
-        id: z.number().int().describe("GitHub App id"),
-        owner: z.string().min(1).describe("Repository owner/org"),
-        repo: z.string().min(1).describe("Repository name"),
+        id: z.number().int().describe('GitHub App id'),
+        owner: z.string().min(1).describe('Repository owner/org'),
+        repo: z.string().min(1).describe('Repository name'),
         instance: CoolifyInstanceSchema,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
-    async ({ id, owner, repo, instance }: { id: number; owner: string; repo: string; instance: CoolifyInstance }) => {
+    async ({
+      id,
+      owner,
+      repo,
+      instance,
+    }: {
+      id: number;
+      owner: string;
+      repo: string;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const branches = await coolifyGet<CoolifyGitHubBranch[]>(
           `/github-apps/${id}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches`,
           undefined,
-          instance
+          instance,
         );
         return jsonResponse(branches);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 }

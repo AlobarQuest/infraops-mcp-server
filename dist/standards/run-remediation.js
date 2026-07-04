@@ -1,7 +1,7 @@
-import { isAutoApplicable } from "./executor.js";
-import { buildHandoff } from "./handoff-brief.js";
-import { proposalIdentity } from "./report.js";
-import { buildRemediationReport, } from "./remediation-report.js";
+import { isAutoApplicable } from './executor.js';
+import { buildHandoff } from './handoff-brief.js';
+import { proposalIdentity } from './report.js';
+import { buildRemediationReport, } from './remediation-report.js';
 /**
  * The remediation core. Re-audits each instance LIVE (the idempotency guard —
  * we act on current reality, not the possibly-stale morning report), partitions

@@ -1,19 +1,19 @@
-import type { ApplyResult } from "./executor.js";
-import type { Proposal } from "./check-engine.js";
-import type { RemediationPlan } from "./remediation-plan.js";
+import type { ApplyResult } from './executor.js';
+import type { Proposal } from './check-engine.js';
+import type { RemediationPlan } from './remediation-plan.js';
 /** One escalated (non-auto-fixable) item plus its Sonnet/raw plan. The change-manager contract. */
 export interface Escalation {
     proposal_id: string;
     instance: string;
-    target: Proposal["target"];
+    target: Proposal['target'];
     risk: string;
     kind: string;
     reasoning: string;
     plan: RemediationPlan;
     /** Why this was escalated rather than auto-applied (e.g. a verify gate held it). Absent for inherently-escalated items. */
     note?: string;
-    lane?: import("./remediation-registry.js").Lane;
-    handoff?: import("./handoff-brief.js").HandoffPackage;
+    lane?: import('./remediation-registry.js').Lane;
+    handoff?: import('./handoff-brief.js').HandoffPackage;
     handoff_brief?: string;
 }
 export interface RemediationReport {

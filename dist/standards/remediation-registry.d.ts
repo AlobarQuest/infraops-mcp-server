@@ -1,6 +1,6 @@
-import type { PlannedAction, Risk } from "./check-engine.js";
+import type { PlannedAction, Risk } from './check-engine.js';
 /** Which lane owns the fix. Extension seam: future remediations can declare their lane here. */
-export type Lane = "infra-config" | "app-conformance";
+export type Lane = 'infra-config' | 'app-conformance';
 interface Remediation {
     tool: string;
     risk: Risk;

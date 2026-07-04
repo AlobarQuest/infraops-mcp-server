@@ -1,5 +1,5 @@
-import type { Finding } from "./scan-parser.js";
-export type Tier = "AUTO_FIX" | "URGENT" | "NORMAL";
+import type { Finding } from './scan-parser.js';
+export type Tier = 'AUTO_FIX' | 'URGENT' | 'NORMAL';
 /** A remediation is a list of exact commands to run verbatim, OR human steps, OR a
  *  typed credential-rotation plan (WS-0.7) the rotation executor interprets. */
 export type Remediation = {
@@ -7,12 +7,12 @@ export type Remediation = {
 } | {
     manual: string[];
 } | {
-    rotation: import("./cred-rotation.js").RotationPlanSpec;
+    rotation: import('./cred-rotation.js').RotationPlanSpec;
 };
 export interface Classification {
     tier: Tier;
-    kind: "remediation" | "question";
-    risk: "safe" | "caution" | "destructive";
+    kind: 'remediation' | 'question';
+    risk: 'safe' | 'caution' | 'destructive';
     remediation: Remediation;
     title: string;
 }

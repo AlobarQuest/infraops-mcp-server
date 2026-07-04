@@ -1,7 +1,7 @@
-import type { Finding } from "./scan-parser.js";
-import type { Classification } from "./taxonomy.js";
-import type { ConsumerSpec, CredentialSpec } from "./cred-consumers.js";
-export type ProviderProbe = "github" | "openrouter" | "openai" | "bitbucket";
+import type { Finding } from './scan-parser.js';
+import type { Classification } from './taxonomy.js';
+import type { ConsumerSpec, CredentialSpec } from './cred-consumers.js';
+export type ProviderProbe = 'github' | 'openrouter' | 'openai' | 'bitbucket';
 interface ClassPolicy {
     maxAgeDays: number;
     probe?: ProviderProbe;

@@ -1,4 +1,4 @@
-export type Severity = "FAIL" | "WARN" | "PASS";
+export type Severity = 'FAIL' | 'WARN' | 'PASS';
 export interface Finding {
     severity: Severity;
     /** stable check key, e.g. "credfile.over_permissive" */

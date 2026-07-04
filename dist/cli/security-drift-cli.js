@@ -5,30 +5,30 @@
 // Runs ~/.claude/bin/security-scan.sh, classifies + diffs, auto-fixes the narrow set,
 // posts the rest to the change-manager (source="security"), and emails NEW urgent
 // items immediately. All write-state files are mode 0600.
-import { execFileSync } from "node:child_process";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { ChangeMgrClient } from "../change-manager/api-client.js";
-import { runSecurityDrift } from "../security-drift/runner.js";
-import { sendUrgentEmail } from "../security-drift/notify.js";
-import { securityPaths } from "../security-drift/paths.js";
-import { runSelfCheck } from "../security-drift/self-check.js";
-import { classify } from "../security-drift/taxonomy.js";
-import { buildEscalations } from "../security-drift/emit.js";
-import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION } from "../security-drift/scanner-version.js";
-import { loadCredConsumerFiles } from "../security-drift/cred-consumers.js";
-import { buildCredClassifications, credFindings, loadRotationState, saveRotationState, } from "../security-drift/cred-rotation.js";
+import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { ChangeMgrClient } from '../change-manager/api-client.js';
+import { runSecurityDrift } from '../security-drift/runner.js';
+import { sendUrgentEmail } from '../security-drift/notify.js';
+import { securityPaths } from '../security-drift/paths.js';
+import { runSelfCheck } from '../security-drift/self-check.js';
+import { classify } from '../security-drift/taxonomy.js';
+import { buildEscalations } from '../security-drift/emit.js';
+import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION, } from '../security-drift/scanner-version.js';
+import { loadCredConsumerFiles } from '../security-drift/cred-consumers.js';
+import { buildCredClassifications, credFindings, loadRotationState, saveRotationState, } from '../security-drift/cred-rotation.js';
 function parseArgs(argv) {
     const args = {};
-    if (argv[0] && !argv[0].startsWith("--"))
+    if (argv[0] && !argv[0].startsWith('--'))
         args.command = argv[0];
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
-        if (!a.startsWith("--"))
+        if (!a.startsWith('--'))
             continue;
         const key = a.slice(2);
         const next = argv[i + 1];
-        if (next !== undefined && !next.startsWith("--")) {
+        if (next !== undefined && !next.startsWith('--')) {
             args[key] = next;
             i++;
         }
@@ -40,7 +40,11 @@ function parseArgs(argv) {
 /** Read a newline-delimited config list (paths/substrings); missing file → []. */
 function readList(file) {
     try {
-        return fs.readFileSync(file, "utf8").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+        return fs
+            .readFileSync(file, 'utf8')
+            .split('\n')
+            .map((l) => l.trim())
+            .filter((l) => l && !l.startsWith('#'));
     }
     catch {
         return [];
@@ -49,10 +53,10 @@ function readList(file) {
 function captureScan(scanPath) {
     // security-scan.sh exits 1 when drift is found — that is expected, not an error.
     try {
-        return execFileSync("/bin/bash", [scanPath], { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+        return execFileSync('/bin/bash', [scanPath], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
     }
     catch (e) {
-        if (typeof e?.stdout === "string")
+        if (typeof e?.stdout === 'string')
             return e.stdout; // non-zero exit: stdout still has the findings
         throw e;
     }
@@ -60,10 +64,10 @@ function captureScan(scanPath) {
 /** Record that Devon confirmed a provider-side revoke the executor cannot probe
  *  (no BWS copy of the old value) — clears the cred.exposure-rotate finding. */
 function doResolveExposure(args) {
-    const cred = typeof args.cred === "string" ? args.cred : "";
-    const exposure = typeof args.exposure === "string" ? args.exposure : "";
+    const cred = typeof args.cred === 'string' ? args.cred : '';
+    const exposure = typeof args.exposure === 'string' ? args.exposure : '';
     if (!cred || !exposure)
-        throw new Error("resolve-exposure requires --cred <id> and --exposure <id>");
+        throw new Error('resolve-exposure requires --cred <id> and --exposure <id>');
     const p = securityPaths();
     const state = loadRotationState(p.credRotationStateFile);
     const key = `${cred}:${exposure}`;
@@ -73,25 +77,27 @@ function doResolveExposure(args) {
     }
     state.resolvedExposures[key] = {
         ts: new Date().toISOString(),
-        detail: typeof args.note === "string" ? args.note : "manually confirmed revoked (resolve-exposure CLI)",
+        detail: typeof args.note === 'string'
+            ? args.note
+            : 'manually confirmed revoked (resolve-exposure CLI)',
     };
     saveRotationState(p.credRotationStateFile, state);
     process.stdout.write(`resolved: ${key} — the finding clears on the next 3am run\n`);
 }
 async function main() {
     const args = parseArgs(process.argv.slice(2));
-    if (args.command === "resolve-exposure") {
+    if (args.command === 'resolve-exposure') {
         doResolveExposure(args);
         return;
     }
-    if (args.command !== "run")
+    if (args.command !== 'run')
         throw new Error(`unknown command: ${String(args.command)} (use: run | resolve-exposure)`);
-    const now = typeof args.now === "string" ? args.now : new Date().toISOString();
-    const reportDir = typeof args["report-dir"] === "string" ? args["report-dir"] : undefined;
-    const base = process.env.CHANGE_MGR_API_BASE ?? "";
-    const token = process.env.CHANGE_MGR_M2M_TOKEN ?? "";
+    const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
+    const reportDir = typeof args['report-dir'] === 'string' ? args['report-dir'] : undefined;
+    const base = process.env.CHANGE_MGR_API_BASE ?? '';
+    const token = process.env.CHANGE_MGR_M2M_TOKEN ?? '';
     if (!base || !token)
-        throw new Error("CHANGE_MGR_API_BASE and CHANGE_MGR_M2M_TOKEN must be set");
+        throw new Error('CHANGE_MGR_API_BASE and CHANGE_MGR_M2M_TOKEN must be set');
     const client = new ChangeMgrClient(base, token);
     const p = securityPaths();
     const selfCheckFindings = runSelfCheck({
@@ -111,7 +117,10 @@ async function main() {
     if (skew) {
         const classified = [];
         for (const finding of [skew, ...selfCheckFindings]) {
-            const classification = classify(finding, { autoFixAllowlist: readList(p.autoFixAllowlistFile), fpExtra: readList(p.fpAllowlistFile) });
+            const classification = classify(finding, {
+                autoFixAllowlist: readList(p.autoFixAllowlistFile),
+                fpExtra: readList(p.fpAllowlistFile),
+            });
             if (classification)
                 classified.push({ finding, classification });
         }
@@ -119,8 +128,8 @@ async function main() {
         const urgent = escalations.filter((e) => e.urgent);
         const emailed = await sendUrgentEmail(urgent, {
             resendApiKey: process.env.RESEND_API_KEY,
-            from: process.env.INFRADRIFT_EMAIL_FROM ?? "infra@devonwatkins.com",
-            to: process.env.INFRADRIFT_EMAIL_TO ?? "devon.watkins@gmail.com",
+            from: process.env.INFRADRIFT_EMAIL_FROM ?? 'infra@devonwatkins.com',
+            to: process.env.INFRADRIFT_EMAIL_TO ?? 'devon.watkins@gmail.com',
         });
         const digest = `# Security drift ${now.slice(0, 10)} — ABORTED (scanner output-version skew)\n\n` +
             `🚨 ${skew.detail}\n\n` +
@@ -128,9 +137,9 @@ async function main() {
             `${urgent.length} urgent item(s), emailed=${emailed}.\n`;
         if (reportDir) {
             fs.mkdirSync(reportDir, { recursive: true });
-            fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security.md`), digest, "utf8");
+            fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security.md`), digest, 'utf8');
         }
-        process.stdout.write(digest + "\n");
+        process.stdout.write(digest + '\n');
         process.stdout.write(`\nsecurity-drift: ABORTED scanner_version_skew urgent=${urgent.length} emailed=${emailed}\n`);
         process.exit(1);
     }
@@ -148,9 +157,9 @@ async function main() {
     catch (e) {
         credExtraFindings = [
             {
-                severity: "FAIL",
-                check: "cred.registry-error",
-                target: "cred-consumers",
+                severity: 'FAIL',
+                check: 'cred.registry-error',
+                target: 'cred-consumers',
                 detail: `rotation registry unreadable: ${e instanceof Error ? e.message : String(e)}`,
             },
         ];
@@ -163,25 +172,28 @@ async function main() {
         baselineFile: p.baselineFile,
         emitStateFile: p.emitStateFile,
         rollbackLog: p.rollbackLog,
-        autoFixCap: Number.parseInt(process.env.SECURITY_AUTOFIX_CAP ?? "10", 10) || 10,
+        autoFixCap: Number.parseInt(process.env.SECURITY_AUTOFIX_CAP ?? '10', 10) || 10,
         extraFindings: [...selfCheckFindings, ...credExtraFindings],
         credClassifications,
     }, {
         postSync: (body) => client.postSync(body),
         sendUrgent: (items) => sendUrgentEmail(items, {
             resendApiKey: process.env.RESEND_API_KEY,
-            from: process.env.INFRADRIFT_EMAIL_FROM ?? "infra@devonwatkins.com",
-            to: process.env.INFRADRIFT_EMAIL_TO ?? "devon.watkins@gmail.com",
+            from: process.env.INFRADRIFT_EMAIL_FROM ?? 'infra@devonwatkins.com',
+            to: process.env.INFRADRIFT_EMAIL_TO ?? 'devon.watkins@gmail.com',
         }),
     });
     if (reportDir) {
         fs.mkdirSync(reportDir, { recursive: true });
-        fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security.md`), result.digest, "utf8");
+        fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security.md`), result.digest, 'utf8');
     }
-    process.stdout.write(result.digest + "\n");
+    process.stdout.write(result.digest + '\n');
     process.stdout.write(`\nsecurity-drift: emitted=${result.emitted} urgent=${result.urgent} emailed=${result.urgentEmailed} autofixed=${result.autoFixed.length} blocked=${result.autoFixBlocked.length} seeded=${result.seeded}\n`);
 }
-if (process.argv[1] && process.argv[1].endsWith("security-drift-cli.js")) {
-    main().catch((e) => { console.error(e instanceof Error ? e.message : String(e)); process.exit(1); });
+if (process.argv[1] && process.argv[1].endsWith('security-drift-cli.js')) {
+    main().catch((e) => {
+        console.error(e instanceof Error ? e.message : String(e));
+        process.exit(1);
+    });
 }
 //# sourceMappingURL=security-drift-cli.js.map

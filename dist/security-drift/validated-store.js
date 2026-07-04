@@ -6,8 +6,8 @@
 // 4am integrity gate. So every read validates regular-file + mode 0600 + owner, and
 // every write is atomic (tmp + rename) at mode 0600. Callers supply their own error
 // constructor so existing error types (BaselineIntegrityError, …) stay stable.
-import * as fs from "node:fs";
-import * as path from "node:path";
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 /**
  * Load + validate a 0600 JSON store. Missing file → null (caller decides whether
  * that means "seed" or "empty"). Any validation failure throws the caller's error.
@@ -18,7 +18,7 @@ export function loadValidated0600Json(file, label, ErrorCtor) {
         st = fs.lstatSync(file);
     }
     catch (e) {
-        if (e?.code === "ENOENT")
+        if (e?.code === 'ENOENT')
             return null;
         throw e;
     }
@@ -26,10 +26,10 @@ export function loadValidated0600Json(file, label, ErrorCtor) {
         throw new ErrorCtor(`${label} ${file} is not a regular file`);
     if ((st.mode & 0o777) !== 0o600)
         throw new ErrorCtor(`${label} ${file} mode is ${(st.mode & 0o777).toString(8)}, expected 600`);
-    if (typeof process.getuid === "function" && st.uid !== process.getuid()) {
+    if (typeof process.getuid === 'function' && st.uid !== process.getuid()) {
         throw new ErrorCtor(`${label} ${file} owned by uid ${st.uid}, expected ${process.getuid()}`);
     }
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 /** Atomic write with mode 0600. */
 export function saveValidated0600Json(file, data) {

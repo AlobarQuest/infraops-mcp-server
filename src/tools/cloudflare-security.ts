@@ -5,27 +5,27 @@
  * Covers: SSL settings, ruleset listing/inspection, ruleset rule CRUD, and cache purge.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import {
   cloudflareGet,
   cloudflarePost,
   cloudflarePatch,
   cloudflarePut,
   handleCloudflareError,
-} from "../services/cloudflare-client.js";
+} from '../services/cloudflare-client.js';
 
 export function registerCloudflareSecurityTools(server: McpServer): void {
   // ── Get SSL Setting ───────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_get_ssl_setting",
+    'cloudflare_get_ssl_setting',
     {
-      title: "Get Cloudflare SSL Setting",
+      title: 'Get Cloudflare SSL Setting',
       description:
-        "Get the SSL/TLS encryption mode for a Cloudflare zone. Returns the current SSL value: off, flexible, full, or strict.",
+        'Get the SSL/TLS encryption mode for a Cloudflare zone. Returns the current SSL value: off, flexible, full, or strict.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
       },
       annotations: {
         readOnlyHint: true,
@@ -37,34 +37,34 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
     async ({ zone_id }: { zone_id: string }) => {
       try {
         const result = await cloudflareGet<Record<string, unknown>>(
-          `/zones/${zone_id}/settings/ssl`
+          `/zones/${zone_id}/settings/ssl`,
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Update SSL Setting ────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_update_ssl_setting",
+    'cloudflare_update_ssl_setting',
     {
-      title: "Update Cloudflare SSL Setting",
+      title: 'Update Cloudflare SSL Setting',
       description:
         "Update the SSL/TLS encryption mode for a Cloudflare zone. Choose 'off' (no SSL), 'flexible' (HTTPS to visitors, HTTP to origin), 'full' (HTTPS to origin, no cert validation), or 'strict' (HTTPS to origin with valid cert).",
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
         value: z
-          .enum(["off", "flexible", "full", "strict"])
+          .enum(['off', 'flexible', 'full', 'strict'])
           .describe(
-            "SSL encryption mode: off, flexible, full, or strict. 'strict' is recommended for production."
+            "SSL encryption mode: off, flexible, full, or strict. 'strict' is recommended for production.",
           ),
       },
       annotations: {
@@ -78,30 +78,30 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
       try {
         const result = await cloudflarePatch<Record<string, unknown>>(
           `/zones/${zone_id}/settings/ssl`,
-          { value }
+          { value },
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── List Rulesets ─────────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_list_rulesets",
+    'cloudflare_list_rulesets',
     {
-      title: "List Cloudflare Rulesets",
+      title: 'List Cloudflare Rulesets',
       description:
-        "List all rulesets for a Cloudflare zone using the Rulesets API. Returns ruleset IDs, names, phases, and descriptions. Use this to find the ruleset ID needed for WAF rule management.",
+        'List all rulesets for a Cloudflare zone using the Rulesets API. Returns ruleset IDs, names, phases, and descriptions. Use this to find the ruleset ID needed for WAF rule management.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
       },
       annotations: {
         readOnlyHint: true,
@@ -112,32 +112,30 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
     },
     async ({ zone_id }: { zone_id: string }) => {
       try {
-        const result = await cloudflareGet<Record<string, unknown>>(
-          `/zones/${zone_id}/rulesets`
-        );
+        const result = await cloudflareGet<Record<string, unknown>>(`/zones/${zone_id}/rulesets`);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Get Ruleset ───────────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_get_ruleset",
+    'cloudflare_get_ruleset',
     {
-      title: "Get Cloudflare Ruleset",
+      title: 'Get Cloudflare Ruleset',
       description:
-        "Get the full details of a specific Cloudflare ruleset by ID, including all rules, expressions, and actions. Use this before modifying rules to get the current state.",
+        'Get the full details of a specific Cloudflare ruleset by ID, including all rules, expressions, and actions. Use this before modifying rules to get the current state.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
-        ruleset_id: z.string().describe("Cloudflare ruleset ID"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
+        ruleset_id: z.string().describe('Cloudflare ruleset ID'),
       },
       annotations: {
         readOnlyHint: true,
@@ -149,43 +147,45 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
     async ({ zone_id, ruleset_id }: { zone_id: string; ruleset_id: string }) => {
       try {
         const result = await cloudflareGet<Record<string, unknown>>(
-          `/zones/${zone_id}/rulesets/${ruleset_id}`
+          `/zones/${zone_id}/rulesets/${ruleset_id}`,
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Create Ruleset Rule ───────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_create_ruleset_rule",
+    'cloudflare_create_ruleset_rule',
     {
-      title: "Create Cloudflare Ruleset Rule",
+      title: 'Create Cloudflare Ruleset Rule',
       description:
         "Add a new rule to an existing Cloudflare ruleset. Fetches the current ruleset, appends the new rule, and PUTs the full ruleset back. Use Cloudflare filter expression syntax for the expression field (e.g. '(ip.src eq 1.2.3.4)').",
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
-        ruleset_id: z.string().describe("Cloudflare ruleset ID to add the rule to"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
+        ruleset_id: z.string().describe('Cloudflare ruleset ID to add the rule to'),
         expression: z
           .string()
           .describe(
-            "Cloudflare filter expression (e.g. '(ip.src eq 1.2.3.4)' or '(http.request.uri.path contains \"/admin\")')"
+            "Cloudflare filter expression (e.g. '(ip.src eq 1.2.3.4)' or '(http.request.uri.path contains \"/admin\")')",
           ),
         action: z
           .string()
-          .describe("Rule action: 'block', 'challenge', 'js_challenge', 'managed_challenge', 'skip', 'log'"),
+          .describe(
+            "Rule action: 'block', 'challenge', 'js_challenge', 'managed_challenge', 'skip', 'log'",
+          ),
         description: z
           .string()
           .optional()
-          .describe("Optional human-readable description for the rule"),
+          .describe('Optional human-readable description for the rule'),
       },
       annotations: {
         readOnlyHint: false,
@@ -204,9 +204,11 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
       try {
         // Fetch current ruleset
         const current = await cloudflareGet<Record<string, unknown>>(
-          `/zones/${params.zone_id}/rulesets/${params.ruleset_id}`
+          `/zones/${params.zone_id}/rulesets/${params.ruleset_id}`,
         );
-        const currentData = current as { result?: { rules?: unknown[]; description?: string; name?: string; phase?: string } };
+        const currentData = current as {
+          result?: { rules?: unknown[]; description?: string; name?: string; phase?: string };
+        };
         const existingRules: unknown[] = currentData.result?.rules ?? [];
 
         // Build new rule
@@ -221,42 +223,42 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
           `/zones/${params.zone_id}/rulesets/${params.ruleset_id}`,
           {
             rules: [...existingRules, newRule],
-          }
+          },
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Update Ruleset Rule ───────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_update_ruleset_rule",
+    'cloudflare_update_ruleset_rule',
     {
-      title: "Update Cloudflare Ruleset Rule",
+      title: 'Update Cloudflare Ruleset Rule',
       description:
-        "Update an existing rule in a Cloudflare ruleset. Fetches the ruleset, finds the rule by ID, replaces it with the new expression/action, and PUTs the full ruleset back.",
+        'Update an existing rule in a Cloudflare ruleset. Fetches the ruleset, finds the rule by ID, replaces it with the new expression/action, and PUTs the full ruleset back.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
-        ruleset_id: z.string().describe("Cloudflare ruleset ID"),
-        rule_id: z.string().describe("ID of the rule to update"),
-        expression: z
-          .string()
-          .describe("New Cloudflare filter expression for the rule"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
+        ruleset_id: z.string().describe('Cloudflare ruleset ID'),
+        rule_id: z.string().describe('ID of the rule to update'),
+        expression: z.string().describe('New Cloudflare filter expression for the rule'),
         action: z
           .string()
-          .describe("New action: 'block', 'challenge', 'js_challenge', 'managed_challenge', 'skip', 'log'"),
+          .describe(
+            "New action: 'block', 'challenge', 'js_challenge', 'managed_challenge', 'skip', 'log'",
+          ),
         description: z
           .string()
           .optional()
-          .describe("Optional human-readable description for the rule"),
+          .describe('Optional human-readable description for the rule'),
       },
       annotations: {
         readOnlyHint: false,
@@ -276,7 +278,7 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
       try {
         // Fetch current ruleset
         const current = await cloudflareGet<Record<string, unknown>>(
-          `/zones/${params.zone_id}/rulesets/${params.ruleset_id}`
+          `/zones/${params.zone_id}/rulesets/${params.ruleset_id}`,
         );
         const currentData = current as { result?: { rules?: Record<string, unknown>[] } };
         const existingRules: Record<string, unknown>[] = currentData.result?.rules ?? [];
@@ -297,32 +299,32 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
 
         const result = await cloudflarePut<Record<string, unknown>>(
           `/zones/${params.zone_id}/rulesets/${params.ruleset_id}`,
-          { rules: updatedRules }
+          { rules: updatedRules },
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Delete Ruleset Rule ───────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_delete_ruleset_rule",
+    'cloudflare_delete_ruleset_rule',
     {
-      title: "Delete Cloudflare Ruleset Rule",
+      title: 'Delete Cloudflare Ruleset Rule',
       description:
-        "Permanently remove a rule from a Cloudflare ruleset. Fetches the ruleset, filters out the rule by ID, and PUTs the updated ruleset back. WARNING: This is irreversible.",
+        'Permanently remove a rule from a Cloudflare ruleset. Fetches the ruleset, filters out the rule by ID, and PUTs the updated ruleset back. WARNING: This is irreversible.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
-        ruleset_id: z.string().describe("Cloudflare ruleset ID"),
-        rule_id: z.string().describe("ID of the rule to delete"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
+        ruleset_id: z.string().describe('Cloudflare ruleset ID'),
+        rule_id: z.string().describe('ID of the rule to delete'),
       },
       annotations: {
         readOnlyHint: false,
@@ -343,7 +345,7 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
       try {
         // Fetch current ruleset
         const current = await cloudflareGet<Record<string, unknown>>(
-          `/zones/${zone_id}/rulesets/${ruleset_id}`
+          `/zones/${zone_id}/rulesets/${ruleset_id}`,
         );
         const currentData = current as { result?: { rules?: Record<string, unknown>[] } };
         const existingRules: Record<string, unknown>[] = currentData.result?.rules ?? [];
@@ -353,12 +355,12 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
 
         const result = await cloudflarePut<Record<string, unknown>>(
           `/zones/${zone_id}/rulesets/${ruleset_id}`,
-          { rules: updatedRules }
+          { rules: updatedRules },
         );
         return {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: `Rule ${rule_id} deleted.\n${JSON.stringify(result, null, 2)}`,
             },
           ],
@@ -366,26 +368,26 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Purge Cache ───────────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_purge_cache",
+    'cloudflare_purge_cache',
     {
-      title: "Purge Cloudflare Cache",
+      title: 'Purge Cloudflare Cache',
       description:
         "Purge cached content from Cloudflare's edge for a zone. Can purge everything, specific URLs, or by cache tags. At least one of purge_everything, files, or tags must be provided. NOTE: purge_everything invalidates all cached content — use with caution.",
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
         purge_everything: z
           .boolean()
           .optional()
-          .describe("If true, purges all cached content for the zone. Use with caution."),
+          .describe('If true, purges all cached content for the zone. Use with caution.'),
         files: z
           .array(z.string())
           .optional()
@@ -393,7 +395,7 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
         tags: z
           .array(z.string())
           .optional()
-          .describe("Array of cache tags to purge (requires Cloudflare Enterprise)"),
+          .describe('Array of cache tags to purge (requires Cloudflare Enterprise)'),
       },
       annotations: {
         readOnlyHint: false,
@@ -416,17 +418,17 @@ export function registerCloudflareSecurityTools(server: McpServer): void {
 
         const result = await cloudflarePost<Record<string, unknown>>(
           `/zones/${params.zone_id}/purge_cache`,
-          body
+          body,
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 }

@@ -33,7 +33,7 @@ export interface ApprovedItem {
     pr_url?: string | null;
 }
 export interface OutcomeBody {
-    outcome: "done" | "failed" | "blocked" | "skipped_conformant";
+    outcome: 'done' | 'failed' | 'blocked' | 'skipped_conformant';
     detail?: string;
     tool_calls?: Record<string, unknown>;
     rollback?: Record<string, unknown>;

@@ -2,16 +2,16 @@
 // emit the rest to the change-manager → email only NEW urgent items. Deps (CM POST,
 // urgent email) are injected so this is unit-testable; file paths point at the
 // 0600-validated baseline / emit-state / rollback stores.
-import { diffFindings, loadBaseline, saveBaseline, snapshot } from "./baseline.js";
-import { buildEscalations, mergeEmitState, newEscalations } from "./emit.js";
-import { loadEmitState, pruneEmitState, saveEmitState } from "./emit-state.js";
-import { runAutoFixes } from "./autofix.js";
-import { parseScan } from "./scan-parser.js";
-import { classify } from "./taxonomy.js";
+import { diffFindings, loadBaseline, saveBaseline, snapshot } from './baseline.js';
+import { buildEscalations, mergeEmitState, newEscalations, } from './emit.js';
+import { loadEmitState, pruneEmitState, saveEmitState } from './emit-state.js';
+import { runAutoFixes } from './autofix.js';
+import { parseScan } from './scan-parser.js';
+import { classify } from './taxonomy.js';
 export async function runSecurityDrift(config, deps) {
     const date = config.now.slice(0, 10);
     const findings = [
-        ...parseScan(config.scanStdout).filter((f) => f.severity !== "PASS"),
+        ...parseScan(config.scanStdout).filter((f) => f.severity !== 'PASS'),
         ...(config.extraFindings ?? []),
     ];
     const classifiedAll = [];
@@ -25,11 +25,11 @@ export async function runSecurityDrift(config, deps) {
             classifiedAll.push({ finding, classification });
     }
     // --- AUTO-FIX the narrow set; blocked ones re-tier to URGENT ---
-    const autoCandidates = classifiedAll.filter((c) => c.classification.tier === "AUTO_FIX");
+    const autoCandidates = classifiedAll.filter((c) => c.classification.tier === 'AUTO_FIX');
     const byTarget = new Map(autoCandidates.map((c) => [c.finding.target, c]));
     const run = runAutoFixes(autoCandidates.map((c) => c.finding.target), { allowlist: config.autoFixAllowlist, rollbackLog: config.rollbackLog, cap: config.autoFixCap });
     // Items that go to the CM for approval = non-auto findings + blocked-autofix (re-tiered URGENT).
-    const nonAuto = classifiedAll.filter((c) => c.classification.tier !== "AUTO_FIX");
+    const nonAuto = classifiedAll.filter((c) => c.classification.tier !== 'AUTO_FIX');
     for (const b of run.blocked) {
         const orig = byTarget.get(b.target);
         if (!orig)
@@ -37,10 +37,12 @@ export async function runSecurityDrift(config, deps) {
         nonAuto.push({
             finding: orig.finding,
             classification: {
-                tier: "URGENT",
-                kind: "question",
-                risk: "caution",
-                remediation: { manual: [`Auto-fix BLOCKED (${b.reason}). Review and tighten ${b.target} manually.`] },
+                tier: 'URGENT',
+                kind: 'question',
+                risk: 'caution',
+                remediation: {
+                    manual: [`Auto-fix BLOCKED (${b.reason}). Review and tighten ${b.target} manually.`],
+                },
                 title: orig.classification.title,
             },
         });
@@ -59,14 +61,16 @@ export async function runSecurityDrift(config, deps) {
     await deps.postSync({
         generated_at: config.now,
         source_report: `${date}.security.json`,
-        source: "security",
+        source: 'security',
         escalations,
     });
     // Persist plan-hashes (merge + prune) for the 4am integrity gate.
     const merged = mergeEmitState(pruneEmitState(loadEmitState(config.emitStateFile), config.emitStateMaxAgeDays ?? 14, config.now), hashes, config.now);
     saveEmitState(config.emitStateFile, merged);
     // --- Immediate URGENT email: only NEW urgent items, and never on the seed run ---
-    const newUrgent = seeded ? [] : newEscalations(escalations.filter((e) => e.urgent), diffs);
+    const newUrgent = seeded
+        ? []
+        : newEscalations(escalations.filter((e) => e.urgent), diffs);
     let urgentEmailed = 0;
     if (newUrgent.length)
         urgentEmailed = (await deps.sendUrgent(newUrgent)) ? newUrgent.length : 0;
@@ -74,25 +78,34 @@ export async function runSecurityDrift(config, deps) {
     saveBaseline(config.baselineFile, snapshot(finalClassified, config.now, baseline ?? {}));
     const urgent = escalations.filter((e) => e.urgent).length;
     const digest = renderDigest(date, { seeded, run, escalations, urgent });
-    return { seeded, autoFixed: run.applied, autoFixBlocked: run.blocked, emitted: escalations.length, urgent, urgentEmailed, digest };
+    return {
+        seeded,
+        autoFixed: run.applied,
+        autoFixBlocked: run.blocked,
+        emitted: escalations.length,
+        urgent,
+        urgentEmailed,
+        digest,
+    };
 }
 function renderDigest(date, s) {
     const lines = [];
     lines.push(`# Security drift ${date}`);
     if (s.seeded)
-        lines.push("", "_First run: accepted baseline seeded; no urgent emails sent. Items below are queued for approval._");
-    lines.push("", `**${s.escalations.length} need approval** (${s.urgent} urgent) · ${s.run.applied.length} auto-fixed · ${s.run.blocked.length} blocked→urgent`);
+        lines.push('', '_First run: accepted baseline seeded; no urgent emails sent. Items below are queued for approval._');
+    lines.push('', `**${s.escalations.length} need approval** (${s.urgent} urgent) · ${s.run.applied.length} auto-fixed · ${s.run.blocked.length} blocked→urgent`);
     if (s.run.applied.length) {
-        lines.push("", "## Auto-fixed (chmod 600)");
+        lines.push('', '## Auto-fixed (chmod 600)');
         for (const a of s.run.applied)
             lines.push(`- ${a.target} (was ${a.priorMode.toString(8)})`);
     }
     if (s.escalations.length) {
-        lines.push("", "## Needs approval");
+        lines.push('', '## Needs approval');
         for (const e of s.escalations)
-            lines.push(`- ${e.urgent ? "🚨 " : ""}[${e.plan.tier}] ${e.target.name} — ${e.reasoning}`);
+            lines.push(`- ${e.urgent ? '🚨 ' : ''}[${e.plan.tier}] ${e.target.name} — ${e.reasoning}`);
     }
-    lines.push("", "## Blind spots", s.escalations[0]?.plan.blind_spots ?? "File-scan excludes env vars and git history; rotation still required.");
-    return lines.join("\n");
+    lines.push('', '## Blind spots', s.escalations[0]?.plan.blind_spots ??
+        'File-scan excludes env vars and git history; rotation still required.');
+    return lines.join('\n');
 }
 //# sourceMappingURL=runner.js.map

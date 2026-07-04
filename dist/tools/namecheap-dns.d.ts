@@ -19,6 +19,6 @@
  *   namecheap_dns_set_nameservers - Set custom nameservers
  *   namecheap_dns_set_default   - Reset to Namecheap default DNS
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export declare function registerNamecheapDNSTools(server: McpServer): void;
 //# sourceMappingURL=namecheap-dns.d.ts.map

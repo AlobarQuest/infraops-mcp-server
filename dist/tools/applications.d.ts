@@ -6,6 +6,6 @@
  *   Git-based:    Public Repository, Private Repository (GitHub App), Private Repository (Deploy Key)
  *   Docker-based: Dockerfile, Docker Compose (Empty), Docker Image
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export declare function registerApplicationTools(server: McpServer): void;
 //# sourceMappingURL=applications.d.ts.map

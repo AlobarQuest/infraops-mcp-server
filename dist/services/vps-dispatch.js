@@ -12,8 +12,8 @@
  * prefixed with `sudo`. Use `dockerCmdPrefix(instance)` inside the docker-specific tools
  * so callers never have to think about it.
  */
-import { sshExec, sshReadFile, sshWriteFile, handleSSHError } from "./ssh-client.js";
-import { orbExec, getOrbMachine, handleOrbError } from "./orb-client.js";
+import { sshExec, sshReadFile, sshWriteFile, handleSSHError } from './ssh-client.js';
+import { orbExec, getOrbMachine, handleOrbError } from './orb-client.js';
 /**
  * Execute a shell command on the selected VPS instance.
  *
@@ -21,7 +21,7 @@ import { orbExec, getOrbMachine, handleOrbError } from "./orb-client.js";
  * - dev  → `orb run -m <machine> bash -c <command>`
  */
 export async function vpsExec(instance, command, options = {}) {
-    if (instance === "dev") {
+    if (instance === 'dev') {
         return orbExec(getOrbMachine(), command, options);
     }
     return sshExec(command, options);
@@ -31,14 +31,14 @@ export async function vpsExec(instance, command, options = {}) {
  * Routes through `cat` on dev so we don't need SFTP on the OrbStack machine.
  */
 export async function vpsReadFile(instance, path) {
-    if (instance === "prod") {
+    if (instance === 'prod') {
         return sshReadFile(path);
     }
     const result = await vpsExec(instance, `cat ${escapeShell(path)}`, {
         allowFailure: true,
     });
     if (result.exitCode !== 0) {
-        throw new Error(`Failed to read ${path}: ${result.stderr || "(empty)"}`);
+        throw new Error(`Failed to read ${path}: ${result.stderr || '(empty)'}`);
     }
     return result.stdout;
 }
@@ -47,13 +47,13 @@ export async function vpsReadFile(instance, path) {
  * Uses a heredoc so arbitrary content (including quotes) round-trips safely.
  */
 export async function vpsWriteFile(instance, path, content) {
-    if (instance === "prod") {
+    if (instance === 'prod') {
         return sshWriteFile(path, content);
     }
     const command = `cat > ${escapeShell(path)} << 'INFRAOPS_EOF'\n${content}\nINFRAOPS_EOF`;
     const result = await vpsExec(instance, command, { allowFailure: true });
     if (result.exitCode !== 0) {
-        throw new Error(`Failed to write ${path}: ${result.stderr || "(empty)"}`);
+        throw new Error(`Failed to write ${path}: ${result.stderr || '(empty)'}`);
     }
 }
 /**
@@ -66,17 +66,17 @@ export async function vpsWriteFile(instance, path, content) {
  * vps_health) so callers don't have to know about the sudo split.
  */
 export function dockerCmdPrefix(instance) {
-    return instance === "dev" ? "sudo docker" : "docker";
+    return instance === 'dev' ? 'sudo docker' : 'docker';
 }
 /** Unified error formatter — picks the right handler based on instance. */
 export function handleVpsError(instance, error) {
-    return instance === "dev" ? handleOrbError(error) : handleSSHError(error);
+    return instance === 'dev' ? handleOrbError(error) : handleSSHError(error);
 }
 /** Describe the target an instance resolves to (for tool response preambles, if desired). */
 export function describeInstance(instance) {
-    if (instance === "dev")
+    if (instance === 'dev')
         return `OrbStack machine '${getOrbMachine()}' (dev)`;
-    return `${process.env.VPS_HOST || "178.156.247.239"} (prod)`;
+    return `${process.env.VPS_HOST || '178.156.247.239'} (prod)`;
 }
 function escapeShell(arg) {
     return `'${arg.replace(/'/g, "'\\''")}'`;

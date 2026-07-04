@@ -16,7 +16,7 @@ const LINE = /^(FAIL|WARN|PASS)\s+(\S+)\s+(.*)$/;
  */
 export function extractTarget(detail) {
     // "<path> (mode 644) ..." — robust even when the path contains spaces.
-    const modeIdx = detail.indexOf(" (mode ");
+    const modeIdx = detail.indexOf(' (mode ');
     if (modeIdx > 0)
         return detail.slice(0, modeIdx).trim();
     // "<file>: <rest>" — shell/mcp/tiktok forms. Require the left side to look like a path/file.
@@ -33,7 +33,7 @@ export function extractTarget(detail) {
 /** Parse scanner stdout into findings. Non-matching lines (headers, summary) are skipped. */
 export function parseScan(stdout) {
     const findings = [];
-    for (const raw of stdout.split("\n")) {
+    for (const raw of stdout.split('\n')) {
         const m = raw.match(LINE);
         if (!m)
             continue;

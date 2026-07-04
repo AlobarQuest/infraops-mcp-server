@@ -1,5 +1,5 @@
-import type { SyncBody, SyncSummary } from "../change-manager/api-client.js";
-import { type SecurityEscalation } from "./emit.js";
+import type { SyncBody, SyncSummary } from '../change-manager/api-client.js';
+import { type SecurityEscalation } from './emit.js';
 export interface RunnerConfig {
     scanStdout: string;
     now: string;
@@ -11,9 +11,9 @@ export interface RunnerConfig {
     autoFixCap: number;
     emitStateMaxAgeDays?: number;
     /** extra findings to merge with the scan output (e.g. control-plane self-check) */
-    extraFindings?: import("./scan-parser.js").Finding[];
+    extraFindings?: import('./scan-parser.js').Finding[];
     /** pre-built cred.* classifications (WS-0.7), keyed `${check}|${target}` */
-    credClassifications?: Record<string, import("./taxonomy.js").Classification>;
+    credClassifications?: Record<string, import('./taxonomy.js').Classification>;
 }
 export interface RunnerDeps {
     postSync: (body: SyncBody) => Promise<SyncSummary>;

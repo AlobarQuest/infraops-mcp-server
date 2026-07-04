@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import fs from "fs";
-import path from "path";
-import { auditInstance } from "../standards/run-audit.js";
-import { buildDriftReport, renderMarkdown, wasCleanlyAudited } from "../standards/report.js";
-import type { DriftReport } from "../standards/report.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
+import fs from 'fs';
+import path from 'path';
+import { auditInstance } from '../standards/run-audit.js';
+import { buildDriftReport, renderMarkdown, wasCleanlyAudited } from '../standards/report.js';
+import type { DriftReport } from '../standards/report.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
 
 /**
  * Headless drift audit. Runs `coolify_audit_standards` for one or more instances,
@@ -21,10 +21,10 @@ function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (!a.startsWith("--")) continue;
+    if (!a.startsWith('--')) continue;
     const key = a.slice(2);
     const next = argv[i + 1];
-    if (next !== undefined && !next.startsWith("--")) {
+    if (next !== undefined && !next.startsWith('--')) {
       args[key] = next;
       i++;
     } else {
@@ -39,11 +39,11 @@ function loadPreviousReport(dir: string, todayBasename: string): DriftReport | n
     if (!fs.existsSync(dir)) return null;
     const files = fs
       .readdirSync(dir)
-      .filter((f) => f.endsWith(".json") && f !== todayBasename)
+      .filter((f) => f.endsWith('.json') && f !== todayBasename)
       .sort();
     const last = files.pop();
     if (!last) return null;
-    return JSON.parse(fs.readFileSync(path.join(dir, last), "utf-8")) as DriftReport;
+    return JSON.parse(fs.readFileSync(path.join(dir, last), 'utf-8')) as DriftReport;
   } catch {
     return null;
   }
@@ -52,27 +52,38 @@ function loadPreviousReport(dir: string, todayBasename: string): DriftReport | n
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
-  const instances = String(args.instance ?? "prod")
-    .split(",")
+  const instances = String(args.instance ?? 'prod')
+    .split(',')
     .map((s) => s.trim())
     .filter(Boolean) as CoolifyInstance[];
 
-  const reportDir = typeof args["report-dir"] === "string" ? (args["report-dir"] as string) : undefined;
-  const generatedAt = typeof args.now === "string" ? (args.now as string) : new Date().toISOString();
+  const reportDir =
+    typeof args['report-dir'] === 'string' ? (args['report-dir'] as string) : undefined;
+  const generatedAt =
+    typeof args.now === 'string' ? (args.now as string) : new Date().toISOString();
   const dateStr = generatedAt.slice(0, 10);
   const toStdout = args.stdout === true || !reportDir;
 
   const prev = reportDir ? loadPreviousReport(reportDir, `${dateStr}.json`) : null;
 
-  const report = await buildDriftReport(instances, (inst) => auditInstance(inst), prev, generatedAt);
+  const report = await buildDriftReport(
+    instances,
+    (inst) => auditInstance(inst),
+    prev,
+    generatedAt,
+  );
 
   if (reportDir) {
     fs.mkdirSync(reportDir, { recursive: true });
-    fs.writeFileSync(path.join(reportDir, `${dateStr}.json`), JSON.stringify(report, null, 2), "utf-8");
-    fs.writeFileSync(path.join(reportDir, `${dateStr}.md`), renderMarkdown(report), "utf-8");
+    fs.writeFileSync(
+      path.join(reportDir, `${dateStr}.json`),
+      JSON.stringify(report, null, 2),
+      'utf-8',
+    );
+    fs.writeFileSync(path.join(reportDir, `${dateStr}.md`), renderMarkdown(report), 'utf-8');
   }
   if (toStdout) {
-    process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+    process.stdout.write(JSON.stringify(report, null, 2) + '\n');
   }
 
   // Exit non-zero unless at least one instance was audited cleanly. This trips the

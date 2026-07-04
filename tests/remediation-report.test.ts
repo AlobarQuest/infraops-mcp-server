@@ -1,62 +1,155 @@
-import { describe, it, expect } from "vitest";
-import { buildRemediationReport, type Escalation } from "../src/standards/remediation-report.js";
-import { renderRemediationMarkdown, buildRemediationReport as build2 } from "../src/standards/remediation-report.js";
-import type { ApplyResult } from "../src/standards/executor.js";
+import { describe, it, expect } from 'vitest';
+import { buildRemediationReport, type Escalation } from '../src/standards/remediation-report.js';
+import {
+  renderRemediationMarkdown,
+  buildRemediationReport as build2,
+} from '../src/standards/remediation-report.js';
+import type { ApplyResult } from '../src/standards/executor.js';
 
 const applied: ApplyResult[] = [
-  { proposal_id: "a1", target: { provider: "coolify", resource_type: "application", uuid: "u1", name: "app1" }, tool: "coolify_update_application", args: { uuid: "u1" }, status: "applied", detail: "ok" },
-  { proposal_id: "a2", target: { provider: "coolify", resource_type: "application", uuid: "u2", name: "app2" }, tool: "coolify_update_application", args: { uuid: "u2" }, status: "skipped", detail: "already conformant" },
-  { proposal_id: "a3", target: { provider: "coolify", resource_type: "application", uuid: "u3", name: "app3" }, tool: "coolify_update_application", args: { uuid: "u3" }, status: "failed", detail: "boom" },
+  {
+    proposal_id: 'a1',
+    target: { provider: 'coolify', resource_type: 'application', uuid: 'u1', name: 'app1' },
+    tool: 'coolify_update_application',
+    args: { uuid: 'u1' },
+    status: 'applied',
+    detail: 'ok',
+  },
+  {
+    proposal_id: 'a2',
+    target: { provider: 'coolify', resource_type: 'application', uuid: 'u2', name: 'app2' },
+    tool: 'coolify_update_application',
+    args: { uuid: 'u2' },
+    status: 'skipped',
+    detail: 'already conformant',
+  },
+  {
+    proposal_id: 'a3',
+    target: { provider: 'coolify', resource_type: 'application', uuid: 'u3', name: 'app3' },
+    tool: 'coolify_update_application',
+    args: { uuid: 'u3' },
+    status: 'failed',
+    detail: 'boom',
+  },
 ];
 
 const escalations: Escalation[] = [
-  { proposal_id: "q1", instance: "prod", target: { provider: "coolify", resource_type: "database", uuid: "db1", name: "pg1" }, risk: "safe", kind: "question", reasoning: "rule #572", plan: { generated_by: "sonnet", root_cause: "x", steps: ["s"], infraops_tools: [], risk: "caution", rollback: "r", cm_window_hint: "h" } },
+  {
+    proposal_id: 'q1',
+    instance: 'prod',
+    target: { provider: 'coolify', resource_type: 'database', uuid: 'db1', name: 'pg1' },
+    risk: 'safe',
+    kind: 'question',
+    reasoning: 'rule #572',
+    plan: {
+      generated_by: 'sonnet',
+      root_cause: 'x',
+      steps: ['s'],
+      infraops_tools: [],
+      risk: 'caution',
+      rollback: 'r',
+      cm_window_hint: 'h',
+    },
+  },
 ];
 
-describe("buildRemediationReport", () => {
-  it("computes totals from applied results and escalations", () => {
-    const r = buildRemediationReport({ generatedAt: "2026-06-13T07:00:00Z", sourceReport: "2026-06-13.json", applied, escalations, selfResolved: 2, runawayTripped: false });
+describe('buildRemediationReport', () => {
+  it('computes totals from applied results and escalations', () => {
+    const r = buildRemediationReport({
+      generatedAt: '2026-06-13T07:00:00Z',
+      sourceReport: '2026-06-13.json',
+      applied,
+      escalations,
+      selfResolved: 2,
+      runawayTripped: false,
+    });
     expect(r.schema_version).toBe(2);
-    expect(r.totals).toEqual({ applied: 1, skipped: 1, failed: 1, escalated: 1, self_resolved: 2, runaway_tripped: false });
-    expect(r.source_report).toBe("2026-06-13.json");
+    expect(r.totals).toEqual({
+      applied: 1,
+      skipped: 1,
+      failed: 1,
+      escalated: 1,
+      self_resolved: 2,
+      runaway_tripped: false,
+    });
+    expect(r.source_report).toBe('2026-06-13.json');
     expect(r.applied).toHaveLength(3);
     expect(r.escalations).toHaveLength(1);
   });
-  it("carries the runaway flag through", () => {
-    const r = buildRemediationReport({ generatedAt: "t", sourceReport: "s", applied: [], escalations, selfResolved: 0, runawayTripped: true });
+  it('carries the runaway flag through', () => {
+    const r = buildRemediationReport({
+      generatedAt: 't',
+      sourceReport: 's',
+      applied: [],
+      escalations,
+      selfResolved: 0,
+      runawayTripped: true,
+    });
     expect(r.totals.runaway_tripped).toBe(true);
   });
 });
 
-describe("renderRemediationMarkdown", () => {
-  it("renders a headline, an applied section, and an escalations section with the plan", () => {
-    const r = build2({ generatedAt: "2026-06-13T07:00:00Z", sourceReport: "2026-06-13.json", applied, escalations, selfResolved: 0, runawayTripped: false });
+describe('renderRemediationMarkdown', () => {
+  it('renders a headline, an applied section, and an escalations section with the plan', () => {
+    const r = build2({
+      generatedAt: '2026-06-13T07:00:00Z',
+      sourceReport: '2026-06-13.json',
+      applied,
+      escalations,
+      selfResolved: 0,
+      runawayTripped: false,
+    });
     const md = renderRemediationMarkdown(r);
-    expect(md).toContain("# Infra Remediation");
-    expect(md).toContain("1 fixed");
-    expect(md).toContain("1 need"); // escalations needing attention
-    expect(md).toContain("app1");   // an applied target
-    expect(md).toContain("pg1");    // an escalated target
-    expect(md).toContain("Plan");   // a plan section marker (e.g. "plan by sonnet")
+    expect(md).toContain('# Infra Remediation');
+    expect(md).toContain('1 fixed');
+    expect(md).toContain('1 need'); // escalations needing attention
+    expect(md).toContain('app1'); // an applied target
+    expect(md).toContain('pg1'); // an escalated target
+    expect(md).toContain('Plan'); // a plan section marker (e.g. "plan by sonnet")
   });
 
-  it("renders cleanly on an empty day (nothing drifted)", () => {
-    const r = build2({ generatedAt: "t", sourceReport: "s", applied: [], escalations: [], selfResolved: 0, runawayTripped: false });
+  it('renders cleanly on an empty day (nothing drifted)', () => {
+    const r = build2({
+      generatedAt: 't',
+      sourceReport: 's',
+      applied: [],
+      escalations: [],
+      selfResolved: 0,
+      runawayTripped: false,
+    });
     const md = renderRemediationMarkdown(r);
-    expect(md).toContain("0 fixed");
+    expect(md).toContain('0 fixed');
     expect(md).toMatch(/no .* attention|nothing/i);
   });
 
-  it("surfaces a loud banner when the runaway guard tripped", () => {
-    const r = build2({ generatedAt: "t", sourceReport: "s", applied: [], escalations, selfResolved: 0, runawayTripped: true });
+  it('surfaces a loud banner when the runaway guard tripped', () => {
+    const r = build2({
+      generatedAt: 't',
+      sourceReport: 's',
+      applied: [],
+      escalations,
+      selfResolved: 0,
+      runawayTripped: true,
+    });
     const md = renderRemediationMarkdown(r);
     expect(md).toMatch(/runaway|safety guard/i);
   });
 
   it("renders an 'Auto-fix held' line when an escalation carries a verify note", () => {
-    const held: Escalation[] = [{ ...escalations[0], note: "status 'running:unknown' is not running:healthy" }];
-    const md = renderRemediationMarkdown(build2({ generatedAt: "t", sourceReport: "s", applied: [], escalations: held, selfResolved: 0, runawayTripped: false }));
-    expect(md).toContain("Auto-fix held");
-    expect(md).toContain("running:unknown");
+    const held: Escalation[] = [
+      { ...escalations[0], note: "status 'running:unknown' is not running:healthy" },
+    ];
+    const md = renderRemediationMarkdown(
+      build2({
+        generatedAt: 't',
+        sourceReport: 's',
+        applied: [],
+        escalations: held,
+        selfResolved: 0,
+        runawayTripped: false,
+      }),
+    );
+    expect(md).toContain('Auto-fix held');
+    expect(md).toContain('running:unknown');
   });
 });

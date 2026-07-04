@@ -1,19 +1,27 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { coolifyGet, type CoolifyInstance } from "../services/coolify-client.js";
-import type { ApprovedItem } from "./api-client.js";
+import Anthropic from '@anthropic-ai/sdk';
+import { coolifyGet, type CoolifyInstance } from '../services/coolify-client.js';
+import type { ApprovedItem } from './api-client.js';
 import {
-  TOOLS, runTool, httpsConformant, revertRollback, deploymentSucceeded, httpsLive, firstDomain,
+  TOOLS,
+  runTool,
+  httpsConformant,
+  revertRollback,
+  deploymentSucceeded,
+  httpsLive,
+  firstDomain,
   type ToolCtx,
-} from "./tools.js";
+} from './tools.js';
 
 export interface ChangeOutcome {
-  outcome: "done" | "blocked" | "failed" | "skipped_conformant";
+  outcome: 'done' | 'blocked' | 'failed' | 'skipped_conformant';
   detail: string;
   rollback: Record<string, unknown>;
-  tool_calls: { calls: Array<{ name: string; input: unknown; result: string; is_error?: boolean }> };
+  tool_calls: {
+    calls: Array<{ name: string; input: unknown; result: string; is_error?: boolean }>;
+  };
 }
 
-type ToolCalls = ChangeOutcome["tool_calls"]["calls"];
+type ToolCalls = ChangeOutcome['tool_calls']['calls'];
 
 /** Injectable deps for post-verify — real defaults in prod, fast fakes in tests. */
 export interface PostVerifyDeps {
@@ -24,14 +32,20 @@ export interface PostVerifyDeps {
   sleep: (ms: number) => Promise<void>;
 }
 const defaultPostVerifyDeps: PostVerifyDeps = {
-  deploymentSucceeded, httpsLive, pollAttempts: 6, pollDelayMs: 10_000,
+  deploymentSucceeded,
+  httpsLive,
+  pollAttempts: 6,
+  pollDelayMs: 10_000,
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
 };
 
-export interface AgentDeps { client?: Anthropic; maxSteps?: number; }
+export interface AgentDeps {
+  client?: Anthropic;
+  maxSteps?: number;
+}
 
 /** HTTPS-enable remediation rule keys (the one change-type we live pre/post-verify). */
-const HTTPS_RULE_KEYS = new Set(["coolify.force_https"]);
+const HTTPS_RULE_KEYS = new Set(['coolify.force_https']);
 
 /** Precise match: is this an HTTPS-enable remediation? */
 function isHttpsRemediation(item: ApprovedItem): boolean {
@@ -42,7 +56,11 @@ function isHttpsRemediation(item: ApprovedItem): boolean {
 async function preValidateConformant(item: ApprovedItem, ctx: ToolCtx): Promise<boolean> {
   if (!isHttpsRemediation(item)) return false;
   try {
-    const app = await coolifyGet<Record<string, unknown>>(`/applications/${item.resource_uuid}`, undefined, ctx.instance);
+    const app = await coolifyGet<Record<string, unknown>>(
+      `/applications/${item.resource_uuid}`,
+      undefined,
+      ctx.instance,
+    );
     return !!app && httpsConformant(app);
   } catch {
     return false; // can't confirm → let the agent try
@@ -64,7 +82,10 @@ async function preValidateConformant(item: ApprovedItem, ctx: ToolCtx): Promise<
  * revert a possibly-good change on a read failure.
  */
 export async function postVerifyOrRevert(
-  item: ApprovedItem, ctx: ToolCtx, calls: ToolCalls, deps: PostVerifyDeps = defaultPostVerifyDeps,
+  item: ApprovedItem,
+  ctx: ToolCtx,
+  calls: ToolCalls,
+  deps: PostVerifyDeps = defaultPostVerifyDeps,
 ): Promise<ChangeOutcome | null> {
   const checksDomains = ctx.rollback.domains !== undefined;
   const checksHealth = ctx.rollback.health_check_enabled !== undefined;
@@ -72,38 +93,48 @@ export async function postVerifyOrRevert(
 
   const fail = async (detail: string): Promise<ChangeOutcome> => {
     await revertRollback(item.resource_uuid, ctx.rollback, ctx.instance).catch(() => {});
-    return { outcome: "failed", detail: `post-verify failed: ${detail}; reverted via rollback`, rollback: ctx.rollback, tool_calls: { calls } };
+    return {
+      outcome: 'failed',
+      detail: `post-verify failed: ${detail}; reverted via rollback`,
+      rollback: ctx.rollback,
+      tool_calls: { calls },
+    };
   };
 
   try {
-    const app = await coolifyGet<Record<string, unknown>>(`/applications/${item.resource_uuid}`, undefined, ctx.instance);
+    const app = await coolifyGet<Record<string, unknown>>(
+      `/applications/${item.resource_uuid}`,
+      undefined,
+      ctx.instance,
+    );
 
     if (checksDomains) {
       // 1. config gate (unchanged): the domain field must actually be https now.
-      if (!app || !httpsConformant(app)) return await fail("domains not https after change");
+      if (!app || !httpsConformant(app)) return await fail('domains not https after change');
       // 2. (B) deterministic: a redeploy must have run without error — the async deploy is
       //    what regenerates the Traefik route + Let's Encrypt cert. Never-run or errored
       //    (e.g. the booking-preview redeploy 404) is a half-applied state, not `done`.
-      const redeploy = calls.find((c) => c.name === "redeploy_application");
-      if (!redeploy || redeploy.is_error) return await fail("redeploy did not run or errored after domain change");
+      const redeploy = calls.find((c) => c.name === 'redeploy_application');
+      if (!redeploy || redeploy.is_error)
+        return await fail('redeploy did not run or errored after domain change');
       // 3. (A) confirm the deployment reached success, bounded poll; then probe the live cert.
-      const since = typeof ctx.domainsChangedAt === "number" ? ctx.domainsChangedAt : 0;
+      const since = typeof ctx.domainsChangedAt === 'number' ? ctx.domainsChangedAt : 0;
       let verdict = await deps.deploymentSucceeded(item.resource_uuid, since, ctx.instance);
-      for (let i = 1; i < deps.pollAttempts && verdict === "pending"; i++) {
+      for (let i = 1; i < deps.pollAttempts && verdict === 'pending'; i++) {
         await deps.sleep(deps.pollDelayMs);
         verdict = await deps.deploymentSucceeded(item.resource_uuid, since, ctx.instance);
       }
-      if (verdict === "failed") return await fail("deploy failed after domain change");
-      if (verdict === "success") {
+      if (verdict === 'failed') return await fail('deploy failed after domain change');
+      if (verdict === 'success') {
         const domain = firstDomain(app);
         const live = domain ? await deps.httpsLive(domain) : true;
-        if (!live) return await fail("live cert not valid after deploy");
+        if (!live) return await fail('live cert not valid after deploy');
       }
       // verdict pending/unknown on a clean redeploy → inconclusive; keep `done` (conservative).
     }
 
     if (checksHealth && (!app || app.health_check_enabled !== true)) {
-      return await fail("health check not enabled after change");
+      return await fail('health check not enabled after change');
     }
   } catch {
     return null;
@@ -113,14 +144,14 @@ export async function postVerifyOrRevert(
 
 function buildSystem(): string {
   return [
-    "You are an infrastructure change executor for a Coolify platform.",
-    "Implement the approved remediation using ONLY the provided tools.",
-    "Read the resource first if useful. For HTTPS: set the domains to https:// then redeploy.",
-    "For health-checks: only enable if you can supply a path the app actually serves; otherwise report_blocked.",
-    "When the change is complete, call report_done with a short summary.",
-    "If you cannot complete it (missing prerequisite, no safe path, or needs a human decision), call report_blocked with the reason.",
-    "Never invent tools. Make the minimal change.",
-  ].join("\n");
+    'You are an infrastructure change executor for a Coolify platform.',
+    'Implement the approved remediation using ONLY the provided tools.',
+    'Read the resource first if useful. For HTTPS: set the domains to https:// then redeploy.',
+    'For health-checks: only enable if you can supply a path the app actually serves; otherwise report_blocked.',
+    'When the change is complete, call report_done with a short summary.',
+    'If you cannot complete it (missing prerequisite, no safe path, or needs a human decision), call report_blocked with the reason.',
+    'Never invent tools. Make the minimal change.',
+  ].join('\n');
 }
 
 function buildUserMessage(item: ApprovedItem): string {
@@ -128,7 +159,7 @@ function buildUserMessage(item: ApprovedItem): string {
     `Resource: ${item.resource_type} '${item.resource_name}' (uuid ${item.resource_uuid}, instance ${item.instance})`,
     `Deviation: ${item.reasoning}`,
     `Guidance plan (advisory; tool names in it may be wrong — use only the provided tools): ${JSON.stringify(item.plan)}`,
-  ].join("\n");
+  ].join('\n');
 }
 
 /**
@@ -136,49 +167,76 @@ function buildUserMessage(item: ApprovedItem): string {
  * Never throws: any failure resolves to outcome "failed". report_done → done; report_blocked → blocked;
  * exceeding maxSteps without a report → failed.
  */
-export async function runChangeAgent(item: ApprovedItem, deps: AgentDeps = {}): Promise<ChangeOutcome> {
+export async function runChangeAgent(
+  item: ApprovedItem,
+  deps: AgentDeps = {},
+): Promise<ChangeOutcome> {
   const client = deps.client ?? new Anthropic();
   const maxSteps = deps.maxSteps ?? 12;
   const ctx: ToolCtx = { instance: item.instance as CoolifyInstance, rollback: {} };
   const calls: ToolCalls = [];
 
-  const messages: Anthropic.MessageParam[] = [{ role: "user", content: buildUserMessage(item) }];
+  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: buildUserMessage(item) }];
 
   try {
     // Pre-validate live: already-conformant → skip without running the agent or writing.
     if (await preValidateConformant(item, ctx)) {
-      return { outcome: "skipped_conformant", detail: "already conformant live; no change needed", rollback: ctx.rollback, tool_calls: { calls } };
+      return {
+        outcome: 'skipped_conformant',
+        detail: 'already conformant live; no change needed',
+        rollback: ctx.rollback,
+        tool_calls: { calls },
+      };
     }
 
     for (let step = 0; step < maxSteps; step++) {
       const res: Anthropic.Message = await client.messages.create({
-        model: "claude-sonnet-4-6",
+        model: 'claude-sonnet-4-6',
         max_tokens: 4096,
         system: buildSystem(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         tools: TOOLS as any,
         messages,
       });
-      messages.push({ role: "assistant", content: res.content });
+      messages.push({ role: 'assistant', content: res.content });
 
-      const toolUses = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+      const toolUses = res.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+      );
       if (toolUses.length === 0) {
         // model ended without a control tool → treat as failed (no completion signal)
-        return { outcome: "failed", detail: "agent ended without report_done/blocked", rollback: ctx.rollback, tool_calls: { calls } };
+        return {
+          outcome: 'failed',
+          detail: 'agent ended without report_done/blocked',
+          rollback: ctx.rollback,
+          tool_calls: { calls },
+        };
       }
 
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
       for (const tu of toolUses) {
-        if (tu.name === "report_done") {
-          const summary = String((tu.input as { summary?: string }).summary ?? "done");
+        if (tu.name === 'report_done') {
+          const summary = String((tu.input as { summary?: string }).summary ?? 'done');
           calls.push({ name: tu.name, input: tu.input, result: summary });
           const reverted = await postVerifyOrRevert(item, ctx, calls);
-          return reverted ?? { outcome: "done", detail: summary, rollback: ctx.rollback, tool_calls: { calls } };
+          return (
+            reverted ?? {
+              outcome: 'done',
+              detail: summary,
+              rollback: ctx.rollback,
+              tool_calls: { calls },
+            }
+          );
         }
-        if (tu.name === "report_blocked") {
-          const reason = String((tu.input as { reason?: string }).reason ?? "blocked");
+        if (tu.name === 'report_blocked') {
+          const reason = String((tu.input as { reason?: string }).reason ?? 'blocked');
           calls.push({ name: tu.name, input: tu.input, result: reason });
-          return { outcome: "blocked", detail: reason, rollback: ctx.rollback, tool_calls: { calls } };
+          return {
+            outcome: 'blocked',
+            detail: reason,
+            rollback: ctx.rollback,
+            tool_calls: { calls },
+          };
         }
         // a write/read tool
         let result: string;
@@ -190,12 +248,27 @@ export async function runChangeAgent(item: ApprovedItem, deps: AgentDeps = {}): 
           isError = true;
         }
         calls.push({ name: tu.name, input: tu.input, result, is_error: isError });
-        toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: result, is_error: isError });
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: result,
+          is_error: isError,
+        });
       }
-      messages.push({ role: "user", content: toolResults });
+      messages.push({ role: 'user', content: toolResults });
     }
-    return { outcome: "failed", detail: "exceeded max steps", rollback: ctx.rollback, tool_calls: { calls } };
+    return {
+      outcome: 'failed',
+      detail: 'exceeded max steps',
+      rollback: ctx.rollback,
+      tool_calls: { calls },
+    };
   } catch (e) {
-    return { outcome: "failed", detail: e instanceof Error ? e.message : String(e), rollback: ctx.rollback, tool_calls: { calls } };
+    return {
+      outcome: 'failed',
+      detail: e instanceof Error ? e.message : String(e),
+      rollback: ctx.rollback,
+      tool_calls: { calls },
+    };
   }
 }

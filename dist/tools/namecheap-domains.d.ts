@@ -17,6 +17,6 @@
  *   namecheap_domains_get_tld_list  - Get available TLDs and pricing
  *   namecheap_domains_get_env       - Show current API environment (sandbox/production)
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export declare function registerNamecheapDomainTools(server: McpServer): void;
 //# sourceMappingURL=namecheap-domains.d.ts.map

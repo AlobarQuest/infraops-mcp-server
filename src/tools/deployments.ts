@@ -4,41 +4,34 @@
  * Trigger, monitor, and inspect deployments.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import {
-  coolifyGet,
-  coolifyPost,
-  handleCoolifyError,
-} from "../services/coolify-client.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
-import { jsonResponse } from "../utils/response.js";
-import type { CoolifyDeployment } from "../types.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { coolifyGet, coolifyPost, handleCoolifyError } from '../services/coolify-client.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from '../schemas/common.js';
+import { jsonResponse } from '../utils/response.js';
+import type { CoolifyDeployment } from '../types.js';
 
 export function registerDeploymentTools(server: McpServer): void {
   // ── Deploy Application ───────────────────────────────────────────
 
   server.registerTool(
-    "coolify_deploy",
+    'coolify_deploy',
     {
-      title: "Deploy Application",
+      title: 'Deploy Application',
       description:
-        "Trigger a deployment for one or more applications. Can deploy by application UUID or by tag " +
-        "(tags let you deploy an entire group of apps at once). Returns the deployment UUID for tracking.",
+        'Trigger a deployment for one or more applications. Can deploy by application UUID or by tag ' +
+        '(tags let you deploy an entire group of apps at once). Returns the deployment UUID for tracking.',
       inputSchema: {
         uuid: z
           .string()
           .optional()
-          .describe("Application UUID to deploy (use this OR tag, not both)"),
-        tag: z
-          .string()
-          .optional()
-          .describe("Deploy all applications matching this tag"),
+          .describe('Application UUID to deploy (use this OR tag, not both)'),
+        tag: z.string().optional().describe('Deploy all applications matching this tag'),
         force: z
           .boolean()
           .default(false)
-          .describe("Force rebuild even if no changes detected (default: false)"),
+          .describe('Force rebuild even if no changes detected (default: false)'),
         instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
@@ -65,7 +58,7 @@ export function registerDeploymentTools(server: McpServer): void {
             isError: true,
             content: [
               {
-                type: "text",
+                type: 'text',
                 text: "Error: Provide either 'uuid' (single app) or 'tag' (batch deploy). Neither was supplied.",
               },
             ],
@@ -77,33 +70,29 @@ export function registerDeploymentTools(server: McpServer): void {
         if (tag) params.tag = tag;
         if (force) params.force = true;
 
-        const result = await coolifyPost<Record<string, unknown>>(
-          "/deploy",
-          params,
-          instance
-        );
+        const result = await coolifyPost<Record<string, unknown>>('/deploy', params, instance);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── List Deployments (by application) ────────────────────────────
 
   server.registerTool(
-    "coolify_list_deployments",
+    'coolify_list_deployments',
     {
-      title: "List Application Deployments",
+      title: 'List Application Deployments',
       description:
-        "List deployment history for a specific application. Returns status, commit, timestamps, and deployment UUIDs.",
+        'List deployment history for a specific application. Returns status, commit, timestamps, and deployment UUIDs.',
       inputSchema: {
-        uuid: z.string().min(1).describe("Application UUID"),
+        uuid: z.string().min(1).describe('Application UUID'),
         instance: CoolifyInstanceSchema,
       },
       annotations: {
@@ -118,17 +107,17 @@ export function registerDeploymentTools(server: McpServer): void {
         const envelope = await coolifyGet<{ count: number; deployments: CoolifyDeployment[] }>(
           `/deployments/applications/${uuid}`,
           undefined,
-          instance
+          instance,
         );
         const deployments = Array.isArray(envelope?.deployments) ? envelope.deployments : [];
         return {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: JSON.stringify(
                 { count: envelope?.count ?? deployments.length, deployments },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -136,25 +125,24 @@ export function registerDeploymentTools(server: McpServer): void {
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Get Deployment ───────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_get_deployment",
+    'coolify_get_deployment',
     {
-      title: "Get Deployment Details",
-      description:
-        "Get full details and logs for a specific deployment by its deployment UUID.",
+      title: 'Get Deployment Details',
+      description: 'Get full details and logs for a specific deployment by its deployment UUID.',
       inputSchema: {
         deployment_uuid: z
           .string()
           .min(1)
-          .describe("The deployment UUID (not the application UUID)"),
+          .describe('The deployment UUID (not the application UUID)'),
         instance: CoolifyInstanceSchema,
       },
       annotations: {
@@ -164,36 +152,44 @@ export function registerDeploymentTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ deployment_uuid, instance }: { deployment_uuid: string; instance: CoolifyInstance }) => {
+    async ({
+      deployment_uuid,
+      instance,
+    }: {
+      deployment_uuid: string;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const deployment = await coolifyGet<CoolifyDeployment>(
           `/deployments/${deployment_uuid}`,
           undefined,
-          instance
+          instance,
         );
         return jsonResponse(deployment);
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Cancel Deployment ────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_cancel_deployment",
+    'coolify_cancel_deployment',
     {
-      title: "Cancel Deployment",
+      title: 'Cancel Deployment',
       description:
-        "Cancel a running or queued deployment by its deployment UUID (not the application UUID).",
+        'Cancel a running or queued deployment by its deployment UUID (not the application UUID).',
       inputSchema: {
         deployment_uuid: z
           .string()
           .min(1)
-          .describe("The deployment UUID to cancel (from coolify_deploy or coolify_list_deployments)"),
+          .describe(
+            'The deployment UUID to cancel (from coolify_deploy or coolify_list_deployments)',
+          ),
         instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
@@ -203,20 +199,26 @@ export function registerDeploymentTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ deployment_uuid, instance }: { deployment_uuid: string; instance: CoolifyInstance }) => {
+    async ({
+      deployment_uuid,
+      instance,
+    }: {
+      deployment_uuid: string;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const result = await coolifyPost<{ message?: string }>(
           `/deployments/${deployment_uuid}/cancel`,
           undefined,
-          instance
+          instance,
         );
         return jsonResponse(result);
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 }

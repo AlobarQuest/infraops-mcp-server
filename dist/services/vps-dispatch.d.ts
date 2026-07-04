@@ -12,7 +12,7 @@
  * prefixed with `sudo`. Use `dockerCmdPrefix(instance)` inside the docker-specific tools
  * so callers never have to think about it.
  */
-export type VpsInstance = "prod" | "dev";
+export type VpsInstance = 'prod' | 'dev';
 export interface VpsExecResult {
     stdout: string;
     stderr: string;

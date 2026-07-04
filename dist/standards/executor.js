@@ -1,5 +1,5 @@
-import { coolifyGet, coolifyPatch } from "../services/coolify-client.js";
-import { vpsExec, dockerCmdPrefix } from "../services/vps-dispatch.js";
+import { coolifyGet, coolifyPatch } from '../services/coolify-client.js';
+import { vpsExec, dockerCmdPrefix } from '../services/vps-dispatch.js';
 export const SAFE_TOOLS = {
     coolify_update_application: {
         fetch: (args, instance) => coolifyGet(`/applications/${args.uuid}`, undefined, instance),
@@ -12,7 +12,7 @@ export const SAFE_TOOLS = {
 /** True if applying `args` would actually change the resource (uuid is the selector, not a field). */
 export function wouldChange(current, args) {
     for (const [k, v] of Object.entries(args)) {
-        if (k === "uuid")
+        if (k === 'uuid')
             continue;
         if (current[k] !== v)
             return true;
@@ -21,9 +21,9 @@ export function wouldChange(current, args) {
 }
 /** The four-gate check: only safe, high-confidence, whitelisted remediations may auto-apply. */
 export function isAutoApplicable(p) {
-    return (p.kind === "remediation" &&
-        p.risk === "safe" &&
-        p.confidence === "high" &&
+    return (p.kind === 'remediation' &&
+        p.risk === 'safe' &&
+        p.confidence === 'high' &&
         p.planned_action !== null &&
         Object.prototype.hasOwnProperty.call(SAFE_TOOLS, p.planned_action.tool));
 }
@@ -44,27 +44,27 @@ export async function applyAction(p, instance, opts = {}) {
     const base = {
         proposal_id: p.id,
         target: p.target,
-        tool: p.planned_action?.tool ?? "",
+        tool: p.planned_action?.tool ?? '',
         args: p.planned_action?.args ?? {},
     };
     if (!isAutoApplicable(p)) {
-        return { ...base, status: "failed", detail: "not auto-applicable (gate failed)" };
+        return { ...base, status: 'failed', detail: 'not auto-applicable (gate failed)' };
     }
     const tool = SAFE_TOOLS[p.planned_action.tool];
     const args = p.planned_action.args;
     try {
         const current = await tool.fetch(args, instance);
         if (!wouldChange(current, args)) {
-            return { ...base, status: "skipped", detail: "already conformant" };
+            return { ...base, status: 'skipped', detail: 'already conformant' };
         }
         if (opts.dryRun) {
-            return { ...base, status: "skipped", detail: "dry-run (would apply)" };
+            return { ...base, status: 'skipped', detail: 'dry-run (would apply)' };
         }
         await tool.apply(args, instance);
-        return { ...base, status: "applied", detail: "applied successfully" };
+        return { ...base, status: 'applied', detail: 'applied successfully' };
     }
     catch (e) {
-        return { ...base, status: "failed", detail: e instanceof Error ? e.message : String(e) };
+        return { ...base, status: 'failed', detail: e instanceof Error ? e.message : String(e) };
     }
 }
 const PROBE_TIMEOUT_MS = 5000;
@@ -77,10 +77,13 @@ export async function probeHealthPath(url, timeoutMs) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-        const res = await fetch(url, { method: "GET", redirect: "manual", signal: ctrl.signal });
+        const res = await fetch(url, { method: 'GET', redirect: 'manual', signal: ctrl.signal });
         // An opaqueredirect (manual redirect) reports status 0 — surface it as a redirect, not "HTTP 0".
         const status = res.status === 0 ? 302 : res.status;
-        return { status, reason: res.status === 0 ? "redirect (no direct 2xx — likely auth/SSO)" : `HTTP ${res.status}` };
+        return {
+            status,
+            reason: res.status === 0 ? 'redirect (no direct 2xx — likely auth/SSO)' : `HTTP ${res.status}`,
+        };
     }
     catch (e) {
         return { status: null, reason: e instanceof Error ? e.message : String(e) };
@@ -94,22 +97,26 @@ export async function probeHealthPath(url, timeoutMs) {
  * stripped) + the path. Returns null when there is no FQDN to probe.
  */
 export function buildHealthProbeUrl(fqdn, path) {
-    const first = String(fqdn ?? "").split(",")[0].trim();
+    const first = String(fqdn ?? '')
+        .split(',')[0]
+        .trim();
     if (!first)
         return null;
     const base = /^https?:\/\//i.test(first) ? first : `https://${first}`;
-    return base.replace(/\/+$/, "") + (path.startsWith("/") ? path : `/${path}`);
+    return base.replace(/\/+$/, '') + (path.startsWith('/') ? path : `/${path}`);
 }
 /** Resolve the port to probe internally: the app's health_check_port, else the first exposed port. "" if neither. */
 export function internalProbePort(app) {
-    const hc = String(app.health_check_port ?? "").trim();
+    const hc = String(app.health_check_port ?? '').trim();
     if (hc)
         return hc;
-    return String(app.ports_exposes ?? "").split(",")[0].trim();
+    return String(app.ports_exposes ?? '')
+        .split(',')[0]
+        .trim();
 }
 /** Coolify sidecar container name prefixes — these share the app's `coolify.applicationId` label
  * but don't serve the app's health path (the web container does). */
-const SIDECAR_PREFIXES = ["worker-", "scheduler-", "task-runners-", "task-", "cron-"];
+const SIDECAR_PREFIXES = ['worker-', 'scheduler-', 'task-runners-', 'task-', 'cron-'];
 /**
  * Pick the primary (web) container among the containers that match an app's `coolify.applicationId`
  * label. A compose app's worker/scheduler sidecars carry the same label, and `docker ps` ordering
@@ -118,7 +125,7 @@ const SIDECAR_PREFIXES = ["worker-", "scheduler-", "task-runners-", "task-", "cr
  */
 export function pickAppContainer(names) {
     const primary = names.find((n) => !SIDECAR_PREFIXES.some((p) => n.startsWith(p)));
-    return primary ?? names[0] ?? "";
+    return primary ?? names[0] ?? '';
 }
 /**
  * Default container-internal probe — the fallback for internal-only apps whose public FQDN is
@@ -133,19 +140,28 @@ export function pickAppContainer(names) {
 export async function probeHealthPathInternal(args, timeoutMs) {
     const { instance, uuid, port, path } = args;
     const docker = dockerCmdPrefix(instance);
-    const p = path.startsWith("/") ? path : `/${path}`;
+    const p = path.startsWith('/') ? path : `/${path}`;
     const url = `http://127.0.0.1:${port}${p}`;
     // Resolve the live container by Coolify label (ephemeral names → resolve every run).
     let container;
     try {
         const ps = await vpsExec(instance, `${docker} ps --filter label=coolify.applicationId=${uuid} --format '{{.Names}}'`, { allowFailure: true, timeout: timeoutMs });
-        container = pickAppContainer(ps.stdout.split("\n").map((s) => s.trim()).filter(Boolean));
+        container = pickAppContainer(ps.stdout
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean));
     }
     catch (e) {
-        return { status: null, reason: `container lookup failed: ${e instanceof Error ? e.message : String(e)}` };
+        return {
+            status: null,
+            reason: `container lookup failed: ${e instanceof Error ? e.message : String(e)}`,
+        };
     }
     if (!container) {
-        return { status: null, reason: `no running container with label coolify.applicationId=${uuid}` };
+        return {
+            status: null,
+            reason: `no running container with label coolify.applicationId=${uuid}`,
+        };
     }
     // curl WITHOUT -f so an HTTP response (even 4xx/5xx) yields its real code; a connection
     // failure prints "000" → status null → escalate.
@@ -154,12 +170,18 @@ export async function probeHealthPathInternal(args, timeoutMs) {
         const res = await vpsExec(instance, `${docker} exec ${container} curl -s -o /dev/null -w '%{http_code}' --max-time ${seconds} ${url}`, { allowFailure: true, timeout: timeoutMs + 2000 });
         const code = Number.parseInt(res.stdout.trim(), 10);
         if (!Number.isInteger(code) || code === 0) {
-            return { status: null, reason: `internal probe ${url} unreachable (${res.stderr.trim() || res.stdout.trim() || "no curl / no http code"})` };
+            return {
+                status: null,
+                reason: `internal probe ${url} unreachable (${res.stderr.trim() || res.stdout.trim() || 'no curl / no http code'})`,
+            };
         }
         return { status: code, reason: `internal HTTP ${code}` };
     }
     catch (e) {
-        return { status: null, reason: `internal probe failed: ${e instanceof Error ? e.message : String(e)}` };
+        return {
+            status: null,
+            reason: `internal probe failed: ${e instanceof Error ? e.message : String(e)}`,
+        };
     }
 }
 /**
@@ -180,29 +202,41 @@ export async function probeHealthPathInternal(args, timeoutMs) {
  * `deps` is injectable for tests; production uses the real client + probe.
  */
 export async function verifySafe(p, instance, deps = {}) {
-    const remediationKey = p.id.split(":")[0];
-    if (remediationKey !== "coolify.enable_healthcheck") {
-        return { ok: true, reason: "no health-path gate for this remediation" };
+    const remediationKey = p.id.split(':')[0];
+    if (remediationKey !== 'coolify.enable_healthcheck') {
+        return { ok: true, reason: 'no health-path gate for this remediation' };
     }
     const get = deps.get ?? coolifyGet;
     const probe = deps.probe ?? probeHealthPath;
     const internalProbe = deps.internalProbe ?? probeHealthPathInternal;
     // Probe the SAME path the remediation will enable (registry sets it per build_pack).
-    const path = String(p.planned_action?.args?.health_check_path ?? "/api/health");
+    const path = String(p.planned_action?.args?.health_check_path ??
+        '/api/health');
     let app;
     try {
         app = await get(`/applications/${p.target.uuid}`, undefined, instance);
     }
     catch (e) {
-        return { ok: false, reason: `could not read app to probe: ${e instanceof Error ? e.message : String(e)}` };
+        return {
+            ok: false,
+            reason: `could not read app to probe: ${e instanceof Error ? e.message : String(e)}`,
+        };
     }
     const url = buildHealthProbeUrl(app.fqdn, path);
     if (!url) {
-        return { ok: false, reason: `app has no FQDN to probe ${path} — confirm the health path and enable manually` };
+        return {
+            ok: false,
+            reason: `app has no FQDN to probe ${path} — confirm the health path and enable manually`,
+        };
     }
     const r = await probe(url, PROBE_TIMEOUT_MS);
     if (r.status !== null && r.status >= 200 && r.status < 300) {
-        return { ok: true, reason: `probe ${url} → HTTP ${r.status} (serves its health path; safe to auto-enable)`, probe: r, url };
+        return {
+            ok: true,
+            reason: `probe ${url} → HTTP ${r.status} (serves its health path; safe to auto-enable)`,
+            probe: r,
+            url,
+        };
     }
     // Fall back to a container-internal probe ONLY when the external probe was UNREACHABLE
     // (status null — couldn't connect/resolve the host). This is the internal-only-app case:
@@ -225,7 +259,7 @@ export async function verifySafe(p, instance, deps = {}) {
         if (ir.status !== null && ir.status >= 200 && ir.status < 300) {
             return {
                 ok: true,
-                reason: `external ${url} unreachable (${r.reason}); internal http://127.0.0.1:${port}${path.startsWith("/") ? path : `/${path}`} → HTTP ${ir.status} (internal-only app serves its health path; safe to auto-enable)`,
+                reason: `external ${url} unreachable (${r.reason}); internal http://127.0.0.1:${port}${path.startsWith('/') ? path : `/${path}`} → HTTP ${ir.status} (internal-only app serves its health path; safe to auto-enable)`,
                 probe: ir,
                 url,
             };

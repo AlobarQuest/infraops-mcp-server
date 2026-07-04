@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import * as client from "../src/services/coolify-client.js";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as client from '../src/services/coolify-client.js';
 
 const mockServer = {
   registerTool: vi.fn((name: string, schema: any, handler: any) => {
@@ -10,7 +10,7 @@ const mockServer = {
   _schemas: {} as Record<string, any>,
 };
 
-vi.mock("../src/services/coolify-client.js", () => ({
+vi.mock('../src/services/coolify-client.js', () => ({
   coolifyGet: vi.fn(),
   coolifyPost: vi.fn(),
   coolifyPatch: vi.fn(),
@@ -18,10 +18,10 @@ vi.mock("../src/services/coolify-client.js", () => ({
   handleCoolifyError: vi.fn((e) => `Error: ${e?.message ?? e}`),
 }));
 
-import { registerDeploymentTools } from "../src/tools/deployments.js";
-import { registerEnvVarTools } from "../src/tools/env-vars.js";
+import { registerDeploymentTools } from '../src/tools/deployments.js';
+import { registerEnvVarTools } from '../src/tools/env-vars.js';
 
-describe("coolify_cancel_deployment", () => {
+describe('coolify_cancel_deployment', () => {
   beforeEach(() => {
     mockServer._handlers = {};
     mockServer._schemas = {};
@@ -29,18 +29,24 @@ describe("coolify_cancel_deployment", () => {
     registerDeploymentTools(mockServer as any);
   });
 
-  it("POSTs to /deployments/{uuid}/cancel", async () => {
-    vi.mocked(client.coolifyPost).mockResolvedValueOnce({ message: "cancelled" });
-    await mockServer._handlers["coolify_cancel_deployment"]({ deployment_uuid: "d1", instance: "prod" });
-    expect(client.coolifyPost).toHaveBeenCalledWith("/deployments/d1/cancel", undefined, "prod");
+  it('POSTs to /deployments/{uuid}/cancel', async () => {
+    vi.mocked(client.coolifyPost).mockResolvedValueOnce({ message: 'cancelled' });
+    await mockServer._handlers['coolify_cancel_deployment']({
+      deployment_uuid: 'd1',
+      instance: 'prod',
+    });
+    expect(client.coolifyPost).toHaveBeenCalledWith('/deployments/d1/cancel', undefined, 'prod');
   });
 
-  it("requires an explicit instance", () => {
-    expect(mockServer._schemas["coolify_cancel_deployment"].inputSchema.instance.safeParse(undefined).success).toBe(false);
+  it('requires an explicit instance', () => {
+    expect(
+      mockServer._schemas['coolify_cancel_deployment'].inputSchema.instance.safeParse(undefined)
+        .success,
+    ).toBe(false);
   });
 });
 
-describe("coolify_bulk_set_app_env", () => {
+describe('coolify_bulk_set_app_env', () => {
   beforeEach(() => {
     mockServer._handlers = {};
     mockServer._schemas = {};
@@ -48,30 +54,33 @@ describe("coolify_bulk_set_app_env", () => {
     registerEnvVarTools(mockServer as any);
   });
 
-  it("upserts the key on each app and aggregates partial failures", async () => {
+  it('upserts the key on each app and aggregates partial failures', async () => {
     vi.mocked(client.coolifyPatch)
       .mockResolvedValueOnce({} as any) // app1 ok
-      .mockRejectedValueOnce(new Error("boom")); // app2 fails
-    const res = await mockServer._handlers["coolify_bulk_set_app_env"]({
-      app_uuids: ["app1", "app2"],
-      key: "SHARED",
-      value: "v",
+      .mockRejectedValueOnce(new Error('boom')); // app2 fails
+    const res = await mockServer._handlers['coolify_bulk_set_app_env']({
+      app_uuids: ['app1', 'app2'],
+      key: 'SHARED',
+      value: 'v',
       is_buildtime: false,
       is_runtime: true,
-      instance: "prod",
+      instance: 'prod',
     });
     expect(client.coolifyPatch).toHaveBeenCalledWith(
-      "/applications/app1/envs",
-      { key: "SHARED", value: "v", is_buildtime: false, is_runtime: true },
-      "prod"
+      '/applications/app1/envs',
+      { key: 'SHARED', value: 'v', is_buildtime: false, is_runtime: true },
+      'prod',
     );
     const parsed = JSON.parse(res.content[0].text);
     expect(parsed.summary).toEqual({ total: 2, succeeded: 1, failed: 1 });
-    expect(parsed.succeeded).toEqual([{ uuid: "app1" }]);
-    expect(parsed.failed[0].uuid).toBe("app2");
+    expect(parsed.succeeded).toEqual([{ uuid: 'app1' }]);
+    expect(parsed.failed[0].uuid).toBe('app2');
   });
 
-  it("requires an explicit instance", () => {
-    expect(mockServer._schemas["coolify_bulk_set_app_env"].inputSchema.instance.safeParse(undefined).success).toBe(false);
+  it('requires an explicit instance', () => {
+    expect(
+      mockServer._schemas['coolify_bulk_set_app_env'].inputSchema.instance.safeParse(undefined)
+        .success,
+    ).toBe(false);
   });
 });

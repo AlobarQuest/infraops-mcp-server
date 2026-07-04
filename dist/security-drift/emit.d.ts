@@ -1,27 +1,27 @@
-import type { DiffItem } from "./baseline.js";
-import type { EmitState } from "./emit-state.js";
-import type { Finding } from "./scan-parser.js";
-import type { Classification, Remediation, Tier } from "./taxonomy.js";
+import type { DiffItem } from './baseline.js';
+import type { EmitState } from './emit-state.js';
+import type { Finding } from './scan-parser.js';
+import type { Classification, Remediation, Tier } from './taxonomy.js';
 export interface SecurityPlan {
-    generated_by: "security-scan";
+    generated_by: 'security-scan';
     tier: Tier;
     root_cause: string;
     remediation: Remediation;
     rollback: string;
-    source: "security";
+    source: 'security';
     blind_spots: string;
 }
 export interface SecurityEscalation {
     proposal_id: string;
-    instance: "mac";
+    instance: 'mac';
     target: {
-        provider: "security";
+        provider: 'security';
         resource_type: string;
         uuid: string;
         name: string;
     };
     risk: string;
-    kind: "remediation" | "question";
+    kind: 'remediation' | 'question';
     reasoning: string;
     plan: SecurityPlan;
     urgent: boolean;
@@ -39,7 +39,7 @@ export interface BuiltEscalations {
     hashes: Record<string, string>;
 }
 /** Build the full set of escalations to POST, plus the plan-hashes to record. */
-export declare function buildEscalations(items: ClassifiedFinding[], now: string): BuiltEscalations;
+export declare function buildEscalations(items: ClassifiedFinding[], _now: string): BuiltEscalations;
 /** Merge freshly-emitted hashes into the existing emit-state with a timestamp. */
 export declare function mergeEmitState(state: EmitState, hashes: Record<string, string>, now: string): EmitState;
 /** Pick the escalations that correspond to NEW/changed findings (for the immediate email). */

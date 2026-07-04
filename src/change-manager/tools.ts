@@ -1,6 +1,6 @@
-import * as tls from "node:tls";
-import { coolifyGet, coolifyPatch, coolifyPost } from "../services/coolify-client.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
+import * as tls from 'node:tls';
+import { coolifyGet, coolifyPatch, coolifyPost } from '../services/coolify-client.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
 
 export interface ToolCtx {
   instance: CoolifyInstance;
@@ -9,7 +9,7 @@ export interface ToolCtx {
   domainsChangedAt?: number;
 }
 
-export type DeployVerdict = "success" | "failed" | "pending" | "unknown";
+export type DeployVerdict = 'success' | 'failed' | 'pending' | 'unknown';
 
 /**
  * Verdict on the newest deployment triggered at/after `sinceMs` for an app.
@@ -17,23 +17,31 @@ export type DeployVerdict = "success" | "failed" | "pending" | "unknown";
  * inconclusive (never a revert trigger on its own). Endpoint is the non-obvious
  * `/deployments/applications/{uuid}` (see CLAUDE.md), returning `{ deployments: [] }`.
  */
-export async function deploymentSucceeded(uuid: string, sinceMs: number, instance: CoolifyInstance): Promise<DeployVerdict> {
+export async function deploymentSucceeded(
+  uuid: string,
+  sinceMs: number,
+  instance: CoolifyInstance,
+): Promise<DeployVerdict> {
   try {
-    const res = await coolifyGet<{ deployments?: Array<Record<string, unknown>> }>(`/deployments/applications/${uuid}`, undefined, instance);
+    const res = await coolifyGet<{ deployments?: Array<Record<string, unknown>> }>(
+      `/deployments/applications/${uuid}`,
+      undefined,
+      instance,
+    );
     const list = Array.isArray(res?.deployments) ? res.deployments : [];
     const newest = list
       .map((d) => ({
-        status: String(d.status ?? "").toLowerCase(),
-        at: Date.parse(String(d.created_at ?? d.started_at ?? d.finished_at ?? "")) || 0,
+        status: String(d.status ?? '').toLowerCase(),
+        at: Date.parse(String(d.created_at ?? d.started_at ?? d.finished_at ?? '')) || 0,
       }))
       .filter((d) => d.at >= sinceMs)
       .sort((a, b) => b.at - a.at)[0];
-    if (!newest) return "unknown";
-    if (["finished", "success", "successful"].includes(newest.status)) return "success";
-    if (["failed", "error", "cancelled", "canceled"].includes(newest.status)) return "failed";
-    return "pending"; // queued / in_progress / running
+    if (!newest) return 'unknown';
+    if (['finished', 'success', 'successful'].includes(newest.status)) return 'success';
+    if (['failed', 'error', 'cancelled', 'canceled'].includes(newest.status)) return 'failed';
+    return 'pending'; // queued / in_progress / running
   } catch {
-    return "unknown";
+    return 'unknown';
   }
 }
 
@@ -43,88 +51,176 @@ export async function deploymentSucceeded(uuid: string, sinceMs: number, instanc
  * cannot give. TLS verification stays ON — a self-signed/expired/missing cert → false.
  */
 export async function httpsLive(domain: string, timeoutMs = 8000): Promise<boolean> {
-  const host = domain.replace(/^https?:\/\//, "").replace(/[/:].*$/, "").trim();
+  const host = domain
+    .replace(/^https?:\/\//, '')
+    .replace(/[/:].*$/, '')
+    .trim();
   if (!host) return false;
   return new Promise<boolean>((resolve) => {
     let done = false;
-    const finish = (v: boolean) => { if (!done) { done = true; resolve(v); } };
+    const finish = (v: boolean) => {
+      if (!done) {
+        done = true;
+        resolve(v);
+      }
+    };
     const socket = tls.connect({ host, port: 443, servername: host, timeout: timeoutMs }, () => {
       const ok = socket.authorized;
       socket.end();
       finish(ok);
     });
-    socket.on("error", () => finish(false));
-    socket.on("timeout", () => { socket.destroy(); finish(false); });
+    socket.on('error', () => finish(false));
+    socket.on('timeout', () => {
+      socket.destroy();
+      finish(false);
+    });
   });
 }
 
 /** First domain string on an app (for the live-cert probe). */
 export function firstDomain(app: Record<string, unknown>): string {
-  const raw = String(app.domains ?? app.fqdn ?? "");
-  return raw.split(",").map((s) => s.trim()).filter(Boolean)[0] ?? "";
+  const raw = String(app.domains ?? app.fqdn ?? '');
+  return (
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)[0] ?? ''
+  );
 }
 
 /** JSON-schema tool definitions handed to the model. Read tools + the two write tools + control tools. */
 export const TOOLS = [
-  { name: "get_application", description: "Read a Coolify application's current config.",
-    input_schema: { type: "object", properties: { uuid: { type: "string" } }, required: ["uuid"] } },
-  { name: "set_application_domains",
-    description: "Set an application's domains (e.g. change http:// to https://). Captures the original for rollback.",
-    input_schema: { type: "object", properties: { uuid: { type: "string" }, domains: { type: "string", description: "comma-separated https URLs" } }, required: ["uuid", "domains"] } },
-  { name: "set_application_healthcheck",
+  {
+    name: 'get_application',
+    description: "Read a Coolify application's current config.",
+    input_schema: { type: 'object', properties: { uuid: { type: 'string' } }, required: ['uuid'] },
+  },
+  {
+    name: 'set_application_domains',
+    description:
+      "Set an application's domains (e.g. change http:// to https://). Captures the original for rollback.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        uuid: { type: 'string' },
+        domains: { type: 'string', description: 'comma-separated https URLs' },
+      },
+      required: ['uuid', 'domains'],
+    },
+  },
+  {
+    name: 'set_application_healthcheck',
     description: "Enable an application's health check at a verified path/port.",
-    input_schema: { type: "object", properties: { uuid: { type: "string" }, path: { type: "string" }, port: { type: "number" } }, required: ["uuid", "path", "port"] } },
-  { name: "redeploy_application", description: "Restart/redeploy an application so routing/cert changes take effect.",
-    input_schema: { type: "object", properties: { uuid: { type: "string" } }, required: ["uuid"] } },
-  { name: "report_done", description: "Call when the remediation is complete and verified.",
-    input_schema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] } },
-  { name: "report_blocked", description: "Call when the change cannot be completed (missing prerequisite or needs human judgment).",
-    input_schema: { type: "object", properties: { reason: { type: "string" } }, required: ["reason"] } },
+    input_schema: {
+      type: 'object',
+      properties: { uuid: { type: 'string' }, path: { type: 'string' }, port: { type: 'number' } },
+      required: ['uuid', 'path', 'port'],
+    },
+  },
+  {
+    name: 'redeploy_application',
+    description: 'Restart/redeploy an application so routing/cert changes take effect.',
+    input_schema: { type: 'object', properties: { uuid: { type: 'string' } }, required: ['uuid'] },
+  },
+  {
+    name: 'report_done',
+    description: 'Call when the remediation is complete and verified.',
+    input_schema: {
+      type: 'object',
+      properties: { summary: { type: 'string' } },
+      required: ['summary'],
+    },
+  },
+  {
+    name: 'report_blocked',
+    description:
+      'Call when the change cannot be completed (missing prerequisite or needs human judgment).',
+    input_schema: {
+      type: 'object',
+      properties: { reason: { type: 'string' } },
+      required: ['reason'],
+    },
+  },
 ] as const;
 
 const NAMES = new Set<string>(TOOLS.map((t) => t.name));
 
 /** Execute one tool call. Write tools capture rollback + validate. Throws on unknown tool (defense in depth). */
-export async function runTool(name: string, args: Record<string, unknown>, ctx: ToolCtx): Promise<string> {
+export async function runTool(
+  name: string,
+  args: Record<string, unknown>,
+  ctx: ToolCtx,
+): Promise<string> {
   if (!NAMES.has(name)) throw new Error(`unknown tool: ${name}`);
-  const uuid = String(args.uuid ?? "");
+  const uuid = String(args.uuid ?? '');
 
   switch (name) {
-    case "get_application": {
-      const app = await coolifyGet<Record<string, unknown>>(`/applications/${uuid}`, undefined, ctx.instance);
-      return JSON.stringify({ uuid, fqdn: app.fqdn, domains: app.domains, status: app.status,
-        health_check_enabled: app.health_check_enabled, health_check_path: app.health_check_path });
+    case 'get_application': {
+      const app = await coolifyGet<Record<string, unknown>>(
+        `/applications/${uuid}`,
+        undefined,
+        ctx.instance,
+      );
+      return JSON.stringify({
+        uuid,
+        fqdn: app.fqdn,
+        domains: app.domains,
+        status: app.status,
+        health_check_enabled: app.health_check_enabled,
+        health_check_path: app.health_check_path,
+      });
     }
-    case "set_application_domains": {
-      const domains = String(args.domains ?? "");
-      const domainList = domains.split(",").map((s) => s.trim()).filter(Boolean);
-      if (!domainList.length || !domainList.every((u) => u.startsWith("https://"))) {
-        throw new Error("domains must be comma-separated https:// URLs");
+    case 'set_application_domains': {
+      const domains = String(args.domains ?? '');
+      const domainList = domains
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!domainList.length || !domainList.every((u) => u.startsWith('https://'))) {
+        throw new Error('domains must be comma-separated https:// URLs');
       }
-      const app = await coolifyGet<Record<string, unknown>>(`/applications/${uuid}`, undefined, ctx.instance);
-      ctx.rollback.domains = app.domains ?? app.fqdn ?? null;  // capture original
-      ctx.domainsChangedAt = Date.now();  // scope the post-verify deployment poll to this change
-      await coolifyPatch(`/applications/${uuid}`, { domains, force_domain_override: true }, ctx.instance);
+      const app = await coolifyGet<Record<string, unknown>>(
+        `/applications/${uuid}`,
+        undefined,
+        ctx.instance,
+      );
+      ctx.rollback.domains = app.domains ?? app.fqdn ?? null; // capture original
+      ctx.domainsChangedAt = Date.now(); // scope the post-verify deployment poll to this change
+      await coolifyPatch(
+        `/applications/${uuid}`,
+        { domains, force_domain_override: true },
+        ctx.instance,
+      );
       return `domains updated to ${domains}`;
     }
-    case "set_application_healthcheck": {
-      const path = String(args.path ?? ""), port = Number(args.port);
-      if (!path.startsWith("/") || !Number.isInteger(port)) throw new Error("path must start with / and port must be an integer");
-      const app = (await coolifyGet<Record<string, unknown>>(`/applications/${uuid}`, undefined, ctx.instance)) ?? {};
-      ctx.rollback.health_check_enabled = app.health_check_enabled ?? false;  // capture original for revert
+    case 'set_application_healthcheck': {
+      const path = String(args.path ?? ''),
+        port = Number(args.port);
+      if (!path.startsWith('/') || !Number.isInteger(port))
+        throw new Error('path must start with / and port must be an integer');
+      const app =
+        (await coolifyGet<Record<string, unknown>>(
+          `/applications/${uuid}`,
+          undefined,
+          ctx.instance,
+        )) ?? {};
+      ctx.rollback.health_check_enabled = app.health_check_enabled ?? false; // capture original for revert
       ctx.rollback.health_check_path = app.health_check_path ?? null;
       ctx.rollback.health_check_port = app.health_check_port ?? null;
-      await coolifyPatch(`/applications/${uuid}`,
-        { health_check_enabled: true, health_check_path: path, health_check_port: port }, ctx.instance);
+      await coolifyPatch(
+        `/applications/${uuid}`,
+        { health_check_enabled: true, health_check_path: path, health_check_port: port },
+        ctx.instance,
+      );
       return `health check enabled at ${path}:${port}`;
     }
-    case "redeploy_application": {
+    case 'redeploy_application': {
       // Full deploy (not restart): only a deploy regenerates Traefik routing + the
       // Let's Encrypt cert after a domain change. Use the canonical `/deploy?uuid=` form
       // (the same one `coolify_deploy` uses). Verified live 2026-06-14: the per-app
       // `/applications/{uuid}/deploy` form returns 404 — do NOT use it.
       await coolifyPost(`/deploy?uuid=${uuid}`, undefined, ctx.instance);
-      return "redeploy (full deploy) triggered";
+      return 'redeploy (full deploy) triggered';
     }
     // report_done / report_blocked are handled by the agent loop (control tools); never reach here as writes
     default:
@@ -134,21 +230,36 @@ export async function runTool(name: string, args: Record<string, unknown>, ctx: 
 
 /** True only when every domain on the app is https:// — the HTTPS post-/pre-verify check. */
 export function httpsConformant(app: Record<string, unknown>): boolean {
-  const raw = String(app.domains ?? app.fqdn ?? "");
-  const urls = raw.split(",").map((s) => s.trim()).filter(Boolean);
-  return urls.length > 0 && urls.every((u) => u.startsWith("https://"));
+  const raw = String(app.domains ?? app.fqdn ?? '');
+  const urls = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return urls.length > 0 && urls.every((u) => u.startsWith('https://'));
 }
 
 /** Revert a captured rollback (domains and/or health fields). Best-effort; idempotent per-dimension. */
-export async function revertRollback(uuid: string, rollback: Record<string, unknown>, instance: CoolifyInstance): Promise<void> {
+export async function revertRollback(
+  uuid: string,
+  rollback: Record<string, unknown>,
+  instance: CoolifyInstance,
+): Promise<void> {
   if (rollback.domains != null) {
-    await coolifyPatch(`/applications/${uuid}`, { domains: String(rollback.domains), force_domain_override: true }, instance);
+    await coolifyPatch(
+      `/applications/${uuid}`,
+      { domains: String(rollback.domains), force_domain_override: true },
+      instance,
+    );
   }
   if (rollback.health_check_enabled !== undefined) {
-    await coolifyPatch(`/applications/${uuid}`, {
-      health_check_enabled: rollback.health_check_enabled,
-      health_check_path: rollback.health_check_path ?? null,
-      health_check_port: rollback.health_check_port ?? null,
-    }, instance);
+    await coolifyPatch(
+      `/applications/${uuid}`,
+      {
+        health_check_enabled: rollback.health_check_enabled,
+        health_check_path: rollback.health_check_path ?? null,
+        health_check_port: rollback.health_check_port ?? null,
+      },
+      instance,
+    );
   }
 }

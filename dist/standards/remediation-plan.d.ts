@@ -1,6 +1,6 @@
-import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
-import type { Proposal } from "./check-engine.js";
+import { z } from 'zod';
+import Anthropic from '@anthropic-ai/sdk';
+import type { Proposal } from './check-engine.js';
 /** The structured remediation plan Sonnet returns for one escalated proposal. */
 export declare const RemediationPlanSchema: z.ZodObject<{
     generated_by: z.ZodEnum<["sonnet", "raw"]>;

@@ -1,12 +1,12 @@
-import type { Proposal, Risk } from "./check-engine.js";
-import type { AuditResult } from "./run-audit.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
+import type { Proposal, Risk } from './check-engine.js';
+import type { AuditResult } from './run-audit.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
 
 /** One audited instance's slice of a drift report. */
 export interface InstanceSection {
   ok: boolean;
-  standards_source?: AuditResult["meta"]["standards_source"];
-  summary?: AuditResult["summary"];
+  standards_source?: AuditResult['meta']['standards_source'];
+  summary?: AuditResult['summary'];
   proposals?: Proposal[];
   /** Per-endpoint read errors (instance partially reachable). */
   errors?: string[];
@@ -52,7 +52,7 @@ export type AuditFn = (instance: CoolifyInstance) => Promise<AuditResult>;
  * is stable for "the same deviation on the same resource".
  */
 export function proposalIdentity(instance: string, p: Proposal): string {
-  const ruleKey = p.id.split(":")[0];
+  const ruleKey = p.id.split(':')[0];
   return `${instance}::${ruleKey}::${p.target.uuid}`;
 }
 
@@ -175,13 +175,13 @@ export function renderMarkdown(report: DriftReport): string {
   const { totals, delta } = report;
   const lines: string[] = [];
   lines.push(`# Infra Standards Drift — ${report.generated_at}`);
-  lines.push("");
+  lines.push('');
   lines.push(
     `**${totals.total_proposals} deviation(s)** across ${totals.instances_ok} instance(s) ` +
       `(${totals.by_risk.safe} safe, ${totals.by_risk.caution} caution, ${totals.by_risk.destructive} destructive)` +
-      (totals.instances_failed > 0 ? ` · ${totals.instances_failed} instance(s) unreachable` : ""),
+      (totals.instances_failed > 0 ? ` · ${totals.instances_failed} instance(s) unreachable` : ''),
   );
-  lines.push("");
+  lines.push('');
 
   // Per-instance status line
   for (const [inst, sec] of Object.entries(report.instances)) {
@@ -190,42 +190,44 @@ export function renderMarkdown(report: DriftReport): string {
       continue;
     }
     const n = sec.summary?.total_proposals ?? 0;
-    const partial = sec.errors?.length ? ` (partial: ${sec.errors.join("; ")})` : "";
+    const partial = sec.errors?.length ? ` (partial: ${sec.errors.join('; ')})` : '';
     lines.push(`- **${inst}:** ${sec.standards_source} · ${n} deviation(s)${partial}`);
   }
-  lines.push("");
+  lines.push('');
 
   // Delta
-  lines.push("## Changes since last run");
-  lines.push(`- New: ${delta.new.length} · Resolved: ${delta.resolved.length} · Unchanged: ${delta.unchanged}`);
+  lines.push('## Changes since last run');
+  lines.push(
+    `- New: ${delta.new.length} · Resolved: ${delta.resolved.length} · Unchanged: ${delta.unchanged}`,
+  );
   if (delta.new.length) {
-    lines.push("");
-    lines.push("**New:**");
+    lines.push('');
+    lines.push('**New:**');
     for (const d of delta.new) lines.push(`- [${d.instance}] ${d.description} _(${d.risk})_`);
   }
   if (delta.resolved.length) {
-    lines.push("");
-    lines.push("**Resolved:**");
+    lines.push('');
+    lines.push('**Resolved:**');
     for (const d of delta.resolved) lines.push(`- [${d.instance}] ${d.description}`);
   }
-  lines.push("");
+  lines.push('');
 
   // Full current list grouped by instance
-  lines.push("## All current deviations");
+  lines.push('## All current deviations');
   for (const [inst, sec] of Object.entries(report.instances)) {
     if (!sec.ok) continue;
     const props = sec.proposals ?? [];
-    lines.push("");
+    lines.push('');
     lines.push(`### ${inst} (${props.length})`);
     if (!props.length) {
-      lines.push("- _none — conforms_");
+      lines.push('- _none — conforms_');
       continue;
     }
     for (const p of props) {
-      const tag = p.kind === "question" ? "❓" : `🔧 ${p.risk}`;
+      const tag = p.kind === 'question' ? '❓' : `🔧 ${p.risk}`;
       lines.push(`- ${tag}: ${p.description}`);
     }
   }
-  lines.push("");
-  return lines.join("\n");
+  lines.push('');
+  return lines.join('\n');
 }

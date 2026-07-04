@@ -1,11 +1,11 @@
-import type { CoolifyInstance } from "../services/coolify-client.js";
+import type { CoolifyInstance } from '../services/coolify-client.js';
 export interface ToolCtx {
     instance: CoolifyInstance;
     rollback: Record<string, unknown>;
     /** Epoch ms when the domains write happened — scopes the post-verify deployment poll to THIS change. */
     domainsChangedAt?: number;
 }
-export type DeployVerdict = "success" | "failed" | "pending" | "unknown";
+export type DeployVerdict = 'success' | 'failed' | 'pending' | 'unknown';
 /**
  * Verdict on the newest deployment triggered at/after `sinceMs` for an app.
  * `unknown` = no such deployment found OR a read error — the caller treats it as

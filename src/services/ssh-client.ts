@@ -11,10 +11,10 @@
  *   VPS_SSH_PASSPHRASE  - Key passphrase (optional, loaded from BWS)
  */
 
-import { Client } from "ssh2";
-import { readFileSync } from "fs";
-import { resolve } from "path";
-import { homedir } from "os";
+import { Client } from 'ssh2';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { homedir } from 'os';
 
 // ── Configuration ────────────────────────────────────────────────────
 
@@ -27,11 +27,10 @@ interface SSHConfig {
 }
 
 function getSSHConfig(): SSHConfig {
-  const host = process.env.VPS_HOST || "178.156.247.239";
-  const port = parseInt(process.env.VPS_PORT || "22", 10);
-  const username = process.env.VPS_USER || "root";
-  const keyPath = process.env.VPS_SSH_KEY_PATH ||
-    resolve(homedir(), ".ssh", "hetzner_ed25519");
+  const host = process.env.VPS_HOST || '178.156.247.239';
+  const port = parseInt(process.env.VPS_PORT || '22', 10);
+  const username = process.env.VPS_USER || 'root';
+  const keyPath = process.env.VPS_SSH_KEY_PATH || resolve(homedir(), '.ssh', 'hetzner_ed25519');
   const passphrase = process.env.VPS_SSH_PASSPHRASE || undefined;
 
   let privateKey: Buffer;
@@ -40,7 +39,7 @@ function getSSHConfig(): SSHConfig {
   } catch (err) {
     throw new Error(
       `Cannot read SSH key at ${keyPath}. ` +
-        `Set VPS_SSH_KEY_PATH if the key is elsewhere. Error: ${err instanceof Error ? err.message : String(err)}`
+        `Set VPS_SSH_KEY_PATH if the key is elsewhere. Error: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 
@@ -55,15 +54,15 @@ function getSSHConfig(): SSHConfig {
  */
 export async function sshExec(
   command: string,
-  options: { timeout?: number; allowFailure?: boolean } = {}
+  options: { timeout?: number; allowFailure?: boolean } = {},
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const config = getSSHConfig();
   const timeout = options.timeout ?? 30000;
 
   return new Promise((resolve, reject) => {
     const conn = new Client();
-    let stdout = "";
-    let stderr = "";
+    let stdout = '';
+    let stderr = '';
     let exitCode = -1;
 
     const timer = setTimeout(() => {
@@ -71,7 +70,7 @@ export async function sshExec(
       reject(new Error(`SSH command timed out after ${timeout}ms: ${command}`));
     }, timeout);
 
-    conn.on("ready", () => {
+    conn.on('ready', () => {
       conn.exec(command, (err, stream) => {
         if (err) {
           clearTimeout(timer);
@@ -80,7 +79,7 @@ export async function sshExec(
           return;
         }
 
-        stream.on("close", (code: number) => {
+        stream.on('close', (code: number) => {
           clearTimeout(timer);
           exitCode = code ?? 0;
           conn.end();
@@ -92,17 +91,17 @@ export async function sshExec(
           }
         });
 
-        stream.on("data", (data: Buffer) => {
+        stream.on('data', (data: Buffer) => {
           stdout += data.toString();
         });
 
-        stream.stderr.on("data", (data: Buffer) => {
+        stream.stderr.on('data', (data: Buffer) => {
           stderr += data.toString();
         });
       });
     });
 
-    conn.on("error", (err) => {
+    conn.on('error', (err) => {
       clearTimeout(timer);
       reject(new Error(`SSH connection error: ${err.message}`));
     });
@@ -132,16 +131,13 @@ export async function sshReadFile(path: string): Promise<string> {
 /**
  * Write content to a file on the VPS via SSH.
  */
-export async function sshWriteFile(
-  path: string,
-  content: string
-): Promise<void> {
+export async function sshWriteFile(path: string, content: string): Promise<void> {
   // Single-quoted heredoc delimiter disables shell expansion, so content
   // is passed through verbatim — no escaping of $, `, ", ' is needed.
   // Known edge case tracked in BACKLOG.md: content containing a line that
   // is literally "INFRAOPS_EOF" will terminate the heredoc early.
   const result = await sshExec(
-    `cat > ${escapeShell(path)} << 'INFRAOPS_EOF'\n${content}\nINFRAOPS_EOF`
+    `cat > ${escapeShell(path)} << 'INFRAOPS_EOF'\n${content}\nINFRAOPS_EOF`,
   );
   if (result.exitCode !== 0) {
     throw new Error(`Failed to write ${path}: ${result.stderr}`);
@@ -153,19 +149,22 @@ export async function sshWriteFile(
 export function handleSSHError(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);
 
-  if (msg.includes("Authentication failed") || msg.includes("All configured authentication methods failed")) {
+  if (
+    msg.includes('Authentication failed') ||
+    msg.includes('All configured authentication methods failed')
+  ) {
     return (
-      "Error: SSH authentication failed. Check that VPS_SSH_KEY_PATH points to the correct key, " +
-      "VPS_SSH_PASSPHRASE is set if the key is encrypted, and the public key is in the VPS authorized_keys."
+      'Error: SSH authentication failed. Check that VPS_SSH_KEY_PATH points to the correct key, ' +
+      'VPS_SSH_PASSPHRASE is set if the key is encrypted, and the public key is in the VPS authorized_keys.'
     );
   }
-  if (msg.includes("ECONNREFUSED")) {
-    return "Error: SSH connection refused. Check that VPS_HOST is correct and SSH is running on the VPS.";
+  if (msg.includes('ECONNREFUSED')) {
+    return 'Error: SSH connection refused. Check that VPS_HOST is correct and SSH is running on the VPS.';
   }
-  if (msg.includes("timed out")) {
+  if (msg.includes('timed out')) {
     return `Error: ${msg}. The VPS may be unreachable or the command is long-running. Try increasing the timeout.`;
   }
-  if (msg.includes("Cannot read SSH key")) {
+  if (msg.includes('Cannot read SSH key')) {
     return `Error: ${msg}`;
   }
 
@@ -174,8 +173,7 @@ export function handleSSHError(error: unknown): string {
 
 /** Check if SSH is configured (key file exists) */
 export function isSSHConfigured(): boolean {
-  const keyPath = process.env.VPS_SSH_KEY_PATH ||
-    resolve(homedir(), ".ssh", "hetzner_ed25519");
+  const keyPath = process.env.VPS_SSH_KEY_PATH || resolve(homedir(), '.ssh', 'hetzner_ed25519');
   try {
     readFileSync(keyPath);
     return true;

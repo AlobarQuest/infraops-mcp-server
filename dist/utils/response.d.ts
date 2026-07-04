@@ -8,7 +8,7 @@
  */
 export interface ToolTextResponse {
     content: {
-        type: "text";
+        type: 'text';
         text: string;
     }[];
     isError?: boolean;

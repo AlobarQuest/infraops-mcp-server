@@ -8,10 +8,10 @@
 //   3a. source integrity — deployed scanner must byte-match its blessed source
 //   3b. change integrity — allowlist config files must not change unexpectedly
 
-import { createHash } from "node:crypto";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import type { Finding } from "./scan-parser.js";
+import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { Finding } from './scan-parser.js';
 
 export interface SelfCheckConfig {
   stateFiles: string[]; // must be 0600 + owned
@@ -26,12 +26,12 @@ export interface SelfCheckConfig {
 
 function uidOf(cfg: SelfCheckConfig): number | null {
   if (cfg.getUid) return cfg.getUid();
-  return typeof process.getuid === "function" ? process.getuid() : null;
+  return typeof process.getuid === 'function' ? process.getuid() : null;
 }
 
 function readJson<T>(file: string): T | null {
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8")) as T;
+    return JSON.parse(fs.readFileSync(file, 'utf8')) as T;
   } catch {
     return null;
   }
@@ -46,7 +46,12 @@ function writeJson(file: string, obj: unknown): void {
   fs.chmodSync(file, 0o600);
 }
 
-const fail = (check: string, target: string, detail: string): Finding => ({ severity: "FAIL", check, target, detail });
+const fail = (check: string, target: string, detail: string): Finding => ({
+  severity: 'FAIL',
+  check,
+  target,
+  detail,
+});
 
 export function runSelfCheck(cfg: SelfCheckConfig): Finding[] {
   const findings: Finding[] = [];
@@ -62,7 +67,13 @@ export function runSelfCheck(cfg: SelfCheckConfig): Finding[] {
     }
     const mode = st.mode & 0o777;
     if (mode !== 0o600 || (uid !== null && st.uid !== uid)) {
-      findings.push(fail("selfcheck.state_perms", file, `state file mode ${mode.toString(8)} owner ${st.uid} (expected 600 / uid ${uid})`));
+      findings.push(
+        fail(
+          'selfcheck.state_perms',
+          file,
+          `state file mode ${mode.toString(8)} owner ${st.uid} (expected 600 / uid ${uid})`,
+        ),
+      );
     }
   }
 
@@ -71,7 +82,13 @@ export function runSelfCheck(cfg: SelfCheckConfig): Finding[] {
     const size = fs.statSync(cfg.auditLog).size;
     const hwm = readJson<{ size: number }>(cfg.hwmFile);
     if (hwm && size < hwm.size) {
-      findings.push(fail("auditlog.tampered", cfg.auditLog, `audit log shrank from ${hwm.size} to ${size} bytes (append-only invariant violated)`));
+      findings.push(
+        fail(
+          'auditlog.tampered',
+          cfg.auditLog,
+          `audit log shrank from ${hwm.size} to ${size} bytes (append-only invariant violated)`,
+        ),
+      );
     }
     writeJson(cfg.hwmFile, { size: Math.max(size, hwm?.size ?? 0), ts: cfg.now });
   } catch {
@@ -88,20 +105,38 @@ export function runSelfCheck(cfg: SelfCheckConfig): Finding[] {
     try {
       deployedBuf = fs.readFileSync(deployed);
     } catch (e: any) {
-      if (e?.code === "ENOENT") continue; // not deployed yet — nothing to verify
+      if (e?.code === 'ENOENT') continue; // not deployed yet — nothing to verify
       // present but unreadable (bad perms, etc.) — fail loud, don't silently skip
-      findings.push(fail("selfcheck.runner_source_unresolved", deployed, `deployed scanner present but unreadable (${e?.code ?? "read error"}) — cannot verify`));
+      findings.push(
+        fail(
+          'selfcheck.runner_source_unresolved',
+          deployed,
+          `deployed scanner present but unreadable (${e?.code ?? 'read error'}) — cannot verify`,
+        ),
+      );
       continue;
     }
     let sourceBuf: Buffer;
     try {
       sourceBuf = fs.readFileSync(source);
     } catch {
-      findings.push(fail("selfcheck.runner_source_unresolved", deployed, `blessed source unreadable at ${source} — cannot verify deployed artifact`));
+      findings.push(
+        fail(
+          'selfcheck.runner_source_unresolved',
+          deployed,
+          `blessed source unreadable at ${source} — cannot verify deployed artifact`,
+        ),
+      );
       continue;
     }
     if (!deployedBuf.equals(sourceBuf)) {
-      findings.push(fail("selfcheck.runner_integrity", deployed, `deployed scanner does not match blessed source ${source} — investigate tamper or stale deploy`));
+      findings.push(
+        fail(
+          'selfcheck.runner_integrity',
+          deployed,
+          `deployed scanner does not match blessed source ${source} — investigate tamper or stale deploy`,
+        ),
+      );
     }
   }
 
@@ -115,9 +150,15 @@ export function runSelfCheck(cfg: SelfCheckConfig): Finding[] {
     } catch {
       continue;
     }
-    const h = createHash("sha256").update(buf).digest("hex");
+    const h = createHash('sha256').update(buf).digest('hex');
     if (recorded[file] && recorded[file] !== h) {
-      findings.push(fail("selfcheck.runner_integrity", file, "scanner/config file hash changed since last run — verify this change was intentional"));
+      findings.push(
+        fail(
+          'selfcheck.runner_integrity',
+          file,
+          'scanner/config file hash changed since last run — verify this change was intentional',
+        ),
+      );
     }
     next[file] = h;
   }

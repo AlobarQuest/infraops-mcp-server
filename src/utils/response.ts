@@ -7,10 +7,10 @@
  * redaction, so a secret is never split across a truncation boundary.
  */
 
-import { CHARACTER_LIMIT } from "../constants.js";
+import { CHARACTER_LIMIT } from '../constants.js';
 
 export interface ToolTextResponse {
-  content: { type: "text"; text: string }[];
+  content: { type: 'text'; text: string }[];
   isError?: boolean;
   // Index signature so the MCP SDK's CallToolResult (which has `[x: string]: unknown`)
   // accepts a value of this named type — a bare interface without it isn't assignable.
@@ -34,11 +34,8 @@ export function truncateToLimit(text: string, charLimit: number = CHARACTER_LIMI
  * the redaction wrapper (register-sanitized.ts) AFTER redaction, so a secret can
  * never be split across the truncation boundary.
  */
-export function jsonResponse(
-  data: unknown,
-  _opts: { charLimit?: number } = {}
-): ToolTextResponse {
-  return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+export function jsonResponse(data: unknown, _opts: { charLimit?: number } = {}): ToolTextResponse {
+  return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
 }
 
 export interface TruncatedLogs {
@@ -56,15 +53,15 @@ export function truncateLogs(
   logs: string,
   lineLimit = 200,
   charLimit = 50000,
-  page = 1
+  page = 1,
 ): TruncatedLogs {
-  const lines = logs.split("\n");
+  const lines = logs.split('\n');
   const total = lines.length;
   const end = Math.max(0, total - (page - 1) * lineLimit);
   const start = Math.max(0, end - lineLimit);
-  let slice = lines.slice(start, end).join("\n");
+  let slice = lines.slice(start, end).join('\n');
   if (slice.length > charLimit) {
-    slice = "…[truncated]…\n" + slice.slice(slice.length - charLimit);
+    slice = '…[truncated]…\n' + slice.slice(slice.length - charLimit);
   }
   return { logs: slice, total_lines: total, showing_start: start, showing_end: end };
 }

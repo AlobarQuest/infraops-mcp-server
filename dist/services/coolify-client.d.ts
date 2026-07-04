@@ -9,7 +9,7 @@
  *   COOLIFY_PROD_BASE_URL / COOLIFY_PROD_API_TOKEN  (or legacy COOLIFY_BASE_URL / COOLIFY_API_TOKEN)
  *   COOLIFY_DEV_BASE_URL  / COOLIFY_DEV_API_TOKEN   (optional)
  */
-export type CoolifyInstance = "prod" | "dev";
+export type CoolifyInstance = 'prod' | 'dev';
 export declare function isCoolifyInstanceConfigured(instance: CoolifyInstance): boolean;
 export declare function getConfiguredInstances(): CoolifyInstance[];
 export declare function getCoolifyInstanceUrl(instance: CoolifyInstance): string | undefined;

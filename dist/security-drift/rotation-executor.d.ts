@@ -1,6 +1,6 @@
-import { type ProviderProbe, type RotationPlanSpec } from "./cred-rotation.js";
+import { type ProviderProbe, type RotationPlanSpec } from './cred-rotation.js';
 export interface RotationOutcome {
-    outcome: "done" | "failed" | "blocked";
+    outcome: 'done' | 'failed' | 'blocked';
     detail: string;
 }
 export interface RotationDeps {
@@ -45,8 +45,8 @@ export declare function defaultRotationDeps(io: {
     coolifyGet: <T>(path: string, instance?: string) => Promise<T>;
     coolifyPatch: <T>(path: string, body: unknown, instance?: string) => Promise<T>;
     coolifyPost: <T>(path: string, body: unknown | undefined, instance?: string) => Promise<T>;
-    loadState: () => import("./cred-rotation.js").RotationState;
-    saveState: (s: import("./cred-rotation.js").RotationState) => void;
+    loadState: () => import('./cred-rotation.js').RotationState;
+    saveState: (s: import('./cred-rotation.js').RotationState) => void;
     now: string;
     /** Dedicated cred-rotation BWS access token (read+write). Used ONLY for the bws
      *  child processes below — NOT the broad ambient BWS_ACCESS_TOKEN the rest of the

@@ -1,6 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 /**
  * The manifest files to load and merge. There are two backup runners on this
  * machine that each emit a manifest of the DBs they proved-backed-up:
@@ -11,15 +11,17 @@ import { join } from "node:path";
  * and rule #572 false-flags it. Each path is independently env-overridable for tests.
  */
 function manifestPaths() {
-    const dir = join(homedir(), ".infraops");
-    const prod = process.env.MANIFEST_PATH ?? process.env.BACKUP_MANIFEST_FILE ?? join(dir, "vps-backup-manifest.json");
-    const dev = process.env.BACKUP_MANIFEST_FILE_ORB ?? join(dir, "vps-backup-manifest-orb.json");
+    const dir = join(homedir(), '.infraops');
+    const prod = process.env.MANIFEST_PATH ??
+        process.env.BACKUP_MANIFEST_FILE ??
+        join(dir, 'vps-backup-manifest.json');
+    const dev = process.env.BACKUP_MANIFEST_FILE_ORB ?? join(dir, 'vps-backup-manifest-orb.json');
     return [prod, dev];
 }
 async function readOneManifest(path) {
     try {
-        const parsed = JSON.parse(await readFile(path, "utf8"));
-        return parsed && typeof parsed === "object" ? parsed : {};
+        const parsed = JSON.parse(await readFile(path, 'utf8'));
+        return parsed && typeof parsed === 'object' ? parsed : {};
     }
     catch {
         return {};
@@ -43,7 +45,7 @@ const FRESH_MS = 24 * 60 * 60 * 1000;
  *   - backup_fresh:   its last successful backup is within 24h
  */
 export function enrichWithBackupCoverage(db, manifest, now) {
-    const uuid = String(db.uuid ?? "");
+    const uuid = String(db.uuid ?? '');
     const entry = uuid ? manifest[uuid] : undefined;
     db.backup_covered = Boolean(entry);
     let fresh = false;

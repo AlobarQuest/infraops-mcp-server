@@ -3,7 +3,7 @@
 // content, regardless of key order, so the integrity gate works across the round-trip
 // through the change-manager DB (which stores the plan as an opaque JSON object).
 
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
 /** Stable stringify: object keys sorted recursively; arrays preserve order. */
 export function canonicalJSON(value: unknown): string {
@@ -12,7 +12,7 @@ export function canonicalJSON(value: unknown): string {
 
 function sortDeep(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortDeep);
-  if (value && typeof value === "object") {
+  if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const k of Object.keys(value as Record<string, unknown>).sort()) {
       out[k] = sortDeep((value as Record<string, unknown>)[k]);
@@ -24,5 +24,5 @@ function sortDeep(value: unknown): unknown {
 
 /** sha256 over the canonical form of a remediation plan. */
 export function planHash(plan: unknown): string {
-  return createHash("sha256").update(canonicalJSON(plan)).digest("hex");
+  return createHash('sha256').update(canonicalJSON(plan)).digest('hex');
 }

@@ -1,6 +1,6 @@
-import { coolifyGet } from "../services/coolify-client.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import type { Proposal } from "./check-engine.js";
+import { coolifyGet } from '../services/coolify-client.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import type { Proposal } from './check-engine.js';
 /**
  * A whitelisted safe remediation: how to re-read the live resource (for the
  * idempotency check) and how to apply the change. This map is the safety
@@ -17,10 +17,10 @@ export declare function wouldChange(current: Record<string, unknown>, args: Reco
 export declare function isAutoApplicable(p: Proposal): boolean;
 export interface ApplyResult {
     proposal_id: string;
-    target: Proposal["target"];
+    target: Proposal['target'];
     tool: string;
     args: Record<string, unknown>;
-    status: "applied" | "skipped" | "failed";
+    status: 'applied' | 'skipped' | 'failed';
     detail: string;
 }
 /** Read MAX_AUTO_APPLIES from env (positive integer); default 20. The runaway guard ceiling. */

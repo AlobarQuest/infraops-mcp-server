@@ -20,20 +20,30 @@
  *   namecheap_dns_set_default   - Reset to Namecheap default DNS
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import {
   namecheapCommand,
   handleNamecheapError,
   splitDomain,
-  type NamecheapHostRecord,
-} from "../services/namecheap-client.js";
+} from '../services/namecheap-client.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-const RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "MXE", "TXT", "NS", "URL", "URL301", "FRAME"] as const;
+const RECORD_TYPES = [
+  'A',
+  'AAAA',
+  'CNAME',
+  'MX',
+  'MXE',
+  'TXT',
+  'NS',
+  'URL',
+  'URL301',
+  'FRAME',
+] as const;
 
-type RecordType = typeof RECORD_TYPES[number];
+type RecordType = (typeof RECORD_TYPES)[number];
 
 interface HostEntry {
   Name: string;
@@ -48,12 +58,13 @@ interface HostEntry {
  */
 async function fetchHosts(domain: string): Promise<HostEntry[]> {
   const { sld, tld } = splitDomain(domain);
-  const result = await namecheapCommand("namecheap.domains.dns.getHosts", {
+  const result = await namecheapCommand('namecheap.domains.dns.getHosts', {
     SLD: sld,
     TLD: tld,
   });
 
-  const hostResult = result.CommandResponse?.DomainDNSGetHostsResult as Record<string, unknown> | undefined;
+  const hostResult = result.CommandResponse?.DomainDNSGetHostsResult as
+    Record<string, unknown> | undefined;
   if (!hostResult) return [];
 
   const rawHosts = (hostResult as Record<string, unknown>).host;
@@ -62,9 +73,9 @@ async function fetchHosts(domain: string): Promise<HostEntry[]> {
   const hostArray = Array.isArray(rawHosts) ? rawHosts : [rawHosts];
 
   return hostArray.map((h: Record<string, unknown>) => ({
-    Name: String(h.Name ?? h.HostName ?? ""),
-    Type: String(h.Type ?? ""),
-    Address: String(h.Address ?? ""),
+    Name: String(h.Name ?? h.HostName ?? ''),
+    Type: String(h.Type ?? ''),
+    Address: String(h.Address ?? ''),
     MXPref: Number(h.MXPref ?? 10),
     TTL: Number(h.TTL ?? 1800),
   }));
@@ -91,28 +102,32 @@ async function pushHosts(domain: string, hosts: HostEntry[]): Promise<Record<str
     params[`TTL${n}`] = h.TTL;
   });
 
-  const result = await namecheapCommand("namecheap.domains.dns.setHosts", params);
+  const result = await namecheapCommand('namecheap.domains.dns.setHosts', params);
   return result.CommandResponse as Record<string, unknown>;
 }
 
 // ── Tool Registration ────────────────────────────────────────────────
 
 export function registerNamecheapDNSTools(server: McpServer): void {
-
   // ═══════════════════════════════════════════════════════════════════
   //  GET HOSTS — List all DNS records
   // ═══════════════════════════════════════════════════════════════════
 
   server.registerTool(
-    "namecheap_dns_get_hosts",
+    'namecheap_dns_get_hosts',
     {
-      title: "Get DNS Records",
+      title: 'Get DNS Records',
       description:
-        "List all DNS host records for a domain. Returns record name, type, address, TTL, and MX preference.",
+        'List all DNS host records for a domain. Returns record name, type, address, TTL, and MX preference.',
       inputSchema: {
         domain: z.string().min(3).describe("Domain name (e.g. 'devonwatkins.com')"),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ domain }: { domain: string }) => {
       try {
@@ -125,14 +140,14 @@ export function registerNamecheapDNSTools(server: McpServer): void {
             type: h.Type,
             address: h.Address,
             ttl: h.TTL,
-            mxPref: h.Type === "MX" || h.Type === "MXE" ? h.MXPref : undefined,
+            mxPref: h.Type === 'MX' || h.Type === 'MXE' ? h.MXPref : undefined,
           })),
         };
-        return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }] };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleNamecheapError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleNamecheapError(error) }] };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════════════
@@ -140,28 +155,35 @@ export function registerNamecheapDNSTools(server: McpServer): void {
   // ═══════════════════════════════════════════════════════════════════
 
   server.registerTool(
-    "namecheap_dns_get_servers",
+    'namecheap_dns_get_servers',
     {
-      title: "Get Nameservers",
+      title: 'Get Nameservers',
       description:
-        "Get the nameservers configured for a domain. Shows whether it uses Namecheap default DNS or custom nameservers.",
+        'Get the nameservers configured for a domain. Shows whether it uses Namecheap default DNS or custom nameservers.',
       inputSchema: {
         domain: z.string().min(3).describe("Domain name (e.g. 'devonwatkins.com')"),
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ domain }: { domain: string }) => {
       try {
         const { sld, tld } = splitDomain(domain);
-        const result = await namecheapCommand("namecheap.domains.dns.getList", {
+        const result = await namecheapCommand('namecheap.domains.dns.getList', {
           SLD: sld,
           TLD: tld,
         });
-        return { content: [{ type: "text", text: JSON.stringify(result.CommandResponse, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result.CommandResponse, null, 2) }],
+        };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleNamecheapError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleNamecheapError(error) }] };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════════════
@@ -169,23 +191,47 @@ export function registerNamecheapDNSTools(server: McpServer): void {
   // ═══════════════════════════════════════════════════════════════════
 
   server.registerTool(
-    "namecheap_dns_add_record",
+    'namecheap_dns_add_record',
     {
-      title: "Add DNS Record",
+      title: 'Add DNS Record',
       description:
-        "Add a single DNS record to a domain while preserving all existing records. " +
-        "Fetches current records, appends the new one, and pushes the full set back.",
+        'Add a single DNS record to a domain while preserving all existing records. ' +
+        'Fetches current records, appends the new one, and pushes the full set back.',
       inputSchema: {
         domain: z.string().min(3).describe("Domain name (e.g. 'devonwatkins.com')"),
         name: z.string().describe("Host name (e.g. '@' for root, 'www', 'api', '*' for wildcard)"),
-        type: z.enum(RECORD_TYPES).describe("Record type"),
-        address: z.string().describe("Record value (IP address, hostname, or text content)"),
-        ttl: z.number().int().min(60).max(86400).default(1800).describe("TTL in seconds (default: 1800)"),
-        mxPref: z.number().int().min(0).max(65535).default(10).describe("MX priority (only for MX/MXE records)"),
+        type: z.enum(RECORD_TYPES).describe('Record type'),
+        address: z.string().describe('Record value (IP address, hostname, or text content)'),
+        ttl: z
+          .number()
+          .int()
+          .min(60)
+          .max(86400)
+          .default(1800)
+          .describe('TTL in seconds (default: 1800)'),
+        mxPref: z
+          .number()
+          .int()
+          .min(0)
+          .max(65535)
+          .default(10)
+          .describe('MX priority (only for MX/MXE records)'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
-    async (params: { domain: string; name: string; type: RecordType; address: string; ttl: number; mxPref: number }) => {
+    async (params: {
+      domain: string;
+      name: string;
+      type: RecordType;
+      address: string;
+      ttl: number;
+      mxPref: number;
+    }) => {
       try {
         const existingHosts = await fetchHosts(params.domain);
 
@@ -201,21 +247,27 @@ export function registerNamecheapDNSTools(server: McpServer): void {
         const result = await pushHosts(params.domain, allHosts);
 
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true,
-              domain: params.domain,
-              added: { name: params.name, type: params.type, address: params.address },
-              totalRecords: allHosts.length,
-              response: result,
-            }, null, 2),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  domain: params.domain,
+                  added: { name: params.name, type: params.type, address: params.address },
+                  totalRecords: allHosts.length,
+                  response: result,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleNamecheapError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleNamecheapError(error) }] };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════════════
@@ -223,22 +275,27 @@ export function registerNamecheapDNSTools(server: McpServer): void {
   // ═══════════════════════════════════════════════════════════════════
 
   server.registerTool(
-    "namecheap_dns_update_record",
+    'namecheap_dns_update_record',
     {
-      title: "Update DNS Record",
+      title: 'Update DNS Record',
       description:
-        "Update an existing DNS record matched by name and type. " +
-        "If multiple records match, updates the first one. " +
-        "Preserves all other records.",
+        'Update an existing DNS record matched by name and type. ' +
+        'If multiple records match, updates the first one. ' +
+        'Preserves all other records.',
       inputSchema: {
         domain: z.string().min(3).describe("Domain name (e.g. 'devonwatkins.com')"),
         name: z.string().describe("Host name to match (e.g. '@', 'www', 'api')"),
-        type: z.enum(RECORD_TYPES).describe("Record type to match"),
-        newAddress: z.string().optional().describe("New record value (IP, hostname, or text)"),
-        newTtl: z.number().int().min(60).max(86400).optional().describe("New TTL in seconds"),
-        newMxPref: z.number().int().min(0).max(65535).optional().describe("New MX priority"),
+        type: z.enum(RECORD_TYPES).describe('Record type to match'),
+        newAddress: z.string().optional().describe('New record value (IP, hostname, or text)'),
+        newTtl: z.number().int().min(60).max(86400).optional().describe('New TTL in seconds'),
+        newMxPref: z.number().int().min(0).max(65535).optional().describe('New MX priority'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (params: {
       domain: string;
@@ -252,16 +309,20 @@ export function registerNamecheapDNSTools(server: McpServer): void {
         const hosts = await fetchHosts(params.domain);
 
         const idx = hosts.findIndex(
-          (h) => h.Name.toLowerCase() === params.name.toLowerCase() && h.Type.toUpperCase() === params.type
+          (h) =>
+            h.Name.toLowerCase() === params.name.toLowerCase() &&
+            h.Type.toUpperCase() === params.type,
         );
 
         if (idx === -1) {
           return {
             isError: true,
-            content: [{
-              type: "text",
-              text: `Error: No ${params.type} record found with name "${params.name}" on ${params.domain}`,
-            }],
+            content: [
+              {
+                type: 'text',
+                text: `Error: No ${params.type} record found with name "${params.name}" on ${params.domain}`,
+              },
+            ],
           };
         }
 
@@ -273,25 +334,31 @@ export function registerNamecheapDNSTools(server: McpServer): void {
         const result = await pushHosts(params.domain, hosts);
 
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true,
-              domain: params.domain,
-              updated: {
-                name: params.name,
-                type: params.type,
-                before: original,
-                after: hosts[idx],
-              },
-              response: result,
-            }, null, 2),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  domain: params.domain,
+                  updated: {
+                    name: params.name,
+                    type: params.type,
+                    before: original,
+                    after: hosts[idx],
+                  },
+                  response: result,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleNamecheapError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleNamecheapError(error) }] };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════════════
@@ -299,20 +366,28 @@ export function registerNamecheapDNSTools(server: McpServer): void {
   // ═══════════════════════════════════════════════════════════════════
 
   server.registerTool(
-    "namecheap_dns_delete_record",
+    'namecheap_dns_delete_record',
     {
-      title: "Delete DNS Record",
+      title: 'Delete DNS Record',
       description:
-        "Delete a DNS record matched by name, type, and optionally address. " +
-        "If address is omitted, removes ALL records matching name+type. " +
-        "Preserves all other records.",
+        'Delete a DNS record matched by name, type, and optionally address. ' +
+        'If address is omitted, removes ALL records matching name+type. ' +
+        'Preserves all other records.',
       inputSchema: {
         domain: z.string().min(3).describe("Domain name (e.g. 'devonwatkins.com')"),
         name: z.string().describe("Host name to match (e.g. '@', 'www', 'api')"),
-        type: z.enum(RECORD_TYPES).describe("Record type to match"),
-        address: z.string().optional().describe("Specific address to match. Omit to delete all records of this name+type."),
+        type: z.enum(RECORD_TYPES).describe('Record type to match'),
+        address: z
+          .string()
+          .optional()
+          .describe('Specific address to match. Omit to delete all records of this name+type.'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (params: { domain: string; name: string; type: RecordType; address?: string }) => {
       try {
@@ -322,7 +397,9 @@ export function registerNamecheapDNSTools(server: McpServer): void {
         const filtered = hosts.filter((h) => {
           const nameMatch = h.Name.toLowerCase() === params.name.toLowerCase();
           const typeMatch = h.Type.toUpperCase() === params.type;
-          const addrMatch = params.address ? h.Address.toLowerCase() === params.address.toLowerCase() : true;
+          const addrMatch = params.address
+            ? h.Address.toLowerCase() === params.address.toLowerCase()
+            : true;
           // Keep records that DON'T match all criteria
           return !(nameMatch && typeMatch && addrMatch);
         });
@@ -331,32 +408,44 @@ export function registerNamecheapDNSTools(server: McpServer): void {
         if (removed === 0) {
           return {
             isError: true,
-            content: [{
-              type: "text",
-              text: `Error: No matching ${params.type} record "${params.name}" found on ${params.domain}`,
-            }],
+            content: [
+              {
+                type: 'text',
+                text: `Error: No matching ${params.type} record "${params.name}" found on ${params.domain}`,
+              },
+            ],
           };
         }
 
         const result = await pushHosts(params.domain, filtered);
 
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true,
-              domain: params.domain,
-              deleted: { name: params.name, type: params.type, address: params.address ?? "(all)" },
-              recordsRemoved: removed,
-              recordsRemaining: filtered.length,
-              response: result,
-            }, null, 2),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  domain: params.domain,
+                  deleted: {
+                    name: params.name,
+                    type: params.type,
+                    address: params.address ?? '(all)',
+                  },
+                  recordsRemoved: removed,
+                  recordsRemaining: filtered.length,
+                  response: result,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleNamecheapError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleNamecheapError(error) }] };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════════════
@@ -364,33 +453,44 @@ export function registerNamecheapDNSTools(server: McpServer): void {
   // ═══════════════════════════════════════════════════════════════════
 
   server.registerTool(
-    "namecheap_dns_set_hosts",
+    'namecheap_dns_set_hosts',
     {
-      title: "Set All DNS Records (Replace)",
+      title: 'Set All DNS Records (Replace)',
       description:
-        "ADVANCED: Replace ALL DNS records for a domain with the provided set. " +
-        "⚠️ This removes any records not in the provided list. " +
-        "For safe single-record operations, use add/update/delete tools instead.",
+        'ADVANCED: Replace ALL DNS records for a domain with the provided set. ' +
+        '⚠️ This removes any records not in the provided list. ' +
+        'For safe single-record operations, use add/update/delete tools instead.',
       inputSchema: {
         domain: z.string().min(3).describe("Domain name (e.g. 'devonwatkins.com')"),
         records: z
           .array(
             z.object({
               name: z.string().describe("Host name (e.g. '@', 'www', 'api')"),
-              type: z.enum(RECORD_TYPES).describe("Record type"),
-              address: z.string().describe("Record value"),
-              ttl: z.number().int().min(60).max(86400).default(1800).describe("TTL in seconds"),
-              mxPref: z.number().int().min(0).max(65535).default(10).describe("MX priority"),
-            })
+              type: z.enum(RECORD_TYPES).describe('Record type'),
+              address: z.string().describe('Record value'),
+              ttl: z.number().int().min(60).max(86400).default(1800).describe('TTL in seconds'),
+              mxPref: z.number().int().min(0).max(65535).default(10).describe('MX priority'),
+            }),
           )
           .min(1)
-          .describe("Complete set of DNS records to apply"),
+          .describe('Complete set of DNS records to apply'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (params: {
       domain: string;
-      records: Array<{ name: string; type: RecordType; address: string; ttl: number; mxPref: number }>;
+      records: Array<{
+        name: string;
+        type: RecordType;
+        address: string;
+        ttl: number;
+        mxPref: number;
+      }>;
     }) => {
       try {
         const hosts: HostEntry[] = params.records.map((r) => ({
@@ -404,20 +504,26 @@ export function registerNamecheapDNSTools(server: McpServer): void {
         const result = await pushHosts(params.domain, hosts);
 
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true,
-              domain: params.domain,
-              recordsSet: hosts.length,
-              response: result,
-            }, null, 2),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  domain: params.domain,
+                  recordsSet: hosts.length,
+                  response: result,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleNamecheapError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleNamecheapError(error) }] };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════════════
@@ -425,17 +531,26 @@ export function registerNamecheapDNSTools(server: McpServer): void {
   // ═══════════════════════════════════════════════════════════════════
 
   server.registerTool(
-    "namecheap_dns_set_nameservers",
+    'namecheap_dns_set_nameservers',
     {
-      title: "Set Custom Nameservers",
+      title: 'Set Custom Nameservers',
       description:
-        "Set custom nameservers for a domain (e.g. to use Cloudflare or another DNS provider). " +
+        'Set custom nameservers for a domain (e.g. to use Cloudflare or another DNS provider). ' +
         "⚠️ This will override Namecheap's DNS — existing host records via Namecheap will stop resolving.",
       inputSchema: {
-        domain: z.string().min(3).describe("Domain name"),
-        nameservers: z.array(z.string()).min(2).max(12).describe("Nameserver hostnames (e.g. ['ns1.cloudflare.com', 'ns2.cloudflare.com'])"),
+        domain: z.string().min(3).describe('Domain name'),
+        nameservers: z
+          .array(z.string())
+          .min(2)
+          .max(12)
+          .describe("Nameserver hostnames (e.g. ['ns1.cloudflare.com', 'ns2.cloudflare.com'])"),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async (params: { domain: string; nameservers: string[] }) => {
       try {
@@ -443,24 +558,30 @@ export function registerNamecheapDNSTools(server: McpServer): void {
         const commandParams: Record<string, string | number | boolean> = {
           SLD: sld,
           TLD: tld,
-          Nameservers: params.nameservers.join(","),
+          Nameservers: params.nameservers.join(','),
         };
-        const result = await namecheapCommand("namecheap.domains.dns.setCustom", commandParams);
+        const result = await namecheapCommand('namecheap.domains.dns.setCustom', commandParams);
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true,
-              domain: params.domain,
-              nameservers: params.nameservers,
-              response: result.CommandResponse,
-            }, null, 2),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  domain: params.domain,
+                  nameservers: params.nameservers,
+                  response: result.CommandResponse,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleNamecheapError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleNamecheapError(error) }] };
       }
-    }
+    },
   );
 
   // ═══════════════════════════════════════════════════════════════════
@@ -468,36 +589,47 @@ export function registerNamecheapDNSTools(server: McpServer): void {
   // ═══════════════════════════════════════════════════════════════════
 
   server.registerTool(
-    "namecheap_dns_set_default",
+    'namecheap_dns_set_default',
     {
-      title: "Reset to Default DNS",
+      title: 'Reset to Default DNS',
       description: "Reset a domain to use Namecheap's default nameservers.",
       inputSchema: {
-        domain: z.string().min(3).describe("Domain name"),
+        domain: z.string().min(3).describe('Domain name'),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ domain }: { domain: string }) => {
       try {
         const { sld, tld } = splitDomain(domain);
-        const result = await namecheapCommand("namecheap.domains.dns.setDefault", {
+        const result = await namecheapCommand('namecheap.domains.dns.setDefault', {
           SLD: sld,
           TLD: tld,
         });
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              success: true,
-              domain,
-              message: "Domain reset to Namecheap default nameservers",
-              response: result.CommandResponse,
-            }, null, 2),
-          }],
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  success: true,
+                  domain,
+                  message: 'Domain reset to Namecheap default nameservers',
+                  response: result.CommandResponse,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleNamecheapError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleNamecheapError(error) }] };
       }
-    }
+    },
   );
 }
