@@ -6,15 +6,15 @@
 // failed validation throws BaselineIntegrityError (the runner turns that into an
 // URGENT control-plane finding rather than trusting a poisoned diff).
 
-import { createHash } from "node:crypto";
-import { loadValidated0600Json, saveValidated0600Json } from "./validated-store.js";
-import type { Finding } from "./scan-parser.js";
-import type { Classification, Tier } from "./taxonomy.js";
+import { createHash } from 'node:crypto';
+import { loadValidated0600Json, saveValidated0600Json } from './validated-store.js';
+import type { Finding } from './scan-parser.js';
+import type { Classification, Tier } from './taxonomy.js';
 
 export class BaselineIntegrityError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "BaselineIntegrityError";
+    this.name = 'BaselineIntegrityError';
   }
 }
 
@@ -26,7 +26,7 @@ export type Baseline = Record<string, BaselineEntry>;
 
 /** Stable cross-run fingerprint for a finding. */
 export function fingerprint(check: string, target: string): string {
-  return createHash("sha256").update(check).update("\0").update(target).digest("hex");
+  return createHash('sha256').update(check).update('\0').update(target).digest('hex');
 }
 
 /**
@@ -35,7 +35,7 @@ export function fingerprint(check: string, target: string): string {
  * A present file MUST be a regular file, mode 0600, owned by the current user.
  */
 export function loadBaseline(file: string): Baseline | null {
-  return loadValidated0600Json<Baseline>(file, "baseline", BaselineIntegrityError);
+  return loadValidated0600Json<Baseline>(file, 'baseline', BaselineIntegrityError);
 }
 
 /** Atomically write the baseline with mode 0600. */

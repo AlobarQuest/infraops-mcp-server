@@ -1,14 +1,14 @@
-import { coolifyGet } from "../services/coolify-client.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import { loadCoolifyChecks } from "./standards-source.js";
-import { evaluateCheck } from "./check-engine.js";
-import { resolveRemediation } from "./remediation-registry.js";
-import { loadBackupManifest, enrichWithBackupCoverage } from "./backup-manifest.js";
-import type { Proposal, Risk } from "./check-engine.js";
+import { coolifyGet } from '../services/coolify-client.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import { loadCoolifyChecks } from './standards-source.js';
+import { evaluateCheck } from './check-engine.js';
+import { resolveRemediation } from './remediation-registry.js';
+import { loadBackupManifest, enrichWithBackupCoverage } from './backup-manifest.js';
+import type { Proposal, Risk } from './check-engine.js';
 
 export interface AuditResult {
   meta: {
-    standards_source: "live" | "cache" | "seed";
+    standards_source: 'live' | 'cache' | 'seed';
     checks_evaluated: number;
     not_audited: number;
     errors?: string[];
@@ -38,27 +38,29 @@ export async function auditInstance(
   const { checks, source } = await loadCoolifyChecks();
 
   const [appsRes, dbsRes] = await Promise.allSettled([
-    coolifyGet<Array<Record<string, unknown>>>("/applications", undefined, instance),
-    coolifyGet<Array<Record<string, unknown>>>("/databases", undefined, instance),
+    coolifyGet<Array<Record<string, unknown>>>('/applications', undefined, instance),
+    coolifyGet<Array<Record<string, unknown>>>('/databases', undefined, instance),
   ]);
 
   const errors: string[] = [];
   function extract<T>(result: PromiseSettledResult<T>, label: string): T | null {
-    if (result.status === "fulfilled") return result.value;
+    if (result.status === 'fulfilled') return result.value;
     errors.push(
       `${label}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
     );
     return null;
   }
 
-  let apps = extract(appsRes, "applications");
-  let dbs = extract(dbsRes, "databases");
+  let apps = extract(appsRes, 'applications');
+  let dbs = extract(dbsRes, 'databases');
 
   if (scope) {
     const s = scope.toLowerCase();
     const matchesScope = (r: Record<string, unknown>) =>
-      String(r.uuid ?? "").toLowerCase() === s ||
-      String(r.name ?? "").toLowerCase().includes(s);
+      String(r.uuid ?? '').toLowerCase() === s ||
+      String(r.name ?? '')
+        .toLowerCase()
+        .includes(s);
     if (apps) apps = apps.filter(matchesScope);
     if (dbs) dbs = dbs.filter(matchesScope);
   }
@@ -72,8 +74,8 @@ export async function auditInstance(
     for (const db of dbs) enrichWithBackupCoverage(db, manifest, now);
   }
 
-  const appChecks = checks.filter((c) => c.resource === "coolify_application");
-  const dbChecks = checks.filter((c) => c.resource === "coolify_database");
+  const appChecks = checks.filter((c) => c.resource === 'coolify_application');
+  const dbChecks = checks.filter((c) => c.resource === 'coolify_database');
 
   const proposals: Proposal[] = [];
   for (const app of apps ?? []) {

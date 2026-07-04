@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-import fs from "fs";
-import path from "path";
-import Anthropic from "@anthropic-ai/sdk";
-import { auditInstance } from "../standards/run-audit.js";
-import { applyAction, maxAutoApplies, verifySafe } from "../standards/executor.js";
-import { planEscalation } from "../standards/remediation-plan.js";
-import { renderRemediationMarkdown } from "../standards/remediation-report.js";
-import { runRemediation } from "../standards/run-remediation.js";
-import { resolveApp, isAppbrainConfigured } from "../services/appbrain-client.js";
+import fs from 'fs';
+import path from 'path';
+import Anthropic from '@anthropic-ai/sdk';
+import { auditInstance } from '../standards/run-audit.js';
+import { applyAction, maxAutoApplies, verifySafe } from '../standards/executor.js';
+import { planEscalation } from '../standards/remediation-plan.js';
+import { renderRemediationMarkdown } from '../standards/remediation-report.js';
+import { runRemediation } from '../standards/run-remediation.js';
+import { resolveApp, isAppbrainConfigured } from '../services/appbrain-client.js';
 /**
  * Headless remediation pass. Reads the morning drift report for context, re-audits
  * live, auto-applies safe remediations, asks Sonnet to plan the rest, and writes
@@ -24,11 +24,11 @@ export function parseArgs(argv) {
     const args = {};
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
-        if (!a.startsWith("--"))
+        if (!a.startsWith('--'))
             continue;
         const key = a.slice(2);
         const next = argv[i + 1];
-        if (next !== undefined && !next.startsWith("--")) {
+        if (next !== undefined && !next.startsWith('--')) {
             args[key] = next;
             i++;
         }
@@ -43,7 +43,7 @@ function loadReport(dir, basename) {
         const p = path.join(dir, basename);
         if (!fs.existsSync(p))
             return null;
-        return JSON.parse(fs.readFileSync(p, "utf-8"));
+        return JSON.parse(fs.readFileSync(p, 'utf-8'));
     }
     catch {
         return null;
@@ -51,14 +51,14 @@ function loadReport(dir, basename) {
 }
 async function main() {
     const args = parseArgs(process.argv.slice(2));
-    const instances = String(args.instance ?? "prod")
-        .split(",")
+    const instances = String(args.instance ?? 'prod')
+        .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-    const reportDir = typeof args["report-dir"] === "string" ? args["report-dir"] : undefined;
-    const generatedAt = typeof args.now === "string" ? args.now : new Date().toISOString();
+    const reportDir = typeof args['report-dir'] === 'string' ? args['report-dir'] : undefined;
+    const generatedAt = typeof args.now === 'string' ? args.now : new Date().toISOString();
     const dateStr = generatedAt.slice(0, 10);
-    const dryRun = args["dry-run"] === true;
+    const dryRun = args['dry-run'] === true;
     const sourceBasename = `${dateStr}.json`;
     const morning = reportDir ? loadReport(reportDir, sourceBasename) : null;
     // Lazily construct one Anthropic client, reused across plan calls. Tolerant of
@@ -81,22 +81,24 @@ async function main() {
         apply: (p, inst, opts) => applyAction(p, inst, opts),
         plan: (p) => planEscalation(p, getAnthropic()),
         verify: (p, inst) => verifySafe(p, inst),
-        ...(isAppbrainConfigured() ? { appBrainResolve: (a) => resolveApp(a) } : {}),
+        ...(isAppbrainConfigured()
+            ? { appBrainResolve: (a) => resolveApp(a) }
+            : {}),
         maxAutoApplies: maxAutoApplies(),
         dryRun,
     });
     if (reportDir && !dryRun) {
         fs.mkdirSync(reportDir, { recursive: true });
-        fs.writeFileSync(path.join(reportDir, `${dateStr}.remediation.json`), JSON.stringify(report, null, 2), "utf-8");
-        fs.writeFileSync(path.join(reportDir, `${dateStr}.remediation.md`), renderRemediationMarkdown(report), "utf-8");
+        fs.writeFileSync(path.join(reportDir, `${dateStr}.remediation.json`), JSON.stringify(report, null, 2), 'utf-8');
+        fs.writeFileSync(path.join(reportDir, `${dateStr}.remediation.md`), renderRemediationMarkdown(report), 'utf-8');
     }
     else {
-        process.stdout.write(renderRemediationMarkdown(report) + "\n");
+        process.stdout.write(renderRemediationMarkdown(report) + '\n');
     }
     process.exit(cleanlyAudited ? 0 : 1);
 }
 // Only run main() when invoked as a script, not when imported by tests.
-if (process.argv[1] && process.argv[1].endsWith("remediate-cli.js")) {
+if (process.argv[1] && process.argv[1].endsWith('remediate-cli.js')) {
     main().catch((e) => {
         console.error(e instanceof Error ? e.message : String(e));
         process.exit(1);

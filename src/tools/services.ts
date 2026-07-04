@@ -6,33 +6,40 @@
  * docker-compose.yml is deployed as a Coolify service.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import {
   coolifyGet,
   coolifyPost,
   coolifyPatch,
   coolifyDelete,
   handleCoolifyError,
-} from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import { jsonResponse } from "../utils/response.js";
-import { summarize, toServiceSummary } from "../utils/summaries.js";
-import { maskSensitive } from "../utils/masking.js";
-import type { CoolifyService } from "../types.js";
+} from '../services/coolify-client.js';
+import {
+  UuidSchema,
+  CoolifyInstanceSchema,
+  CoolifyInstanceRequiredSchema,
+} from '../schemas/common.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import { jsonResponse } from '../utils/response.js';
+import { summarize, toServiceSummary } from '../utils/summaries.js';
+import { maskSensitive } from '../utils/masking.js';
+import type { CoolifyService } from '../types.js';
 
 export function registerServiceTools(server: McpServer): void {
   // ── List Services ────────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_list_services",
+    'coolify_list_services',
     {
-      title: "List Coolify Services",
+      title: 'List Coolify Services',
       description:
-        "List all services (Docker Compose workloads) managed by Coolify. Compact summary by default; pass summary:false for full objects.",
+        'List all services (Docker Compose workloads) managed by Coolify. Compact summary by default; pass summary:false for full objects.',
       inputSchema: {
-        summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+        summary: z
+          .boolean()
+          .default(true)
+          .describe('Compact projection (default true); false for full objects'),
         instance: CoolifyInstanceSchema,
       },
       annotations: {
@@ -44,28 +51,31 @@ export function registerServiceTools(server: McpServer): void {
     },
     async ({ summary, instance }: { summary: boolean; instance: CoolifyInstance }) => {
       try {
-        const services = await coolifyGet<CoolifyService[]>("/services", undefined, instance);
+        const services = await coolifyGet<CoolifyService[]>('/services', undefined, instance);
         return jsonResponse(summarize(services as any[], toServiceSummary, summary));
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Get Service ──────────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_get_service",
+    'coolify_get_service',
     {
-      title: "Get Coolify Service",
+      title: 'Get Coolify Service',
       description:
-        "Get full details for a service by UUID — includes compose config, status, and resource mapping. Webhook/basic-auth secrets are masked unless reveal:true.",
+        'Get full details for a service by UUID — includes compose config, status, and resource mapping. Webhook/basic-auth secrets are masked unless reveal:true.',
       inputSchema: {
         uuid: UuidSchema,
-        reveal: z.boolean().default(false).describe("Reveal masked webhook/basic-auth secrets (default false)"),
+        reveal: z
+          .boolean()
+          .default(false)
+          .describe('Reveal masked webhook/basic-auth secrets (default false)'),
         instance: CoolifyInstanceSchema,
       },
       annotations: {
@@ -75,50 +85,53 @@ export function registerServiceTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ uuid, reveal, instance }: { uuid: string; reveal: boolean; instance: CoolifyInstance }) => {
+    async ({
+      uuid,
+      reveal,
+      instance,
+    }: {
+      uuid: string;
+      reveal: boolean;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const svc = await coolifyGet<CoolifyService>(`/services/${uuid}`, undefined, instance);
         return jsonResponse(maskSensitive(svc as any, reveal));
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Create Service ───────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_create_service",
+    'coolify_create_service',
     {
-      title: "Create Coolify Service",
+      title: 'Create Coolify Service',
       description:
-        "Create a new service from a Docker Compose definition or a one-click template. " +
+        'Create a new service from a Docker Compose definition or a one-click template. ' +
         "For Devon's Flavor C apps (like Contact Hub), supply the docker-compose.yml content.",
       inputSchema: {
-        project_uuid: z.string().min(1).describe("UUID of the target project"),
-        environment_name: z
-          .string()
-          .default("production")
-          .describe("Environment name"),
-        server_uuid: z.string().min(1).describe("Server UUID"),
-        destination_uuid: z.string().min(1).describe("Destination UUID"),
+        project_uuid: z.string().min(1).describe('UUID of the target project'),
+        environment_name: z.string().default('production').describe('Environment name'),
+        server_uuid: z.string().min(1).describe('Server UUID'),
+        destination_uuid: z.string().min(1).describe('Destination UUID'),
         type: z
           .string()
           .describe(
-            "Service type — use a one-click template name or 'docker-compose' for custom compose"
+            "Service type — use a one-click template name or 'docker-compose' for custom compose",
           ),
-        name: z.string().optional().describe("Service display name"),
-        description: z.string().optional().describe("Service description"),
+        name: z.string().optional().describe('Service display name'),
+        description: z.string().optional().describe('Service description'),
         docker_compose_raw: z
           .string()
           .optional()
-          .describe(
-            "Raw docker-compose.yml content (required if type is docker-compose)"
-          ),
-        domains: z.string().optional().describe("FQDN for the service"),
+          .describe('Raw docker-compose.yml content (required if type is docker-compose)'),
+        domains: z.string().optional().describe('FQDN for the service'),
         instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
@@ -150,39 +163,35 @@ export function registerServiceTools(server: McpServer): void {
         };
         if (params.name) body.name = params.name;
         if (params.description) body.description = params.description;
-        if (params.docker_compose_raw)
-          body.docker_compose_raw = params.docker_compose_raw;
+        if (params.docker_compose_raw) body.docker_compose_raw = params.docker_compose_raw;
         if (params.domains) body.domains = params.domains;
 
-        const svc = await coolifyPost<CoolifyService>("/services", body, params.instance);
+        const svc = await coolifyPost<CoolifyService>('/services', body, params.instance);
         return {
-          content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(svc, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Update Service ───────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_update_service",
+    'coolify_update_service',
     {
-      title: "Update Coolify Service",
+      title: 'Update Coolify Service',
       description: "Update a service's configuration.",
       inputSchema: {
         uuid: UuidSchema,
-        name: z.string().optional().describe("New name"),
-        description: z.string().optional().describe("New description"),
-        docker_compose_raw: z
-          .string()
-          .optional()
-          .describe("Updated docker-compose.yml content"),
-        domains: z.string().optional().describe("New FQDN"),
+        name: z.string().optional().describe('New name'),
+        description: z.string().optional().describe('New description'),
+        docker_compose_raw: z.string().optional().describe('Updated docker-compose.yml content'),
+        domains: z.string().optional().describe('New FQDN'),
         instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
@@ -197,40 +206,36 @@ export function registerServiceTools(server: McpServer): void {
         const uuid = params.uuid as string;
         const instance = params.instance as CoolifyInstance;
         const body: Record<string, unknown> = {};
-        for (const field of ["name", "description", "domains"]) {
+        for (const field of ['name', 'description', 'domains']) {
           if (params[field] !== undefined) body[field] = params[field];
         }
-        if (params["docker_compose_raw"] !== undefined) {
+        if (params['docker_compose_raw'] !== undefined) {
           body.docker_compose_raw = Buffer.from(
-            params["docker_compose_raw"] as string,
-            "utf8"
-          ).toString("base64");
+            params['docker_compose_raw'] as string,
+            'utf8',
+          ).toString('base64');
         }
-        const svc = await coolifyPatch<CoolifyService>(
-          `/services/${uuid}`,
-          body,
-          instance
-        );
+        const svc = await coolifyPatch<CoolifyService>(`/services/${uuid}`, body, instance);
         return {
-          content: [{ type: "text", text: JSON.stringify(svc, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(svc, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Delete Service ───────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_delete_service",
+    'coolify_delete_service',
     {
-      title: "Delete Coolify Service",
+      title: 'Delete Coolify Service',
       description:
-        "Delete a service. WARNING: Stops all containers and removes the service definition.",
+        'Delete a service. WARNING: Stops all containers and removes the service definition.',
       inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceRequiredSchema },
       annotations: {
         readOnlyHint: false,
@@ -243,16 +248,14 @@ export function registerServiceTools(server: McpServer): void {
       try {
         await coolifyDelete(`/services/${uuid}`, instance);
         return {
-          content: [
-            { type: "text", text: `Service ${uuid} deleted successfully.` },
-          ],
+          content: [{ type: 'text', text: `Service ${uuid} deleted successfully.` }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 }

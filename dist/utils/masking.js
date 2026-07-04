@@ -10,16 +10,16 @@
  * handled separately in env-vars.ts.
  */
 export const SENSITIVE_RESOURCE_FIELDS = [
-    "manual_webhook_secret_github",
-    "manual_webhook_secret_gitlab",
-    "manual_webhook_secret_gitea",
-    "manual_webhook_secret_bitbucket",
-    "http_basic_auth_password",
+    'manual_webhook_secret_github',
+    'manual_webhook_secret_gitlab',
+    'manual_webhook_secret_gitea',
+    'manual_webhook_secret_bitbucket',
+    'http_basic_auth_password',
 ];
-const MASKED_VALUE = "***";
+const MASKED_VALUE = '***';
 /** Mask sensitive fields on a single resource object (non-mutating). */
 export function maskSensitive(obj, reveal = false) {
-    if (reveal || obj == null || typeof obj !== "object")
+    if (reveal || obj == null || typeof obj !== 'object')
         return obj;
     const out = { ...obj };
     for (const field of SENSITIVE_RESOURCE_FIELDS) {

@@ -1,4 +1,4 @@
-import type { SecurityEscalation } from "./emit.js";
+import type { SecurityEscalation } from './emit.js';
 export interface NotifyDeps {
     resendApiKey?: string;
     from: string;

@@ -3,8 +3,8 @@
 // scanner (NOT emitted to stdout); we read it from the deployed file and refuse to parse
 // a contract we weren't written for. See scan-parser.ts for what version 1 means.
 
-import * as fs from "node:fs";
-import type { Finding } from "./scan-parser.js";
+import * as fs from 'node:fs';
+import type { Finding } from './scan-parser.js';
 
 /** The scanner output-contract version scan-parser.ts was written against. Bump in the
  *  SAME PR that changes the LINE shape or a detail form in scan-parser.ts. */
@@ -17,7 +17,7 @@ const MARKER = /^#\s*SCANNER_OUTPUT_VERSION=(\d+)\s*$/m;
 export function readScannerOutputVersion(scanPath: string): number | null {
   let text: string;
   try {
-    text = fs.readFileSync(scanPath, "utf8");
+    text = fs.readFileSync(scanPath, 'utf8');
   } catch {
     return null;
   }
@@ -34,11 +34,11 @@ export function scannerVersionGate(scanPath: string, expected: number): Finding 
   const v = readScannerOutputVersion(scanPath);
   if (v === expected) return null;
   return {
-    severity: "FAIL",
-    check: "scanner.output_version_skew",
+    severity: 'FAIL',
+    check: 'scanner.output_version_skew',
     target: scanPath,
     detail:
-      `deployed scanner output version ${v ?? "missing/unreadable"} != parser-expected ${expected} — ` +
+      `deployed scanner output version ${v ?? 'missing/unreadable'} != parser-expected ${expected} — ` +
       `parser cannot be trusted; run aborted. Reconcile with: cd ~/Projects/security-standards && make install`,
   };
 }

@@ -2,7 +2,7 @@
  * Pure secret redaction (Balanced posture). No I/O. Applied centrally by
  * register-sanitized.ts to every tool response. Masks to "***"; preserves null.
  */
-const MASK = "***";
+const MASK = '***';
 // Field names whose VALUE is a secret. Checked only after the guard below.
 // Deliberate omission: `api_key` / `key` field NAMES are NOT listed here — their
 // secret VALUES (JWTs, PEMs, prefixed tokens) are caught by VALUE_SHAPES instead,
@@ -39,11 +39,11 @@ export function redactText(s) {
 export function deepRedact(value) {
     if (value === null || value === undefined)
         return value;
-    if (typeof value === "string")
+    if (typeof value === 'string')
         return redactText(value);
     if (Array.isArray(value))
         return value.map(deepRedact);
-    if (typeof value === "object") {
+    if (typeof value === 'object') {
         const out = {};
         for (const [k, v] of Object.entries(value)) {
             if (v !== null && v !== undefined && isSecretName(k))

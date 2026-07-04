@@ -1,24 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  CoolifyInstanceSchema,
-  CoolifyInstanceRequiredSchema,
-} from "../src/schemas/common.js";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from '../src/schemas/common.js';
 
 // ── Shared schema behavior ───────────────────────────────────────────
-describe("Coolify instance schemas", () => {
-  it("read schema defaults to prod when instance is omitted", () => {
-    expect(CoolifyInstanceSchema.parse(undefined)).toBe("prod");
+describe('Coolify instance schemas', () => {
+  it('read schema defaults to prod when instance is omitted', () => {
+    expect(CoolifyInstanceSchema.parse(undefined)).toBe('prod');
   });
 
-  it("required schema rejects an omitted instance (no silent prod default)", () => {
+  it('required schema rejects an omitted instance (no silent prod default)', () => {
     expect(CoolifyInstanceRequiredSchema.safeParse(undefined).success).toBe(false);
   });
 
-  it("both schemas accept explicit prod/dev and reject anything else", () => {
+  it('both schemas accept explicit prod/dev and reject anything else', () => {
     for (const schema of [CoolifyInstanceSchema, CoolifyInstanceRequiredSchema]) {
-      expect(schema.parse("dev")).toBe("dev");
-      expect(schema.parse("prod")).toBe("prod");
-      expect(schema.safeParse("staging").success).toBe(false);
+      expect(schema.parse('dev')).toBe('dev');
+      expect(schema.parse('prod')).toBe('prod');
+      expect(schema.safeParse('staging').success).toBe(false);
     }
   });
 });
@@ -35,7 +32,7 @@ const mockServer = {
   }),
 };
 
-vi.mock("../src/services/coolify-client.js", () => ({
+vi.mock('../src/services/coolify-client.js', () => ({
   coolifyGet: vi.fn(),
   coolifyPost: vi.fn(),
   coolifyPatch: vi.fn(),
@@ -43,13 +40,13 @@ vi.mock("../src/services/coolify-client.js", () => ({
   handleCoolifyError: vi.fn((e) => `Error: ${e}`),
 }));
 
-import { registerDeploymentTools } from "../src/tools/deployments.js";
-import { registerApplicationTools } from "../src/tools/applications.js";
-import { registerControlTools } from "../src/tools/control.js";
+import { registerDeploymentTools } from '../src/tools/deployments.js';
+import { registerApplicationTools } from '../src/tools/applications.js';
+import { registerControlTools } from '../src/tools/control.js';
 
 const instanceOf = (tool: string) => captured[tool].inputSchema.instance;
 
-describe("mutating Coolify tools require an explicit instance", () => {
+describe('mutating Coolify tools require an explicit instance', () => {
   beforeEach(() => {
     for (const k of Object.keys(captured)) delete captured[k];
     registerDeploymentTools(mockServer as any);
@@ -58,23 +55,23 @@ describe("mutating Coolify tools require an explicit instance", () => {
   });
 
   it.each([
-    "coolify_deploy",
-    "coolify_create_application_public",
-    "coolify_update_application",
-    "coolify_delete_application",
-    "coolify_control",
-  ])("%s rejects a missing instance", (tool) => {
+    'coolify_deploy',
+    'coolify_create_application_public',
+    'coolify_update_application',
+    'coolify_delete_application',
+    'coolify_control',
+  ])('%s rejects a missing instance', (tool) => {
     expect(instanceOf(tool).safeParse(undefined).success).toBe(false);
-    expect(instanceOf(tool).parse("dev")).toBe("dev");
+    expect(instanceOf(tool).parse('dev')).toBe('dev');
   });
 
   it.each([
-    "coolify_list_deployments",
-    "coolify_get_deployment",
-    "coolify_list_applications",
-    "coolify_get_application",
-    "coolify_overview",
-  ])("%s still defaults to prod (read-only convenience)", (tool) => {
-    expect(instanceOf(tool).parse(undefined)).toBe("prod");
+    'coolify_list_deployments',
+    'coolify_get_deployment',
+    'coolify_list_applications',
+    'coolify_get_application',
+    'coolify_overview',
+  ])('%s still defaults to prod (read-only convenience)', (tool) => {
+    expect(instanceOf(tool).parse(undefined)).toBe('prod');
   });
 });

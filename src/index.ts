@@ -31,71 +31,75 @@
  *   SUPABASE_ACCESS_TOKEN       - Supabase management API token (optional, from BWS via start.sh)
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Coolify client
-import { getConfiguredInstances, getCoolifyInstanceUrl, isCoolifyInstanceConfigured } from "./services/coolify-client.js";
+import {
+  getConfiguredInstances,
+  getCoolifyInstanceUrl,
+  isCoolifyInstanceConfigured,
+} from './services/coolify-client.js';
 
 // Coolify tools
-import { registerProjectTools } from "./tools/projects.js";
-import { registerApplicationTools } from "./tools/applications.js";
-import { registerPrivateKeyTools } from "./tools/private-keys.js";
-import { registerDeploymentTools } from "./tools/deployments.js";
-import { registerEnvVarTools } from "./tools/env-vars.js";
-import { registerDatabaseTools } from "./tools/databases.js";
-import { registerServerTools } from "./tools/servers.js";
-import { registerServiceTools } from "./tools/services.js";
-import { registerControlTools } from "./tools/control.js";
-import { registerDiagnosticTools } from "./tools/diagnostics.js";
-import { registerAuditTools } from "./tools/audit.js";
-import { registerStorageTools } from "./tools/storages.js";
-import { registerScheduledTaskTools } from "./tools/scheduled-tasks.js";
-import { registerDatabaseBackupTools } from "./tools/database-backups.js";
-import { registerGithubAppTools } from "./tools/github-apps.js";
-import { registerDocsTools } from "./tools/docs.js";
+import { registerProjectTools } from './tools/projects.js';
+import { registerApplicationTools } from './tools/applications.js';
+import { registerPrivateKeyTools } from './tools/private-keys.js';
+import { registerDeploymentTools } from './tools/deployments.js';
+import { registerEnvVarTools } from './tools/env-vars.js';
+import { registerDatabaseTools } from './tools/databases.js';
+import { registerServerTools } from './tools/servers.js';
+import { registerServiceTools } from './tools/services.js';
+import { registerControlTools } from './tools/control.js';
+import { registerDiagnosticTools } from './tools/diagnostics.js';
+import { registerAuditTools } from './tools/audit.js';
+import { registerStorageTools } from './tools/storages.js';
+import { registerScheduledTaskTools } from './tools/scheduled-tasks.js';
+import { registerDatabaseBackupTools } from './tools/database-backups.js';
+import { registerGithubAppTools } from './tools/github-apps.js';
+import { registerDocsTools } from './tools/docs.js';
 
 // GitHub tools
-import { registerGithubTools } from "./tools/github.js";
-import { isGithubConfigured } from "./services/github-client.js";
+import { registerGithubTools } from './tools/github.js';
+import { isGithubConfigured } from './services/github-client.js';
 
 // Hetzner Cloud tools
-import { registerHetznerServerTools } from "./tools/hetzner-servers.js";
-import { registerHetznerNetworkingTools } from "./tools/hetzner-networking.js";
-import { isHetznerConfigured } from "./services/hetzner-client.js";
+import { registerHetznerServerTools } from './tools/hetzner-servers.js';
+import { registerHetznerNetworkingTools } from './tools/hetzner-networking.js';
+import { isHetznerConfigured } from './services/hetzner-client.js';
 
 // VPS SSH tools
-import { registerVPSTools } from "./tools/vps.js";
+import { registerVPSTools } from './tools/vps.js';
 
 // Namecheap tools
-import { registerNamecheapDNSTools } from "./tools/namecheap-dns.js";
-import { registerNamecheapDomainTools } from "./tools/namecheap-domains.js";
-import { isNamecheapConfigured, getNamecheapEnvironment } from "./services/namecheap-client.js";
+import { registerNamecheapDNSTools } from './tools/namecheap-dns.js';
+import { registerNamecheapDomainTools } from './tools/namecheap-domains.js';
+import { isNamecheapConfigured, getNamecheapEnvironment } from './services/namecheap-client.js';
 
 // Cloudflare tools
-import { registerCloudflareDNSTools } from "./tools/cloudflare-dns.js";
-import { registerCloudflarePagesTools } from "./tools/cloudflare-pages.js";
-import { registerCloudflareWorkersTools } from "./tools/cloudflare-workers.js";
-import { registerCloudflareR2Tools } from "./tools/cloudflare-r2.js";
-import { registerCloudflareTunnelTools } from "./tools/cloudflare-tunnels.js";
-import { registerCloudflareSecurityTools } from "./tools/cloudflare-security.js";
-import { isCloudflareConfigured } from "./services/cloudflare-client.js";
+import { registerCloudflareDNSTools } from './tools/cloudflare-dns.js';
+import { registerCloudflarePagesTools } from './tools/cloudflare-pages.js';
+import { registerCloudflareWorkersTools } from './tools/cloudflare-workers.js';
+import { registerCloudflareR2Tools } from './tools/cloudflare-r2.js';
+import { registerCloudflareTunnelTools } from './tools/cloudflare-tunnels.js';
+import { registerCloudflareSecurityTools } from './tools/cloudflare-security.js';
+import { isCloudflareConfigured } from './services/cloudflare-client.js';
 
 // Supabase tools
-import { registerSupabaseProjectTools } from "./tools/supabase-projects.js";
-import { registerSupabaseDatabaseTools } from "./tools/supabase-database.js";
-import { registerSupabaseFunctionTools } from "./tools/supabase-functions.js";
-import { registerSupabaseConfigTools } from "./tools/supabase-config.js";
-import { isSupabaseConfigured } from "./services/supabase-client.js";
+import { registerSupabaseProjectTools } from './tools/supabase-projects.js';
+import { registerSupabaseDatabaseTools } from './tools/supabase-database.js';
+import { registerSupabaseFunctionTools } from './tools/supabase-functions.js';
+import { registerSupabaseConfigTools } from './tools/supabase-config.js';
+import { isSupabaseConfigured } from './services/supabase-client.js';
 
 // Secret redaction chokepoint
-import { installRedaction } from "./utils/register-sanitized.js";
+import { installRedaction } from './utils/register-sanitized.js';
 
 // ── Create server ────────────────────────────────────────────────────
 
 const server = new McpServer({
-  name: "infraops-mcp-server",
-  version: "3.4.0",
+  name: 'infraops-mcp-server',
+  version: '3.4.0',
 });
 
 // Patch registerTool BEFORE any tool registers, so every tool is covered.
@@ -107,7 +111,9 @@ installRedaction(server);
 
 const coolifyInstances = getConfiguredInstances();
 if (coolifyInstances.length === 0) {
-  console.error("WARNING: No Coolify instances configured. Set COOLIFY_PROD_BASE_URL/TOKEN (or COOLIFY_BASE_URL/TOKEN).");
+  console.error(
+    'WARNING: No Coolify instances configured. Set COOLIFY_PROD_BASE_URL/TOKEN (or COOLIFY_BASE_URL/TOKEN).',
+  );
 }
 
 registerProjectTools(server);
@@ -130,9 +136,9 @@ registerDocsTools(server);
 // ── Register GitHub tools ──────────────────────────────────────────
 if (isGithubConfigured()) {
   registerGithubTools(server);
-  console.error("GitHub tools registered");
+  console.error('GitHub tools registered');
 } else {
-  console.error("GITHUB_TOKEN not set — GitHub tools disabled");
+  console.error('GITHUB_TOKEN not set — GitHub tools disabled');
 }
 
 // ── Register Hetzner Cloud tools ─────────────────────────────────────
@@ -140,15 +146,15 @@ if (isGithubConfigured()) {
 if (isHetznerConfigured()) {
   registerHetznerServerTools(server);
   registerHetznerNetworkingTools(server);
-  console.error("Hetzner Cloud tools registered");
+  console.error('Hetzner Cloud tools registered');
 } else {
-  console.error("HETZNER_API_TOKEN not set — Hetzner Cloud tools disabled");
+  console.error('HETZNER_API_TOKEN not set — Hetzner Cloud tools disabled');
 }
 
 // ── Register VPS SSH tools ───────────────────────────────────────────
 
 registerVPSTools(server);
-console.error(`VPS SSH tools registered (host: ${process.env.VPS_HOST || "178.156.247.239"})`);
+console.error(`VPS SSH tools registered (host: ${process.env.VPS_HOST || '178.156.247.239'})`);
 
 // ── Register Namecheap tools ────────────────────────────────────────
 
@@ -157,7 +163,7 @@ if (isNamecheapConfigured()) {
   registerNamecheapDNSTools(server);
   console.error(`Namecheap tools registered (env: ${getNamecheapEnvironment()})`);
 } else {
-  console.error("NAMECHEAP_API_USER/KEY/PROXY_TOKEN not set — Namecheap tools disabled");
+  console.error('NAMECHEAP_API_USER/KEY/PROXY_TOKEN not set — Namecheap tools disabled');
 }
 
 // ── Register Cloudflare tools ──────────────────────────────────────
@@ -168,9 +174,9 @@ if (isCloudflareConfigured()) {
   registerCloudflareR2Tools(server);
   registerCloudflareTunnelTools(server);
   registerCloudflareSecurityTools(server);
-  console.error("Cloudflare tools registered");
+  console.error('Cloudflare tools registered');
 } else {
-  console.error("CLOUDFLARE_API_TOKEN/ACCOUNT_ID not set — Cloudflare tools disabled");
+  console.error('CLOUDFLARE_API_TOKEN/ACCOUNT_ID not set — Cloudflare tools disabled');
 }
 
 // ── Register Supabase tools ────────────────────────────────────────
@@ -179,9 +185,9 @@ if (isSupabaseConfigured()) {
   registerSupabaseDatabaseTools(server);
   registerSupabaseFunctionTools(server);
   registerSupabaseConfigTools(server);
-  console.error("Supabase tools registered");
+  console.error('Supabase tools registered');
 } else {
-  console.error("SUPABASE_ACCESS_TOKEN not set — Supabase tools disabled");
+  console.error('SUPABASE_ACCESS_TOKEN not set — Supabase tools disabled');
 }
 
 // ── Transport ────────────────────────────────────────────────────────
@@ -189,28 +195,24 @@ if (isSupabaseConfigured()) {
 async function runStdio(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("InfraOps MCP server v3.4.0 running via stdio");
+  console.error('InfraOps MCP server v3.4.0 running via stdio');
   console.error(
-    `  Coolify prod: ${isCoolifyInstanceConfigured("prod") ? getCoolifyInstanceUrl("prod") : "not configured"}`
+    `  Coolify prod: ${isCoolifyInstanceConfigured('prod') ? getCoolifyInstanceUrl('prod') : 'not configured'}`,
   );
   console.error(
-    `  Coolify dev:  ${isCoolifyInstanceConfigured("dev") ? getCoolifyInstanceUrl("dev") : "not configured"}`
+    `  Coolify dev:  ${isCoolifyInstanceConfigured('dev') ? getCoolifyInstanceUrl('dev') : 'not configured'}`,
   );
+  console.error(`  Hetzner: ${isHetznerConfigured() ? 'configured' : 'not configured'}`);
+  console.error(`  VPS SSH: ${process.env.VPS_HOST || '178.156.247.239'}`);
   console.error(
-    `  Hetzner: ${isHetznerConfigured() ? "configured" : "not configured"}`
+    `  Namecheap: ${isNamecheapConfigured() ? getNamecheapEnvironment() : 'not configured'}`,
   );
-  console.error(
-    `  VPS SSH: ${process.env.VPS_HOST || "178.156.247.239"}`
-  );
-  console.error(
-    `  Namecheap: ${isNamecheapConfigured() ? getNamecheapEnvironment() : "not configured"}`
-  );
-  console.error(`  Cloudflare: ${isCloudflareConfigured() ? "configured" : "not configured"}`);
-  console.error(`  Supabase: ${isSupabaseConfigured() ? "configured" : "not configured"}`);
-  console.error(`  GitHub: ${isGithubConfigured() ? "configured" : "not configured"}`);
+  console.error(`  Cloudflare: ${isCloudflareConfigured() ? 'configured' : 'not configured'}`);
+  console.error(`  Supabase: ${isSupabaseConfigured() ? 'configured' : 'not configured'}`);
+  console.error(`  GitHub: ${isGithubConfigured() ? 'configured' : 'not configured'}`);
 }
 
 runStdio().catch((error) => {
-  console.error("Server error:", error);
+  console.error('Server error:', error);
   process.exit(1);
 });

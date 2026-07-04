@@ -9,6 +9,6 @@
  * must mirror that routing so follow-up VPS introspection lands on the same host. Leaving
  * instance unspecified preserves existing prod behavior for every pre-existing caller.
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export declare function registerVPSTools(server: McpServer): void;
 //# sourceMappingURL=vps.d.ts.map

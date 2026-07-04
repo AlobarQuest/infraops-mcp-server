@@ -1,8 +1,8 @@
 /**
  * Shared Zod schemas used across multiple tool files.
  */
-import { z } from "zod";
-import { ResponseFormat } from "../constants.js";
+import { z } from 'zod';
+import { ResponseFormat } from '../constants.js';
 export declare const CoolifyInstanceSchema: z.ZodDefault<z.ZodEnum<["prod", "dev"]>>;
 /**
  * Required (no-default) instance selector for *mutating* Coolify tools.

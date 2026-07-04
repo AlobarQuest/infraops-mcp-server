@@ -5,31 +5,28 @@
  * Devon currently runs a single Hetzner VPS.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import {
-  coolifyGet,
-  coolifyPost,
-  coolifyDelete,
-  handleCoolifyError,
-  CoolifyInstance,
-} from "../services/coolify-client.js";
-import { UuidSchema, CoolifyInstanceSchema } from "../schemas/common.js";
-import { jsonResponse } from "../utils/response.js";
-import { summarize, toServerSummary } from "../utils/summaries.js";
-import type { CoolifyServer } from "../types.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { coolifyGet, handleCoolifyError, CoolifyInstance } from '../services/coolify-client.js';
+import { UuidSchema, CoolifyInstanceSchema } from '../schemas/common.js';
+import { jsonResponse } from '../utils/response.js';
+import { summarize, toServerSummary } from '../utils/summaries.js';
+import type { CoolifyServer } from '../types.js';
 
 export function registerServerTools(server: McpServer): void {
   // ── List Servers ─────────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_list_servers",
+    'coolify_list_servers',
     {
-      title: "List Coolify Servers",
+      title: 'List Coolify Servers',
       description:
-        "List all servers registered with Coolify. Returns name, IP, reachability status, and UUID for each. Compact summary by default; pass summary:false for full objects.",
+        'List all servers registered with Coolify. Returns name, IP, reachability status, and UUID for each. Compact summary by default; pass summary:false for full objects.',
       inputSchema: {
-        summary: z.boolean().default(true).describe("Compact projection (default true); false for full objects"),
+        summary: z
+          .boolean()
+          .default(true)
+          .describe('Compact projection (default true); false for full objects'),
         instance: CoolifyInstanceSchema,
       },
       annotations: {
@@ -41,25 +38,25 @@ export function registerServerTools(server: McpServer): void {
     },
     async ({ summary, instance }: { summary: boolean; instance: CoolifyInstance }) => {
       try {
-        const servers = await coolifyGet<CoolifyServer[]>("/servers", undefined, instance);
+        const servers = await coolifyGet<CoolifyServer[]>('/servers', undefined, instance);
         return jsonResponse(summarize(servers as any[], toServerSummary, summary));
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Get Server ───────────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_get_server",
+    'coolify_get_server',
     {
-      title: "Get Coolify Server",
+      title: 'Get Coolify Server',
       description:
-        "Get full details for a server by UUID — IP, settings, connectivity status, and validation logs.",
+        'Get full details for a server by UUID — IP, settings, connectivity status, and validation logs.',
       inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
@@ -72,26 +69,26 @@ export function registerServerTools(server: McpServer): void {
       try {
         const srv = await coolifyGet<CoolifyServer>(`/servers/${uuid}`, undefined, instance);
         return {
-          content: [{ type: "text", text: JSON.stringify(srv, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(srv, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Validate Server ──────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_validate_server",
+    'coolify_validate_server',
     {
-      title: "Validate Coolify Server",
+      title: 'Validate Coolify Server',
       description:
-        "Test SSH connectivity and Docker prerequisites for a server. " +
-        "Use this to verify a server is properly connected before deploying resources.",
+        'Test SSH connectivity and Docker prerequisites for a server. ' +
+        'Use this to verify a server is properly connected before deploying resources.',
       inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
@@ -103,28 +100,30 @@ export function registerServerTools(server: McpServer): void {
     async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const result = await coolifyGet<Record<string, unknown>>(
-          `/servers/${uuid}/validate`, undefined, instance
+          `/servers/${uuid}/validate`,
+          undefined,
+          instance,
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Server Resources ─────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_server_resources",
+    'coolify_server_resources',
     {
-      title: "List Server Resources",
+      title: 'List Server Resources',
       description:
-        "List all applications, databases, and services deployed on a specific server. " +
+        'List all applications, databases, and services deployed on a specific server. ' +
         "Great for getting a full inventory of what's running on your VPS.",
       inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
@@ -137,31 +136,31 @@ export function registerServerTools(server: McpServer): void {
     async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const resources = await coolifyGet<Record<string, unknown>>(
-          `/servers/${uuid}/resources`, undefined, instance
+          `/servers/${uuid}/resources`,
+          undefined,
+          instance,
         );
         return {
-          content: [
-            { type: "text", text: JSON.stringify(resources, null, 2) },
-          ],
+          content: [{ type: 'text', text: JSON.stringify(resources, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Server Domains ───────────────────────────────────────────────
 
   server.registerTool(
-    "coolify_server_domains",
+    'coolify_server_domains',
     {
-      title: "List Server Domains",
+      title: 'List Server Domains',
       description:
-        "Retrieve all domain-to-resource mappings configured on a server. " +
-        "Shows which apps are reachable at which FQDNs.",
+        'Retrieve all domain-to-resource mappings configured on a server. ' +
+        'Shows which apps are reachable at which FQDNs.',
       inputSchema: { uuid: UuidSchema, instance: CoolifyInstanceSchema },
       annotations: {
         readOnlyHint: true,
@@ -173,19 +172,19 @@ export function registerServerTools(server: McpServer): void {
     async ({ uuid, instance }: { uuid: string; instance: CoolifyInstance }) => {
       try {
         const domains = await coolifyGet<Record<string, unknown>>(
-          `/servers/${uuid}/domains`, undefined, instance
+          `/servers/${uuid}/domains`,
+          undefined,
+          instance,
         );
         return {
-          content: [
-            { type: "text", text: JSON.stringify(domains, null, 2) },
-          ],
+          content: [{ type: 'text', text: JSON.stringify(domains, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCoolifyError(error) }],
+          content: [{ type: 'text', text: handleCoolifyError(error) }],
         };
       }
-    }
+    },
   );
 }

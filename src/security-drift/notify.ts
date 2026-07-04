@@ -3,7 +3,7 @@
 // must never block the runner. Bodies carry the scanner's already-redacted detail
 // only; never secret values.
 
-import type { SecurityEscalation } from "./emit.js";
+import type { SecurityEscalation } from './emit.js';
 
 export interface NotifyDeps {
   resendApiKey?: string;
@@ -13,35 +13,42 @@ export interface NotifyDeps {
 }
 
 function renderBody(items: SecurityEscalation[]): string {
-  const lines = [`${items.length} new URGENT security finding(s) need approval at https://change-mgr.alobar.net`, ""];
+  const lines = [
+    `${items.length} new URGENT security finding(s) need approval at https://change-mgr.alobar.net`,
+    '',
+  ];
   for (const e of items) {
     lines.push(`• ${e.target.name}`);
     lines.push(`  ${e.reasoning}`);
     const rem =
-      "manual" in e.plan.remediation
-        ? e.plan.remediation.manual.join("; ")
-        : "rotation" in e.plan.remediation
+      'manual' in e.plan.remediation
+        ? e.plan.remediation.manual.join('; ')
+        : 'rotation' in e.plan.remediation
           ? `credential rotation plan for ${e.plan.remediation.rotation.credId} (${e.plan.remediation.rotation.credClass}) — approve in change-manager; console steps in the item`
-          : e.plan.remediation.exec.map((c) => c.join(" ")).join(" && ");
+          : e.plan.remediation.exec.map((c) => c.join(' ')).join(' && ');
     lines.push(`  remediation: ${rem}`);
-    lines.push("");
+    lines.push('');
   }
-  lines.push("Note: " + e0(items));
-  return lines.join("\n");
+  lines.push('Note: ' + e0(items));
+  return lines.join('\n');
 }
 // blind-spots footer (same text for all; pull from the first item)
 function e0(items: SecurityEscalation[]): string {
-  return items[0]?.plan.blind_spots ?? "";
+  return items[0]?.plan.blind_spots ?? '';
 }
 
 /** Low-level Resend send. Best-effort: skips when no key, returns false on any failure. */
-export async function sendAlertEmail(subject: string, text: string, deps: NotifyDeps): Promise<boolean> {
+export async function sendAlertEmail(
+  subject: string,
+  text: string,
+  deps: NotifyDeps,
+): Promise<boolean> {
   if (!deps.resendApiKey) return false; // no key configured → skip (non-fatal)
   const doFetch = deps.fetchImpl ?? fetch;
   try {
-    const res = await doFetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${deps.resendApiKey}`, "Content-Type": "application/json" },
+    const res = await doFetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${deps.resendApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: deps.from, to: [deps.to], subject, text }),
     });
     return res.ok;
@@ -51,7 +58,14 @@ export async function sendAlertEmail(subject: string, text: string, deps: Notify
 }
 
 /** Send the immediate URGENT email. Returns true on a 2xx, false if skipped or failed. */
-export async function sendUrgentEmail(items: SecurityEscalation[], deps: NotifyDeps): Promise<boolean> {
+export async function sendUrgentEmail(
+  items: SecurityEscalation[],
+  deps: NotifyDeps,
+): Promise<boolean> {
   if (!items.length) return false;
-  return sendAlertEmail(`🚨 URGENT security drift — ${items.length} item(s) need approval now`, renderBody(items), deps);
+  return sendAlertEmail(
+    `🚨 URGENT security drift — ${items.length} item(s) need approval now`,
+    renderBody(items),
+    deps,
+  );
 }

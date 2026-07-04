@@ -1,5 +1,5 @@
-import type { ApprovedItem, OutcomeBody } from "../change-manager/api-client.js";
-import { type RotationDeps } from "./rotation-executor.js";
+import type { ApprovedItem, OutcomeBody } from '../change-manager/api-client.js';
+import { type RotationDeps } from './rotation-executor.js';
 export interface ExecResult {
     ok: boolean;
     detail: string;

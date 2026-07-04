@@ -1,1 +1,1 @@
-{"version":3,"file":"cloudflare-pages.d.ts","sourceRoot":"","sources":["../../src/tools/cloudflare-pages.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,OAAO,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AAWpE,wBAAgB,4BAA4B,CAAC,MAAM,EAAE,SAAS,GAAG,IAAI,CAqVpE"}
+{"version":3,"file":"cloudflare-pages.d.ts","sourceRoot":"","sources":["../../src/tools/cloudflare-pages.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,OAAO,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AAWpE,wBAAgB,4BAA4B,CAAC,MAAM,EAAE,SAAS,GAAG,IAAI,CAuUpE"}

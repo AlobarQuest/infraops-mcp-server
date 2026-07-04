@@ -5,30 +5,27 @@
  * list zones, get zone, list records, create, update, delete.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import {
   cloudflareGet,
   cloudflarePost,
   cloudflarePut,
   cloudflareDelete,
   handleCloudflareError,
-} from "../services/cloudflare-client.js";
+} from '../services/cloudflare-client.js';
 
 export function registerCloudflareDNSTools(server: McpServer): void {
   // ── List Zones ───────────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_list_zones",
+    'cloudflare_list_zones',
     {
-      title: "List Cloudflare Zones",
+      title: 'List Cloudflare Zones',
       description:
-        "List all zones in the Cloudflare account. Optionally filter by zone name. Returns zone ID, name, status, and nameservers.",
+        'List all zones in the Cloudflare account. Optionally filter by zone name. Returns zone ID, name, status, and nameservers.',
       inputSchema: {
-        name: z
-          .string()
-          .optional()
-          .describe("Filter by zone name (e.g. 'example.com')"),
+        name: z.string().optional().describe("Filter by zone name (e.g. 'example.com')"),
       },
       annotations: {
         readOnlyHint: true,
@@ -41,29 +38,29 @@ export function registerCloudflareDNSTools(server: McpServer): void {
       try {
         const params: Record<string, unknown> = {};
         if (name) params.name = name;
-        const result = await cloudflareGet<Record<string, unknown>>("/zones", params);
+        const result = await cloudflareGet<Record<string, unknown>>('/zones', params);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Get Zone ─────────────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_get_zone",
+    'cloudflare_get_zone',
     {
-      title: "Get Cloudflare Zone",
+      title: 'Get Cloudflare Zone',
       description:
-        "Get full details for a Cloudflare zone by ID — name, status, nameservers, plan, and settings.",
+        'Get full details for a Cloudflare zone by ID — name, status, nameservers, plan, and settings.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
       },
       annotations: {
         readOnlyHint: true,
@@ -76,35 +73,31 @@ export function registerCloudflareDNSTools(server: McpServer): void {
       try {
         const result = await cloudflareGet<Record<string, unknown>>(`/zones/${zone_id}`);
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── List DNS Records ─────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_list_dns_records",
+    'cloudflare_list_dns_records',
     {
-      title: "List Cloudflare DNS Records",
-      description:
-        "List all DNS records for a zone. Optionally filter by record type and/or name.",
+      title: 'List Cloudflare DNS Records',
+      description: 'List all DNS records for a zone. Optionally filter by record type and/or name.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
         type: z
-          .enum(["A", "AAAA", "CNAME", "MX", "TXT", "SRV", "NS", "CAA"])
+          .enum(['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'NS', 'CAA'])
           .optional()
-          .describe("Filter by DNS record type"),
-        name: z
-          .string()
-          .optional()
-          .describe("Filter by record name (e.g. 'www.example.com')"),
+          .describe('Filter by DNS record type'),
+        name: z.string().optional().describe("Filter by record name (e.g. 'www.example.com')"),
       },
       annotations: {
         readOnlyHint: true,
@@ -113,58 +106,50 @@ export function registerCloudflareDNSTools(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({
-      zone_id,
-      type,
-      name,
-    }: {
-      zone_id: string;
-      type?: string;
-      name?: string;
-    }) => {
+    async ({ zone_id, type, name }: { zone_id: string; type?: string; name?: string }) => {
       try {
         const params: Record<string, unknown> = {};
         if (type) params.type = type;
         if (name) params.name = name;
         const result = await cloudflareGet<Record<string, unknown>>(
           `/zones/${zone_id}/dns_records`,
-          params
+          params,
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Create DNS Record ────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_create_dns_record",
+    'cloudflare_create_dns_record',
     {
-      title: "Create Cloudflare DNS Record",
+      title: 'Create Cloudflare DNS Record',
       description:
-        "Create a new DNS record in a Cloudflare zone. Returns the created record with its ID.",
+        'Create a new DNS record in a Cloudflare zone. Returns the created record with its ID.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
         type: z
-          .enum(["A", "AAAA", "CNAME", "MX", "TXT", "SRV", "NS", "CAA"])
-          .describe("DNS record type"),
+          .enum(['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'NS', 'CAA'])
+          .describe('DNS record type'),
         name: z.string().describe("DNS record name (e.g. 'www' or 'www.example.com')"),
-        content: z.string().describe("DNS record content (e.g. IP address or target hostname)"),
+        content: z.string().describe('DNS record content (e.g. IP address or target hostname)'),
         ttl: z
           .number()
           .optional()
-          .describe("Time to live in seconds. 1 = auto (Cloudflare default)"),
+          .describe('Time to live in seconds. 1 = auto (Cloudflare default)'),
         proxied: z
           .boolean()
           .optional()
-          .describe("Whether the record is proxied through Cloudflare (orange cloud)"),
+          .describe('Whether the record is proxied through Cloudflare (orange cloud)'),
       },
       annotations: {
         readOnlyHint: false,
@@ -192,44 +177,43 @@ export function registerCloudflareDNSTools(server: McpServer): void {
 
         const result = await cloudflarePost<Record<string, unknown>>(
           `/zones/${params.zone_id}/dns_records`,
-          body
+          body,
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Update DNS Record ────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_update_dns_record",
+    'cloudflare_update_dns_record',
     {
-      title: "Update Cloudflare DNS Record",
-      description:
-        "Update an existing DNS record in a Cloudflare zone. Replaces the full record.",
+      title: 'Update Cloudflare DNS Record',
+      description: 'Update an existing DNS record in a Cloudflare zone. Replaces the full record.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
-        record_id: z.string().describe("DNS record ID to update"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
+        record_id: z.string().describe('DNS record ID to update'),
         type: z
-          .enum(["A", "AAAA", "CNAME", "MX", "TXT", "SRV", "NS", "CAA"])
-          .describe("DNS record type"),
+          .enum(['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'NS', 'CAA'])
+          .describe('DNS record type'),
         name: z.string().describe("DNS record name (e.g. 'www' or 'www.example.com')"),
-        content: z.string().describe("DNS record content (e.g. IP address or target hostname)"),
+        content: z.string().describe('DNS record content (e.g. IP address or target hostname)'),
         ttl: z
           .number()
           .optional()
-          .describe("Time to live in seconds. 1 = auto (Cloudflare default)"),
+          .describe('Time to live in seconds. 1 = auto (Cloudflare default)'),
         proxied: z
           .boolean()
           .optional()
-          .describe("Whether the record is proxied through Cloudflare (orange cloud)"),
+          .describe('Whether the record is proxied through Cloudflare (orange cloud)'),
       },
       annotations: {
         readOnlyHint: false,
@@ -258,31 +242,31 @@ export function registerCloudflareDNSTools(server: McpServer): void {
 
         const result = await cloudflarePut<Record<string, unknown>>(
           `/zones/${params.zone_id}/dns_records/${params.record_id}`,
-          body
+          body,
         );
         return {
-          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
         };
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 
   // ── Delete DNS Record ────────────────────────────────────────────
 
   server.registerTool(
-    "cloudflare_delete_dns_record",
+    'cloudflare_delete_dns_record',
     {
-      title: "Delete Cloudflare DNS Record",
+      title: 'Delete Cloudflare DNS Record',
       description:
-        "Permanently delete a DNS record from a Cloudflare zone. WARNING: This is irreversible.",
+        'Permanently delete a DNS record from a Cloudflare zone. WARNING: This is irreversible.',
       inputSchema: {
-        zone_id: z.string().describe("Cloudflare zone ID"),
-        record_id: z.string().describe("DNS record ID to delete"),
+        zone_id: z.string().describe('Cloudflare zone ID'),
+        record_id: z.string().describe('DNS record ID to delete'),
       },
       annotations: {
         readOnlyHint: false,
@@ -294,12 +278,12 @@ export function registerCloudflareDNSTools(server: McpServer): void {
     async ({ zone_id, record_id }: { zone_id: string; record_id: string }) => {
       try {
         const result = await cloudflareDelete<Record<string, unknown>>(
-          `/zones/${zone_id}/dns_records/${record_id}`
+          `/zones/${zone_id}/dns_records/${record_id}`,
         );
         return {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: `DNS record ${record_id} deleted.\n${JSON.stringify(result, null, 2)}`,
             },
           ],
@@ -307,9 +291,9 @@ export function registerCloudflareDNSTools(server: McpServer): void {
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: handleCloudflareError(error) }],
+          content: [{ type: 'text', text: handleCloudflareError(error) }],
         };
       }
-    }
+    },
   );
 }

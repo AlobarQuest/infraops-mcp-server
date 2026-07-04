@@ -1,8 +1,8 @@
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import type { Proposal, Risk } from "./check-engine.js";
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import type { Proposal, Risk } from './check-engine.js';
 export interface AuditResult {
     meta: {
-        standards_source: "live" | "cache" | "seed";
+        standards_source: 'live' | 'cache' | 'seed';
         checks_evaluated: number;
         not_audited: number;
         errors?: string[];

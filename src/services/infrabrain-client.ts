@@ -1,5 +1,5 @@
-import axios, { AxiosError, AxiosInstance } from "axios";
-import { REQUEST_TIMEOUT } from "../constants.js";
+import axios, { AxiosError, AxiosInstance } from 'axios';
+import { REQUEST_TIMEOUT } from '../constants.js';
 
 let _client: AxiosInstance | null = null;
 
@@ -11,7 +11,7 @@ function getClient(): AxiosInstance {
 
   if (!baseURL || !key) {
     throw new Error(
-      "infra-brain is not configured. Set INFRABRAIN_BASE_URL and INFRABRAIN_ACCESS_KEY."
+      'infra-brain is not configured. Set INFRABRAIN_BASE_URL and INFRABRAIN_ACCESS_KEY.',
     );
   }
 
@@ -19,9 +19,9 @@ function getClient(): AxiosInstance {
     baseURL,
     timeout: REQUEST_TIMEOUT,
     headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "x-brain-key": key,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'x-brain-key': key,
     },
   });
 
@@ -30,7 +30,7 @@ function getClient(): AxiosInstance {
 
 export async function infrabrainGet<T>(
   endpoint: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
 ): Promise<T> {
   const client = getClient();
   const response = await client.get<T>(endpoint, { params });
@@ -49,7 +49,7 @@ export function handleInfrabrainError(error: unknown): string {
       switch (status) {
         case 401:
           return (
-            "Error: infra-brain authentication failed (HTTP 401). " +
+            'Error: infra-brain authentication failed (HTTP 401). ' +
             "Check INFRABRAIN_ACCESS_KEY matches the server's MCP_ACCESS_KEY."
           );
         case 403:
@@ -57,7 +57,7 @@ export function handleInfrabrainError(error: unknown): string {
         case 404:
           return `Error: infra-brain resource not found. ${msg}`;
         case 429:
-          return "Error: infra-brain rate limit exceeded. Wait before retrying.";
+          return 'Error: infra-brain rate limit exceeded. Wait before retrying.';
         case 503:
           return `Error: infra-brain service unavailable. Try again in a moment.`;
         default:
@@ -65,8 +65,8 @@ export function handleInfrabrainError(error: unknown): string {
       }
     }
 
-    if (axErr.code === "ECONNABORTED") {
-      return "Error: infra-brain request timeout.";
+    if (axErr.code === 'ECONNABORTED') {
+      return 'Error: infra-brain request timeout.';
     }
 
     return `Error: infra-brain network error — ${axErr.message}`;

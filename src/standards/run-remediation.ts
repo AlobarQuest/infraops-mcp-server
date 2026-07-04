@@ -1,26 +1,32 @@
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import type { AuditResult } from "./run-audit.js";
-import type { Proposal } from "./check-engine.js";
-import type { ApplyResult } from "./executor.js";
-import { isAutoApplicable } from "./executor.js";
-import type { ProbeResult } from "./executor.js";
-import type { RemediationPlan } from "./remediation-plan.js";
-import { buildHandoff } from "./handoff-brief.js";
-import type { AppResolution } from "../services/appbrain-client.js";
-import { proposalIdentity, type DriftReport } from "./report.js";
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import type { AuditResult } from './run-audit.js';
+import type { Proposal } from './check-engine.js';
+import type { ApplyResult } from './executor.js';
+import { isAutoApplicable } from './executor.js';
+import type { ProbeResult } from './executor.js';
+import type { RemediationPlan } from './remediation-plan.js';
+import { buildHandoff } from './handoff-brief.js';
+import type { AppResolution } from '../services/appbrain-client.js';
+import { proposalIdentity, type DriftReport } from './report.js';
 import {
   buildRemediationReport,
   type Escalation,
   type RemediationReport,
-} from "./remediation-report.js";
+} from './remediation-report.js';
 
 export interface RemediationDeps {
   audit: (inst: CoolifyInstance) => Promise<AuditResult>;
   apply: (p: Proposal, inst: CoolifyInstance, opts: { dryRun?: boolean }) => Promise<ApplyResult>;
   plan: (p: Proposal) => Promise<RemediationPlan>;
   /** Pre-apply gate: returns ok=false (with a reason) to reroute a "safe" proposal to escalation. */
-  verify: (p: Proposal, inst: CoolifyInstance) => Promise<{ ok: boolean; reason: string; probe?: ProbeResult; url?: string }>;
-  appBrainResolve?: (args: { coolifyAppUuid: string; fqdn: string | null }) => Promise<AppResolution | null>;
+  verify: (
+    p: Proposal,
+    inst: CoolifyInstance,
+  ) => Promise<{ ok: boolean; reason: string; probe?: ProbeResult; url?: string }>;
+  appBrainResolve?: (args: {
+    coolifyAppUuid: string;
+    fqdn: string | null;
+  }) => Promise<AppResolution | null>;
   maxAutoApplies: number;
   dryRun: boolean;
 }
@@ -103,7 +109,10 @@ export async function runRemediation(
   for (const t of toEscalate) {
     const plan = await deps.plan(t.proposal);
     const { lane, handoff, handoff_brief } = await buildHandoff(
-      t.proposal, t.probe, t.url, t.instance,
+      t.proposal,
+      t.probe,
+      t.url,
+      t.instance,
       deps.appBrainResolve ? { appBrainResolve: deps.appBrainResolve } : {},
     );
     escalations.push({

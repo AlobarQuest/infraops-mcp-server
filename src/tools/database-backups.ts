@@ -5,30 +5,30 @@
  * All endpoints live under `/databases/{database_uuid}/backups`.
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
 import {
   coolifyGet,
   coolifyPost,
   coolifyPatch,
   coolifyDelete,
   handleCoolifyError,
-} from "../services/coolify-client.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
-import { jsonResponse } from "../utils/response.js";
-import type { CoolifyDatabaseBackup, CoolifyBackupExecution } from "../types.js";
+} from '../services/coolify-client.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from '../schemas/common.js';
+import { jsonResponse } from '../utils/response.js';
+import type { CoolifyDatabaseBackup, CoolifyBackupExecution } from '../types.js';
 
 // Shared optional backup-config fields (create/update share these).
 const backupConfigShape = {
-  enabled: z.boolean().optional().describe("Whether the schedule is active"),
-  save_s3: z.boolean().optional().describe("Also upload backups to S3"),
-  s3_storage_uuid: z.string().optional().describe("S3 storage UUID (required if save_s3)"),
+  enabled: z.boolean().optional().describe('Whether the schedule is active'),
+  save_s3: z.boolean().optional().describe('Also upload backups to S3'),
+  s3_storage_uuid: z.string().optional().describe('S3 storage UUID (required if save_s3)'),
   databases_to_backup: z
     .string()
     .optional()
-    .describe("Comma-separated DB names to back up (engine-specific)"),
-  dump_all: z.boolean().optional().describe("Dump all databases on the server"),
+    .describe('Comma-separated DB names to back up (engine-specific)'),
+  dump_all: z.boolean().optional().describe('Dump all databases on the server'),
   database_backup_retention_days_locally: z.number().int().optional(),
   database_backup_retention_days_s3: z.number().int().optional(),
   database_backup_retention_amount_locally: z.number().int().optional(),
@@ -38,223 +38,318 @@ const backupConfigShape = {
 export function registerDatabaseBackupTools(server: McpServer): void {
   // ── List backup schedules ────────────────────────────────────────
   server.registerTool(
-    "coolify_list_database_backups",
+    'coolify_list_database_backups',
     {
-      title: "List Database Backup Schedules",
+      title: 'List Database Backup Schedules',
       description:
-        "List configured backup schedules for a database. Returns frequency (cron), enabled state, S3 config, and retention.",
+        'List configured backup schedules for a database. Returns frequency (cron), enabled state, S3 config, and retention.',
       inputSchema: {
-        database_uuid: z.string().min(1).describe("Database UUID"),
+        database_uuid: z.string().min(1).describe('Database UUID'),
         instance: CoolifyInstanceSchema,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ database_uuid, instance }: { database_uuid: string; instance: CoolifyInstance }) => {
       try {
         const backups = await coolifyGet<CoolifyDatabaseBackup[]>(
           `/databases/${database_uuid}/backups`,
           undefined,
-          instance
+          instance,
         );
         return jsonResponse(backups);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Get one backup schedule ──────────────────────────────────────
   server.registerTool(
-    "coolify_get_database_backup",
+    'coolify_get_database_backup',
     {
-      title: "Get Database Backup Schedule",
-      description: "Get a single backup schedule by its UUID.",
+      title: 'Get Database Backup Schedule',
+      description: 'Get a single backup schedule by its UUID.',
       inputSchema: {
-        database_uuid: z.string().min(1).describe("Database UUID"),
-        backup_uuid: z.string().min(1).describe("Backup schedule UUID"),
+        database_uuid: z.string().min(1).describe('Database UUID'),
+        backup_uuid: z.string().min(1).describe('Backup schedule UUID'),
         instance: CoolifyInstanceSchema,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
-    async ({ database_uuid, backup_uuid, instance }: { database_uuid: string; backup_uuid: string; instance: CoolifyInstance }) => {
+    async ({
+      database_uuid,
+      backup_uuid,
+      instance,
+    }: {
+      database_uuid: string;
+      backup_uuid: string;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const backup = await coolifyGet<CoolifyDatabaseBackup>(
           `/databases/${database_uuid}/backups/${backup_uuid}`,
           undefined,
-          instance
+          instance,
         );
         return jsonResponse(backup);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── List backup executions ───────────────────────────────────────
   server.registerTool(
-    "coolify_list_backup_executions",
+    'coolify_list_backup_executions',
     {
-      title: "List Backup Executions",
-      description: "List execution history (runs) for a backup schedule — status, size, filename, timestamps.",
+      title: 'List Backup Executions',
+      description:
+        'List execution history (runs) for a backup schedule — status, size, filename, timestamps.',
       inputSchema: {
-        database_uuid: z.string().min(1).describe("Database UUID"),
-        backup_uuid: z.string().min(1).describe("Backup schedule UUID"),
+        database_uuid: z.string().min(1).describe('Database UUID'),
+        backup_uuid: z.string().min(1).describe('Backup schedule UUID'),
         instance: CoolifyInstanceSchema,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
-    async ({ database_uuid, backup_uuid, instance }: { database_uuid: string; backup_uuid: string; instance: CoolifyInstance }) => {
+    async ({
+      database_uuid,
+      backup_uuid,
+      instance,
+    }: {
+      database_uuid: string;
+      backup_uuid: string;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const execs = await coolifyGet<CoolifyBackupExecution[]>(
           `/databases/${database_uuid}/backups/${backup_uuid}/executions`,
           undefined,
-          instance
+          instance,
         );
         return jsonResponse(execs);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Get one backup execution ─────────────────────────────────────
   server.registerTool(
-    "coolify_get_backup_execution",
+    'coolify_get_backup_execution',
     {
-      title: "Get Backup Execution",
-      description: "Get a single backup execution by its UUID.",
+      title: 'Get Backup Execution',
+      description: 'Get a single backup execution by its UUID.',
       inputSchema: {
-        database_uuid: z.string().min(1).describe("Database UUID"),
-        backup_uuid: z.string().min(1).describe("Backup schedule UUID"),
-        execution_uuid: z.string().min(1).describe("Backup execution UUID"),
+        database_uuid: z.string().min(1).describe('Database UUID'),
+        backup_uuid: z.string().min(1).describe('Backup schedule UUID'),
+        execution_uuid: z.string().min(1).describe('Backup execution UUID'),
         instance: CoolifyInstanceSchema,
       },
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
-    async ({ database_uuid, backup_uuid, execution_uuid, instance }: { database_uuid: string; backup_uuid: string; execution_uuid: string; instance: CoolifyInstance }) => {
+    async ({
+      database_uuid,
+      backup_uuid,
+      execution_uuid,
+      instance,
+    }: {
+      database_uuid: string;
+      backup_uuid: string;
+      execution_uuid: string;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const exec = await coolifyGet<CoolifyBackupExecution>(
           `/databases/${database_uuid}/backups/${backup_uuid}/executions/${execution_uuid}`,
           undefined,
-          instance
+          instance,
         );
         return jsonResponse(exec);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Create backup schedule ───────────────────────────────────────
   server.registerTool(
-    "coolify_create_database_backup",
+    'coolify_create_database_backup',
     {
-      title: "Create Database Backup Schedule",
+      title: 'Create Database Backup Schedule',
       description:
         "Create a scheduled backup for a database. `frequency` is a cron expression (e.g. '0 2 * * *').",
       inputSchema: {
-        database_uuid: z.string().min(1).describe("Database UUID"),
+        database_uuid: z.string().min(1).describe('Database UUID'),
         frequency: z.string().min(1).describe("Cron expression, e.g. '0 2 * * *'"),
         ...backupConfigShape,
         instance: CoolifyInstanceRequiredSchema,
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
-    async (params: { database_uuid: string; frequency: string; instance: CoolifyInstance } & Record<string, unknown>) => {
+    async (
+      params: { database_uuid: string; frequency: string; instance: CoolifyInstance } & Record<
+        string,
+        unknown
+      >,
+    ) => {
       try {
         const { database_uuid, instance, ...body } = params;
         const backup = await coolifyPost<CoolifyDatabaseBackup>(
           `/databases/${database_uuid}/backups`,
           body,
-          instance
+          instance,
         );
         return jsonResponse(backup);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Update backup schedule ───────────────────────────────────────
   server.registerTool(
-    "coolify_update_database_backup",
+    'coolify_update_database_backup',
     {
-      title: "Update Database Backup Schedule",
-      description: "Update fields of an existing backup schedule. Only supplied fields change.",
+      title: 'Update Database Backup Schedule',
+      description: 'Update fields of an existing backup schedule. Only supplied fields change.',
       inputSchema: {
-        database_uuid: z.string().min(1).describe("Database UUID"),
-        backup_uuid: z.string().min(1).describe("Backup schedule UUID"),
-        frequency: z.string().optional().describe("Cron expression"),
+        database_uuid: z.string().min(1).describe('Database UUID'),
+        backup_uuid: z.string().min(1).describe('Backup schedule UUID'),
+        frequency: z.string().optional().describe('Cron expression'),
         ...backupConfigShape,
         instance: CoolifyInstanceRequiredSchema,
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
-    async (params: { database_uuid: string; backup_uuid: string; instance: CoolifyInstance } & Record<string, unknown>) => {
+    async (
+      params: { database_uuid: string; backup_uuid: string; instance: CoolifyInstance } & Record<
+        string,
+        unknown
+      >,
+    ) => {
       try {
         const { database_uuid, backup_uuid, instance, ...body } = params;
         const result = await coolifyPatch<{ message?: string }>(
           `/databases/${database_uuid}/backups/${backup_uuid}`,
           body,
-          instance
+          instance,
         );
         return jsonResponse(result);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Delete backup schedule ───────────────────────────────────────
   server.registerTool(
-    "coolify_delete_database_backup",
+    'coolify_delete_database_backup',
     {
-      title: "Delete Database Backup Schedule",
-      description: "Delete a backup schedule by UUID. Does not delete already-stored backup files.",
+      title: 'Delete Database Backup Schedule',
+      description: 'Delete a backup schedule by UUID. Does not delete already-stored backup files.',
       inputSchema: {
-        database_uuid: z.string().min(1).describe("Database UUID"),
-        backup_uuid: z.string().min(1).describe("Backup schedule UUID"),
+        database_uuid: z.string().min(1).describe('Database UUID'),
+        backup_uuid: z.string().min(1).describe('Backup schedule UUID'),
         instance: CoolifyInstanceRequiredSchema,
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
-    async ({ database_uuid, backup_uuid, instance }: { database_uuid: string; backup_uuid: string; instance: CoolifyInstance }) => {
+    async ({
+      database_uuid,
+      backup_uuid,
+      instance,
+    }: {
+      database_uuid: string;
+      backup_uuid: string;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const result = await coolifyDelete<{ message?: string }>(
           `/databases/${database_uuid}/backups/${backup_uuid}`,
-          instance
+          instance,
         );
         return jsonResponse(result);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 
   // ── Delete backup execution ──────────────────────────────────────
   server.registerTool(
-    "coolify_delete_backup_execution",
+    'coolify_delete_backup_execution',
     {
-      title: "Delete Backup Execution",
-      description: "Delete a single backup execution (and its stored file) by UUID.",
+      title: 'Delete Backup Execution',
+      description: 'Delete a single backup execution (and its stored file) by UUID.',
       inputSchema: {
-        database_uuid: z.string().min(1).describe("Database UUID"),
-        backup_uuid: z.string().min(1).describe("Backup schedule UUID"),
-        execution_uuid: z.string().min(1).describe("Backup execution UUID"),
+        database_uuid: z.string().min(1).describe('Database UUID'),
+        backup_uuid: z.string().min(1).describe('Backup schedule UUID'),
+        execution_uuid: z.string().min(1).describe('Backup execution UUID'),
         instance: CoolifyInstanceRequiredSchema,
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
-    async ({ database_uuid, backup_uuid, execution_uuid, instance }: { database_uuid: string; backup_uuid: string; execution_uuid: string; instance: CoolifyInstance }) => {
+    async ({
+      database_uuid,
+      backup_uuid,
+      execution_uuid,
+      instance,
+    }: {
+      database_uuid: string;
+      backup_uuid: string;
+      execution_uuid: string;
+      instance: CoolifyInstance;
+    }) => {
       try {
         const result = await coolifyDelete<{ message?: string }>(
           `/databases/${database_uuid}/backups/${backup_uuid}/executions/${execution_uuid}`,
-          instance
+          instance,
         );
         return jsonResponse(result);
       } catch (error) {
-        return { isError: true, content: [{ type: "text", text: handleCoolifyError(error) }] };
+        return { isError: true, content: [{ type: 'text', text: handleCoolifyError(error) }] };
       }
-    }
+    },
   );
 }

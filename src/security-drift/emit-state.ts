@@ -7,12 +7,12 @@
 // item approved on a later day can still be verified against the hash recorded when
 // it was emitted.
 
-import { loadValidated0600Json, saveValidated0600Json } from "./validated-store.js";
+import { loadValidated0600Json, saveValidated0600Json } from './validated-store.js';
 
 export class EmitStateIntegrityError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "EmitStateIntegrityError";
+    this.name = 'EmitStateIntegrityError';
   }
 }
 
@@ -24,7 +24,7 @@ export type EmitState = Record<string, EmitStateEntry>; // key = fingerprint
 
 /** Load + validate. Missing file → {} (no recorded hashes; executor will block, which is safe). */
 export function loadEmitState(file: string): EmitState {
-  return loadValidated0600Json<EmitState>(file, "emit-state", EmitStateIntegrityError) ?? {};
+  return loadValidated0600Json<EmitState>(file, 'emit-state', EmitStateIntegrityError) ?? {};
 }
 
 /** Atomic write with mode 0600. */

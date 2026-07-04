@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import * as client from "../src/services/coolify-client.js";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as client from '../src/services/coolify-client.js';
 
 const mockServer = {
   registerTool: vi.fn((name, _schema, handler) => {
@@ -8,7 +8,7 @@ const mockServer = {
   _handlers: {} as Record<string, Function>,
 };
 
-vi.mock("../src/services/coolify-client.js", () => ({
+vi.mock('../src/services/coolify-client.js', () => ({
   coolifyGet: vi.fn(),
   coolifyPost: vi.fn(),
   coolifyPatch: vi.fn(),
@@ -20,45 +20,45 @@ vi.mock("../src/services/coolify-client.js", () => ({
   }),
 }));
 
-import { registerApplicationTools } from "../src/tools/applications.js";
+import { registerApplicationTools } from '../src/tools/applications.js';
 
-describe("coolify_application_logs", () => {
+describe('coolify_application_logs', () => {
   beforeEach(() => {
     mockServer._handlers = {};
     registerApplicationTools(mockServer as any);
   });
 
-  it("returns informational message (not isError) when app is not running (HTTP 400)", async () => {
-    const axiosError = Object.assign(new Error("Request failed with status code 400"), {
+  it('returns informational message (not isError) when app is not running (HTTP 400)', async () => {
+    const axiosError = Object.assign(new Error('Request failed with status code 400'), {
       isAxiosError: true,
       response: {
         status: 400,
-        data: { message: "Application is not running." },
+        data: { message: 'Application is not running.' },
       },
     });
     vi.mocked(client.coolifyGet).mockRejectedValueOnce(axiosError);
 
-    const result = await mockServer._handlers["coolify_application_logs"]({
-      uuid: "app-uuid-1",
+    const result = await mockServer._handlers['coolify_application_logs']({
+      uuid: 'app-uuid-1',
       lines: 100,
-      instance: "prod",
+      instance: 'prod',
     });
 
     expect(result.isError).toBeUndefined();
-    expect(result.content[0].text).toContain("not running");
+    expect(result.content[0].text).toContain('not running');
   });
 
-  it("returns isError for non-400 errors (e.g. 404)", async () => {
-    const axiosError = Object.assign(new Error("Not found"), {
+  it('returns isError for non-400 errors (e.g. 404)', async () => {
+    const axiosError = Object.assign(new Error('Not found'), {
       isAxiosError: true,
-      response: { status: 404, data: { message: "Application not found" } },
+      response: { status: 404, data: { message: 'Application not found' } },
     });
     vi.mocked(client.coolifyGet).mockRejectedValueOnce(axiosError);
 
-    const result = await mockServer._handlers["coolify_application_logs"]({
-      uuid: "app-uuid-1",
+    const result = await mockServer._handlers['coolify_application_logs']({
+      uuid: 'app-uuid-1',
       lines: 100,
-      instance: "prod",
+      instance: 'prod',
     });
 
     expect(result.isError).toBe(true);

@@ -8,11 +8,11 @@
  * Environment variables:
  *   VPS_DEV_ORB_MACHINE - OrbStack machine name for the dev VPS (default: "ubuntu")
  */
-import { execFile, spawnSync } from "node:child_process";
-import { promisify } from "node:util";
+import { execFile, spawnSync } from 'node:child_process';
+import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 export function getOrbMachine() {
-    return process.env.VPS_DEV_ORB_MACHINE || "ubuntu";
+    return process.env.VPS_DEV_ORB_MACHINE || 'ubuntu';
 }
 /**
  * Execute a shell command inside an OrbStack machine.
@@ -24,7 +24,7 @@ export function getOrbMachine() {
 export async function orbExec(machine, command, options = {}) {
     const timeout = options.timeout ?? 30000;
     try {
-        const { stdout, stderr } = await execFileAsync("orb", ["run", "-m", machine, "bash", "-c", command], {
+        const { stdout, stderr } = await execFileAsync('orb', ['run', '-m', machine, 'bash', '-c', command], {
             timeout,
             maxBuffer: 10 * 1024 * 1024,
         });
@@ -32,15 +32,15 @@ export async function orbExec(machine, command, options = {}) {
     }
     catch (err) {
         const e = err;
-        if (e.killed && e.signal === "SIGTERM") {
+        if (e.killed && e.signal === 'SIGTERM') {
             throw new Error(`orb run timed out after ${timeout}ms on machine '${machine}': ${command}`);
         }
-        if (e.code === "ENOENT") {
-            throw new Error("orb CLI not found on PATH. Install OrbStack or ensure `orb` is available to the MCP process.");
+        if (e.code === 'ENOENT') {
+            throw new Error('orb CLI not found on PATH. Install OrbStack or ensure `orb` is available to the MCP process.');
         }
-        const stdout = typeof e.stdout === "string" ? e.stdout : e.stdout?.toString() ?? "";
-        const stderr = typeof e.stderr === "string" ? e.stderr : e.stderr?.toString() ?? "";
-        const exitCode = typeof e.code === "number" ? e.code : 1;
+        const stdout = typeof e.stdout === 'string' ? e.stdout : (e.stdout?.toString() ?? '');
+        const stderr = typeof e.stderr === 'string' ? e.stderr : (e.stderr?.toString() ?? '');
+        const exitCode = typeof e.code === 'number' ? e.code : 1;
         if (options.allowFailure) {
             return { stdout, stderr, exitCode };
         }
@@ -50,7 +50,7 @@ export async function orbExec(machine, command, options = {}) {
 /** Check whether the orb CLI is reachable at all. Best-effort. */
 export function isOrbConfigured() {
     try {
-        const res = spawnSync("orb", ["version"], { stdio: "ignore" });
+        const res = spawnSync('orb', ['version'], { stdio: 'ignore' });
         return res.status === 0 || res.status === null;
     }
     catch {
@@ -59,9 +59,9 @@ export function isOrbConfigured() {
 }
 export function handleOrbError(error) {
     const msg = error instanceof Error ? error.message : String(error);
-    if (msg.includes("orb CLI not found"))
+    if (msg.includes('orb CLI not found'))
         return `Error: ${msg}`;
-    if (msg.includes("timed out"))
+    if (msg.includes('timed out'))
         return `Error: ${msg}`;
     return `Error: orb run failed — ${msg}`;
 }

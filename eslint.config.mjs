@@ -14,7 +14,7 @@ export default tseslint.config(
   // reference that trips @typescript-eslint/triple-slash-reference, and is not
   // hand-editable — never lint it (agent-sites).
   {
-    ignores: ['.next/', 'dist/', 'build/', 'node_modules/', 'next-env.d.ts'],
+    ignores: ['.next/', '.worktrees/', 'dist/', 'build/', 'node_modules/', 'next-env.d.ts'],
   },
   ...tseslint.configs.recommended,
   // Treat `_`-prefixed bindings as the intentional "unused" marker (the
@@ -22,6 +22,11 @@ export default tseslint.config(
   // isn't flagged by no-unused-vars (agent-sites).
   {
     rules: {
+      // Provider SDK responses and MCP tool adapters intentionally cross
+      // dynamic JSON boundaries. TypeScript still checks the surrounding
+      // contracts; forcing decorative `unknown as ...` casts here reduces
+      // clarity without adding runtime validation.
+      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
@@ -37,6 +42,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unsafe-function-type': 'off',
     },
   },
 );

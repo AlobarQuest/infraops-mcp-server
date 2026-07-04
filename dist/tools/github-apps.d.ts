@@ -6,6 +6,6 @@
  * to register/inspect a GitHub App that Coolify uses as a deployment source, and to
  * browse the repos/branches it can see.
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export declare function registerGithubAppTools(server: McpServer): void;
 //# sourceMappingURL=github-apps.d.ts.map

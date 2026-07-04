@@ -1,4 +1,4 @@
-import type { Finding } from "./scan-parser.js";
+import type { Finding } from './scan-parser.js';
 export interface SelfCheckConfig {
     stateFiles: string[];
     auditLog: string;

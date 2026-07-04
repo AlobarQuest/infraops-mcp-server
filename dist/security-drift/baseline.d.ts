@@ -1,5 +1,5 @@
-import type { Finding } from "./scan-parser.js";
-import type { Classification, Tier } from "./taxonomy.js";
+import type { Finding } from './scan-parser.js';
+import type { Classification, Tier } from './taxonomy.js';
 export declare class BaselineIntegrityError extends Error {
     constructor(message: string);
 }

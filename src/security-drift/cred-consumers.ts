@@ -10,12 +10,12 @@
 // CredConsumersParseError — deny-by-default: a malformed file yields NO
 // rotation-eligible credentials, never a guessed one.
 
-import * as fs from "node:fs";
+import * as fs from 'node:fs';
 
 export class CredConsumersParseError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "CredConsumersParseError";
+    this.name = 'CredConsumersParseError';
   }
 }
 
@@ -68,16 +68,17 @@ function parseValue(raw: string, line: number): Scalar {
   const v = raw.trim();
   if (v.startsWith('"') && v.endsWith('"') && v.length >= 2) {
     const inner = v.slice(1, -1);
-    if (inner.includes('"')) throw new CredConsumersParseError(`line ${line}: embedded quote in string`);
+    if (inner.includes('"'))
+      throw new CredConsumersParseError(`line ${line}: embedded quote in string`);
     return inner;
   }
-  if (v === "true") return true;
-  if (v === "false") return false;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
   if (/^-?\d+$/.test(v)) return Number.parseInt(v, 10);
-  if (v.startsWith("[") && v.endsWith("]")) {
+  if (v.startsWith('[') && v.endsWith(']')) {
     const body = v.slice(1, -1).trim();
     if (!body) return [];
-    return body.split(",").map((part) => {
+    return body.split(',').map((part) => {
       const p = part.trim();
       if (!(p.startsWith('"') && p.endsWith('"') && p.length >= 2)) {
         throw new CredConsumersParseError(`line ${line}: arrays may contain only quoted strings`);
@@ -97,7 +98,7 @@ function stripComment(line: string): string {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (ch === '"') inString = !inString;
-    else if (ch === "#" && !inString) return line.slice(0, i);
+    else if (ch === '#' && !inString) return line.slice(0, i);
   }
   return line;
 }
@@ -108,42 +109,44 @@ export function parseCredConsumers(text: string): CredentialSpec[] {
   let cred: CredentialSpec | null = null;
   let sub: ConsumerSpec | ExposureSpec | null = null;
 
-  const lines = text.split("\n");
+  const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const n = i + 1;
     const line = stripComment(lines[i]).trim();
     if (!line) continue;
 
-    if (line === "[[credential]]") {
-      cred = { id: "", class: "", rotation_preconditions: [], consumers: [], exposures: [] };
+    if (line === '[[credential]]') {
+      cred = { id: '', class: '', rotation_preconditions: [], consumers: [], exposures: [] };
       creds.push(cred);
       sub = null;
       continue;
     }
-    if (line === "[[credential.consumer]]" || line === "[[credential.exposure]]") {
+    if (line === '[[credential.consumer]]' || line === '[[credential.exposure]]') {
       if (!cred) throw new CredConsumersParseError(`line ${n}: ${line} before any [[credential]]`);
-      if (line === "[[credential.consumer]]") {
-        sub = { kind: "" } as ConsumerSpec;
+      if (line === '[[credential.consumer]]') {
+        sub = { kind: '' } as ConsumerSpec;
         cred.consumers.push(sub as ConsumerSpec);
       } else {
-        sub = { id: "", date: "" } as ExposureSpec;
+        sub = { id: '', date: '' } as ExposureSpec;
         cred.exposures.push(sub as ExposureSpec);
       }
       continue;
     }
-    if (line.startsWith("[")) throw new CredConsumersParseError(`line ${n}: unsupported table ${line}`);
+    if (line.startsWith('['))
+      throw new CredConsumersParseError(`line ${n}: unsupported table ${line}`);
 
-    const eq = line.indexOf("=");
+    const eq = line.indexOf('=');
     if (eq < 1) throw new CredConsumersParseError(`line ${n}: expected key = value`);
     const key = line.slice(0, eq).trim();
-    if (!/^[A-Za-z0-9_-]+$/.test(key)) throw new CredConsumersParseError(`line ${n}: bad key ${key}`);
+    if (!/^[A-Za-z0-9_-]+$/.test(key))
+      throw new CredConsumersParseError(`line ${n}: bad key ${key}`);
     const value = parseValue(line.slice(eq + 1), n);
 
     if (sub) {
       (sub as unknown as Record<string, Scalar>)[key] = value;
     } else if (cred) {
       (cred as unknown as Record<string, Scalar>)[key] = value;
-    } else if (key === "version") {
+    } else if (key === 'version') {
       if (value !== 1) throw new CredConsumersParseError(`unsupported version ${String(value)}`);
     } else {
       throw new CredConsumersParseError(`line ${n}: top-level key ${key} outside any table`);
@@ -151,14 +154,18 @@ export function parseCredConsumers(text: string): CredentialSpec[] {
   }
 
   for (const c of creds) {
-    if (typeof c.id !== "string" || typeof c.class !== "string" || !c.id || !c.class) {
-      throw new CredConsumersParseError(`credential missing string id/class (id=${String(c.id) || "?"})`);
+    if (typeof c.id !== 'string' || typeof c.class !== 'string' || !c.id || !c.class) {
+      throw new CredConsumersParseError(
+        `credential missing string id/class (id=${String(c.id) || '?'})`,
+      );
     }
     for (const consumer of c.consumers) {
-      if (!consumer.kind) throw new CredConsumersParseError(`credential ${c.id}: consumer missing kind`);
+      if (!consumer.kind)
+        throw new CredConsumersParseError(`credential ${c.id}: consumer missing kind`);
     }
     for (const exposure of c.exposures) {
-      if (!exposure.id || !exposure.date) throw new CredConsumersParseError(`credential ${c.id}: exposure missing id/date`);
+      if (!exposure.id || !exposure.date)
+        throw new CredConsumersParseError(`credential ${c.id}: exposure missing id/date`);
     }
   }
   const ids = new Set<string>();
@@ -180,12 +187,17 @@ export function loadCredConsumerFiles(files: string[]): CredentialSpec[] {
   for (const file of files) {
     let text: string;
     try {
-      text = fs.readFileSync(file, "utf8");
+      text = fs.readFileSync(file, 'utf8');
     } catch (e) {
-      throw new CredConsumersParseError(`cannot read ${file}: ${e instanceof Error ? e.message : String(e)}`);
+      throw new CredConsumersParseError(
+        `cannot read ${file}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
     for (const cred of parseCredConsumers(text)) {
-      if (ids.has(cred.id)) throw new CredConsumersParseError(`duplicate credential id ${cred.id} across files (${file})`);
+      if (ids.has(cred.id))
+        throw new CredConsumersParseError(
+          `duplicate credential id ${cred.id} across files (${file})`,
+        );
       ids.add(cred.id);
       all.push(cred);
     }

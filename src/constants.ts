@@ -13,6 +13,6 @@ export const REQUEST_TIMEOUT = 30000;
 
 /** Response format options */
 export enum ResponseFormat {
-  MARKDOWN = "markdown",
-  JSON = "json",
+  MARKDOWN = 'markdown',
+  JSON = 'json',
 }

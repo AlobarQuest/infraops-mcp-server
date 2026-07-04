@@ -1,8 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type { ApprovedItem } from "./api-client.js";
-import { deploymentSucceeded, httpsLive, type ToolCtx } from "./tools.js";
+import Anthropic from '@anthropic-ai/sdk';
+import type { ApprovedItem } from './api-client.js';
+import { deploymentSucceeded, httpsLive, type ToolCtx } from './tools.js';
 export interface ChangeOutcome {
-    outcome: "done" | "blocked" | "failed" | "skipped_conformant";
+    outcome: 'done' | 'blocked' | 'failed' | 'skipped_conformant';
     detail: string;
     rollback: Record<string, unknown>;
     tool_calls: {
@@ -14,7 +14,7 @@ export interface ChangeOutcome {
         }>;
     };
 }
-type ToolCalls = ChangeOutcome["tool_calls"]["calls"];
+type ToolCalls = ChangeOutcome['tool_calls']['calls'];
 /** Injectable deps for post-verify — real defaults in prod, fast fakes in tests. */
 export interface PostVerifyDeps {
     deploymentSucceeded: typeof deploymentSucceeded;

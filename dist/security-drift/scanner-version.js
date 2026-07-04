@@ -2,7 +2,7 @@
 // parser understands. The marker `# SCANNER_OUTPUT_VERSION=N` is a bash comment in the
 // scanner (NOT emitted to stdout); we read it from the deployed file and refuse to parse
 // a contract we weren't written for. See scan-parser.ts for what version 1 means.
-import * as fs from "node:fs";
+import * as fs from 'node:fs';
 /** The scanner output-contract version scan-parser.ts was written against. Bump in the
  *  SAME PR that changes the LINE shape or a detail form in scan-parser.ts. */
 export const EXPECTED_SCANNER_OUTPUT_VERSION = 1;
@@ -12,7 +12,7 @@ const MARKER = /^#\s*SCANNER_OUTPUT_VERSION=(\d+)\s*$/m;
 export function readScannerOutputVersion(scanPath) {
     let text;
     try {
-        text = fs.readFileSync(scanPath, "utf8");
+        text = fs.readFileSync(scanPath, 'utf8');
     }
     catch {
         return null;
@@ -31,10 +31,10 @@ export function scannerVersionGate(scanPath, expected) {
     if (v === expected)
         return null;
     return {
-        severity: "FAIL",
-        check: "scanner.output_version_skew",
+        severity: 'FAIL',
+        check: 'scanner.output_version_skew',
         target: scanPath,
-        detail: `deployed scanner output version ${v ?? "missing/unreadable"} != parser-expected ${expected} — ` +
+        detail: `deployed scanner output version ${v ?? 'missing/unreadable'} != parser-expected ${expected} — ` +
             `parser cannot be trusted; run aborted. Reconcile with: cd ~/Projects/security-standards && make install`,
     };
 }

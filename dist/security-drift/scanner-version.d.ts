@@ -1,4 +1,4 @@
-import type { Finding } from "./scan-parser.js";
+import type { Finding } from './scan-parser.js';
 /** The scanner output-contract version scan-parser.ts was written against. Bump in the
  *  SAME PR that changes the LINE shape or a detail form in scan-parser.ts. */
 export declare const EXPECTED_SCANNER_OUTPUT_VERSION = 1;

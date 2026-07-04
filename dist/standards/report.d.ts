@@ -1,11 +1,11 @@
-import type { Proposal, Risk } from "./check-engine.js";
-import type { AuditResult } from "./run-audit.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
+import type { Proposal, Risk } from './check-engine.js';
+import type { AuditResult } from './run-audit.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
 /** One audited instance's slice of a drift report. */
 export interface InstanceSection {
     ok: boolean;
-    standards_source?: AuditResult["meta"]["standards_source"];
-    summary?: AuditResult["summary"];
+    standards_source?: AuditResult['meta']['standards_source'];
+    summary?: AuditResult['summary'];
     proposals?: Proposal[];
     /** Per-endpoint read errors (instance partially reachable). */
     errors?: string[];

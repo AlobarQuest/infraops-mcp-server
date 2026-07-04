@@ -3,16 +3,18 @@
  * register-sanitized.ts to every tool response. Masks to "***"; preserves null.
  */
 
-const MASK = "***";
+const MASK = '***';
 
 // Field names whose VALUE is a secret. Checked only after the guard below.
 // Deliberate omission: `api_key` / `key` field NAMES are NOT listed here — their
 // secret VALUES (JWTs, PEMs, prefixed tokens) are caught by VALUE_SHAPES instead,
 // avoiding over-masking of benign `*_key` fields (e.g. cache_key, sort_key).
-const SECRET_NAME = /(password|secret|token|credentials|private_key|service_role|jwt_secret|tunnel_secret)/i;
+const SECRET_NAME =
+  /(password|secret|token|credentials|private_key|service_role|jwt_secret|tunnel_secret)/i;
 
 // Names that look secret-ish but are not — never redact by name (value-shape may still apply).
-const GUARD_NAME = /(?:^|_)(id|uuid|name|fingerprint|url|at|count|type|status|version|region|host|port)$|^public_key$|_key_name$|^key_name$/i;
+const GUARD_NAME =
+  /(?:^|_)(id|uuid|name|fingerprint|url|at|count|type|status|version|region|host|port)$|^public_key$|_key_name$|^key_name$/i;
 
 export function isSecretName(key: string): boolean {
   if (GUARD_NAME.test(key)) return false;
@@ -44,9 +46,9 @@ export function redactText(s: string): string {
 
 export function deepRedact(value: unknown): unknown {
   if (value === null || value === undefined) return value;
-  if (typeof value === "string") return redactText(value);
+  if (typeof value === 'string') return redactText(value);
   if (Array.isArray(value)) return value.map(deepRedact);
-  if (typeof value === "object") {
+  if (typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       if (v !== null && v !== undefined && isSecretName(k)) out[k] = MASK;

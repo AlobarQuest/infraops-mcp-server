@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import * as client from "../src/services/coolify-client.js";
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as client from '../src/services/coolify-client.js';
 
 const mockServer = {
   registerTool: vi.fn((name, _schema, handler) => {
@@ -8,7 +8,7 @@ const mockServer = {
   _handlers: {} as Record<string, Function>,
 };
 
-vi.mock("../src/services/coolify-client.js", () => ({
+vi.mock('../src/services/coolify-client.js', () => ({
   coolifyGet: vi.fn(),
   coolifyPost: vi.fn(),
   coolifyPatch: vi.fn(),
@@ -16,90 +16,90 @@ vi.mock("../src/services/coolify-client.js", () => ({
   handleCoolifyError: vi.fn((e) => `Error: ${e}`),
 }));
 
-import { registerEnvVarTools } from "../src/tools/env-vars.js";
+import { registerEnvVarTools } from '../src/tools/env-vars.js';
 
-describe("service env var tools", () => {
+describe('service env var tools', () => {
   beforeEach(() => {
     mockServer._handlers = {};
     registerEnvVarTools(mockServer as any);
   });
 
-  it("coolify_list_service_envs calls /services/{uuid}/envs and masks values", async () => {
+  it('coolify_list_service_envs calls /services/{uuid}/envs and masks values', async () => {
     vi.mocked(client.coolifyGet).mockResolvedValueOnce([
-      { uuid: "env-1", key: "FOO", value: "bar", is_buildtime: false, is_runtime: true },
+      { uuid: 'env-1', key: 'FOO', value: 'bar', is_buildtime: false, is_runtime: true },
     ]);
-    const result = await mockServer._handlers["coolify_list_service_envs"]({
-      uuid: "svc-uuid-1",
+    const result = await mockServer._handlers['coolify_list_service_envs']({
+      uuid: 'svc-uuid-1',
       reveal: false,
-      instance: "prod",
+      instance: 'prod',
     });
-    expect(client.coolifyGet).toHaveBeenCalledWith("/services/svc-uuid-1/envs", undefined, "prod");
+    expect(client.coolifyGet).toHaveBeenCalledWith('/services/svc-uuid-1/envs', undefined, 'prod');
     expect(result.isError).toBeUndefined();
     const parsed = JSON.parse(result.content[0].text);
-    expect(parsed[0].value).toBe("***"); // masked by default
+    expect(parsed[0].value).toBe('***'); // masked by default
   });
 
-  it("coolify_create_service_env calls POST /services/{uuid}/envs", async () => {
-    vi.mocked(client.coolifyPost).mockResolvedValueOnce({ uuid: "env-2" });
-    await mockServer._handlers["coolify_create_service_env"]({
-      uuid: "svc-uuid-1",
-      key: "DATABASE_URL",
-      value: "postgres://...",
+  it('coolify_create_service_env calls POST /services/{uuid}/envs', async () => {
+    vi.mocked(client.coolifyPost).mockResolvedValueOnce({ uuid: 'env-2' });
+    await mockServer._handlers['coolify_create_service_env']({
+      uuid: 'svc-uuid-1',
+      key: 'DATABASE_URL',
+      value: 'postgres://...',
       is_buildtime: false,
       is_runtime: true,
       is_preview: false,
-      instance: "prod",
+      instance: 'prod',
     });
     expect(client.coolifyPost).toHaveBeenCalledWith(
-      "/services/svc-uuid-1/envs",
-      expect.objectContaining({ key: "DATABASE_URL", is_buildtime: false, is_runtime: true }),
-      "prod"
+      '/services/svc-uuid-1/envs',
+      expect.objectContaining({ key: 'DATABASE_URL', is_buildtime: false, is_runtime: true }),
+      'prod',
     );
   });
 
-  it("coolify_update_service_env calls PATCH /services/{uuid}/envs", async () => {
-    vi.mocked(client.coolifyPatch).mockResolvedValueOnce({ uuid: "env-2" });
-    await mockServer._handlers["coolify_update_service_env"]({
-      uuid: "svc-uuid-1",
-      key: "DATABASE_URL",
-      value: "postgres://new",
-      instance: "prod",
+  it('coolify_update_service_env calls PATCH /services/{uuid}/envs', async () => {
+    vi.mocked(client.coolifyPatch).mockResolvedValueOnce({ uuid: 'env-2' });
+    await mockServer._handlers['coolify_update_service_env']({
+      uuid: 'svc-uuid-1',
+      key: 'DATABASE_URL',
+      value: 'postgres://new',
+      instance: 'prod',
     });
     expect(client.coolifyPatch).toHaveBeenCalledWith(
-      "/services/svc-uuid-1/envs",
-      expect.objectContaining({ key: "DATABASE_URL", value: "postgres://new" }),
-      "prod"
+      '/services/svc-uuid-1/envs',
+      expect.objectContaining({ key: 'DATABASE_URL', value: 'postgres://new' }),
+      'prod',
     );
   });
 
-  it("coolify_bulk_update_service_envs calls PATCH /services/{uuid}/envs/bulk", async () => {
+  it('coolify_bulk_update_service_envs calls PATCH /services/{uuid}/envs/bulk', async () => {
     vi.mocked(client.coolifyPatch).mockResolvedValueOnce({});
-    await mockServer._handlers["coolify_bulk_update_service_envs"]({
-      uuid: "svc-uuid-1",
+    await mockServer._handlers['coolify_bulk_update_service_envs']({
+      uuid: 'svc-uuid-1',
       variables: [
-        { key: "A", value: "1", is_buildtime: false, is_runtime: true, is_preview: false },
+        { key: 'A', value: '1', is_buildtime: false, is_runtime: true, is_preview: false },
       ],
-      instance: "prod",
+      instance: 'prod',
     });
     expect(client.coolifyPatch).toHaveBeenCalledWith(
-      "/services/svc-uuid-1/envs/bulk",
+      '/services/svc-uuid-1/envs/bulk',
       expect.objectContaining({ data: expect.any(Array) }),
-      "prod"
+      'prod',
     );
   });
 
-  it("coolify_delete_service_env calls DELETE /services/{uuid}/envs/{env_uuid}", async () => {
+  it('coolify_delete_service_env calls DELETE /services/{uuid}/envs/{env_uuid}', async () => {
     vi.mocked(client.coolifyDelete).mockResolvedValueOnce(undefined);
-    const result = await mockServer._handlers["coolify_delete_service_env"]({
-      uuid: "svc-uuid-1",
-      env_uuid: "env-uuid-1",
-      instance: "prod",
+    const result = await mockServer._handlers['coolify_delete_service_env']({
+      uuid: 'svc-uuid-1',
+      env_uuid: 'env-uuid-1',
+      instance: 'prod',
     });
     expect(client.coolifyDelete).toHaveBeenCalledWith(
-      "/services/svc-uuid-1/envs/env-uuid-1",
-      "prod"
+      '/services/svc-uuid-1/envs/env-uuid-1',
+      'prod',
     );
     expect(result.isError).toBeUndefined();
-    expect(result.content[0].text).toContain("env-uuid-1");
+    expect(result.content[0].text).toContain('env-uuid-1');
   });
 });

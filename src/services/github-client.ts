@@ -5,10 +5,10 @@
  * Requires a GITHUB_TOKEN env var (classic PAT with `repo` scope).
  */
 
-import axios, { AxiosError, AxiosInstance } from "axios";
-import { REQUEST_TIMEOUT } from "../constants.js";
+import axios, { AxiosError, AxiosInstance } from 'axios';
+import { REQUEST_TIMEOUT } from '../constants.js';
 
-const GITHUB_API_BASE = "https://api.github.com";
+const GITHUB_API_BASE = 'https://api.github.com';
 
 // ── Singleton client ─────────────────────────────────────────────────
 
@@ -20,9 +20,9 @@ function getClient(): AxiosInstance {
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
     throw new Error(
-      "GITHUB_TOKEN environment variable is required. " +
-        "Create a PAT with `repo` scope at https://github.com/settings/tokens. " +
-        "Store it in BWS and set BWS_GITHUB_SECRET_ID in your MCP config."
+      'GITHUB_TOKEN environment variable is required. ' +
+        'Create a PAT with `repo` scope at https://github.com/settings/tokens. ' +
+        'Store it in BWS and set BWS_GITHUB_SECRET_ID in your MCP config.',
     );
   }
 
@@ -30,10 +30,10 @@ function getClient(): AxiosInstance {
     baseURL: GITHUB_API_BASE,
     timeout: REQUEST_TIMEOUT,
     headers: {
-      "Content-Type": "application/json",
-      Accept: "application/vnd.github+json",
+      'Content-Type': 'application/json',
+      Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
-      "X-GitHub-Api-Version": "2022-11-28",
+      'X-GitHub-Api-Version': '2022-11-28',
     },
   });
 
@@ -42,19 +42,13 @@ function getClient(): AxiosInstance {
 
 // ── Public helpers ───────────────────────────────────────────────────
 
-export async function githubGet<T>(
-  endpoint: string,
-  params?: Record<string, unknown>
-): Promise<T> {
+export async function githubGet<T>(endpoint: string, params?: Record<string, unknown>): Promise<T> {
   const client = getClient();
   const response = await client.get<T>(endpoint, { params });
   return response.data;
 }
 
-export async function githubPost<T>(
-  endpoint: string,
-  data?: Record<string, unknown>
-): Promise<T> {
+export async function githubPost<T>(endpoint: string, data?: Record<string, unknown>): Promise<T> {
   const client = getClient();
   const response = await client.post<T>(endpoint, data);
   return response.data;
@@ -76,14 +70,14 @@ export function handleGithubError(error: unknown): string {
       const status = axErr.response.status;
       const body = axErr.response.data;
       const msg = body?.message ?? JSON.stringify(body);
-      const details = body?.errors?.map((e) => e.message).join("; ");
+      const details = body?.errors?.map((e) => e.message).join('; ');
       const full = details ? `${msg} — ${details}` : msg;
 
       switch (status) {
         case 401:
           return (
-            "Error: GitHub authentication failed. Your GITHUB_TOKEN may be invalid or expired. " +
-            "Regenerate it at https://github.com/settings/tokens."
+            'Error: GitHub authentication failed. Your GITHUB_TOKEN may be invalid or expired. ' +
+            'Regenerate it at https://github.com/settings/tokens.'
           );
         case 403:
           return `Error: GitHub permission denied. Your token may lack the required scope. ${full}`;
@@ -92,14 +86,14 @@ export function handleGithubError(error: unknown): string {
         case 422:
           return `Error: GitHub validation failed. ${full}`;
         case 429:
-          return "Error: GitHub rate limit exceeded. Wait before retrying.";
+          return 'Error: GitHub rate limit exceeded. Wait before retrying.';
         default:
           return `Error: GitHub API returned HTTP ${status}. ${full}`;
       }
     }
 
-    if (axErr.code === "ECONNABORTED") {
-      return "Error: GitHub API request timed out.";
+    if (axErr.code === 'ECONNABORTED') {
+      return 'Error: GitHub API request timed out.';
     }
   }
 

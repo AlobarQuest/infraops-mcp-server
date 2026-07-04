@@ -14,12 +14,12 @@ function pick(obj, keys) {
     }
     return out;
 }
-export const toApplicationSummary = (a) => pick(a, ["uuid", "name", "status", "fqdn", "git_repository", "git_branch", "build_pack"]);
-export const toDatabaseSummary = (d) => pick(d, ["uuid", "name", "status", "is_public", "environment_name"]);
-export const toServiceSummary = (s) => pick(s, ["uuid", "name", "status", "fqdn"]);
-export const toServerSummary = (s) => pick(s, ["uuid", "name", "ip", "status", "is_reachable"]);
-export const toProjectSummary = (p) => pick(p, ["uuid", "name", "description"]);
-export const toGitHubAppSummary = (g) => pick(g, ["id", "uuid", "name", "organization", "is_public", "app_id"]);
+export const toApplicationSummary = (a) => pick(a, ['uuid', 'name', 'status', 'fqdn', 'git_repository', 'git_branch', 'build_pack']);
+export const toDatabaseSummary = (d) => pick(d, ['uuid', 'name', 'status', 'is_public', 'environment_name']);
+export const toServiceSummary = (s) => pick(s, ['uuid', 'name', 'status', 'fqdn']);
+export const toServerSummary = (s) => pick(s, ['uuid', 'name', 'ip', 'status', 'is_reachable']);
+export const toProjectSummary = (p) => pick(p, ['uuid', 'name', 'description']);
+export const toGitHubAppSummary = (g) => pick(g, ['id', 'uuid', 'name', 'organization', 'is_public', 'app_id']);
 /** Apply a projector to an array iff `summary` is truthy; otherwise pass through. */
 export function summarize(items, projector, summary) {
     if (!Array.isArray(items))

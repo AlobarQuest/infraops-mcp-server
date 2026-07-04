@@ -4,6 +4,6 @@
  * Uses the Rulesets API (not the deprecated Firewall Rules API).
  * Covers: SSL settings, ruleset listing/inspection, ruleset rule CRUD, and cache purge.
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export declare function registerCloudflareSecurityTools(server: McpServer): void;
 //# sourceMappingURL=cloudflare-security.d.ts.map

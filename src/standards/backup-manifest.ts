@@ -1,6 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 /**
  * Backup coverage manifest emitted by ~/Projects/vps-backup/backup.sh.
@@ -29,16 +29,19 @@ export type BackupManifest = Record<string, BackupManifestEntry>;
  * and rule #572 false-flags it. Each path is independently env-overridable for tests.
  */
 function manifestPaths(): string[] {
-  const dir = join(homedir(), ".infraops");
-  const prod = process.env.MANIFEST_PATH ?? process.env.BACKUP_MANIFEST_FILE ?? join(dir, "vps-backup-manifest.json");
-  const dev = process.env.BACKUP_MANIFEST_FILE_ORB ?? join(dir, "vps-backup-manifest-orb.json");
+  const dir = join(homedir(), '.infraops');
+  const prod =
+    process.env.MANIFEST_PATH ??
+    process.env.BACKUP_MANIFEST_FILE ??
+    join(dir, 'vps-backup-manifest.json');
+  const dev = process.env.BACKUP_MANIFEST_FILE_ORB ?? join(dir, 'vps-backup-manifest-orb.json');
   return [prod, dev];
 }
 
 async function readOneManifest(path: string): Promise<BackupManifest> {
   try {
-    const parsed = JSON.parse(await readFile(path, "utf8"));
-    return parsed && typeof parsed === "object" ? (parsed as BackupManifest) : {};
+    const parsed = JSON.parse(await readFile(path, 'utf8'));
+    return parsed && typeof parsed === 'object' ? (parsed as BackupManifest) : {};
   } catch {
     return {};
   }
@@ -68,7 +71,7 @@ export function enrichWithBackupCoverage(
   manifest: BackupManifest,
   now: number,
 ): void {
-  const uuid = String(db.uuid ?? "");
+  const uuid = String(db.uuid ?? '');
   const entry = uuid ? manifest[uuid] : undefined;
   db.backup_covered = Boolean(entry);
   let fresh = false;

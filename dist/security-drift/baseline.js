@@ -5,17 +5,17 @@
 // file is mode 0600, owned by the runner user, and validated on every read. A
 // failed validation throws BaselineIntegrityError (the runner turns that into an
 // URGENT control-plane finding rather than trusting a poisoned diff).
-import { createHash } from "node:crypto";
-import { loadValidated0600Json, saveValidated0600Json } from "./validated-store.js";
+import { createHash } from 'node:crypto';
+import { loadValidated0600Json, saveValidated0600Json } from './validated-store.js';
 export class BaselineIntegrityError extends Error {
     constructor(message) {
         super(message);
-        this.name = "BaselineIntegrityError";
+        this.name = 'BaselineIntegrityError';
     }
 }
 /** Stable cross-run fingerprint for a finding. */
 export function fingerprint(check, target) {
-    return createHash("sha256").update(check).update("\0").update(target).digest("hex");
+    return createHash('sha256').update(check).update('\0').update(target).digest('hex');
 }
 /**
  * Load and validate the baseline. A missing file means "first run" → returns null so
@@ -23,7 +23,7 @@ export function fingerprint(check, target) {
  * A present file MUST be a regular file, mode 0600, owned by the current user.
  */
 export function loadBaseline(file) {
-    return loadValidated0600Json(file, "baseline", BaselineIntegrityError);
+    return loadValidated0600Json(file, 'baseline', BaselineIntegrityError);
 }
 /** Atomically write the baseline with mode 0600. */
 export function saveBaseline(file, baseline) {

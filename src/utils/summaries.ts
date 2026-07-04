@@ -16,28 +16,28 @@ function pick<T extends Record<string, any>>(obj: T, keys: string[]): Record<str
 }
 
 export const toApplicationSummary = (a: Record<string, any>) =>
-  pick(a, ["uuid", "name", "status", "fqdn", "git_repository", "git_branch", "build_pack"]);
+  pick(a, ['uuid', 'name', 'status', 'fqdn', 'git_repository', 'git_branch', 'build_pack']);
 
 export const toDatabaseSummary = (d: Record<string, any>) =>
-  pick(d, ["uuid", "name", "status", "is_public", "environment_name"]);
+  pick(d, ['uuid', 'name', 'status', 'is_public', 'environment_name']);
 
 export const toServiceSummary = (s: Record<string, any>) =>
-  pick(s, ["uuid", "name", "status", "fqdn"]);
+  pick(s, ['uuid', 'name', 'status', 'fqdn']);
 
 export const toServerSummary = (s: Record<string, any>) =>
-  pick(s, ["uuid", "name", "ip", "status", "is_reachable"]);
+  pick(s, ['uuid', 'name', 'ip', 'status', 'is_reachable']);
 
 export const toProjectSummary = (p: Record<string, any>) =>
-  pick(p, ["uuid", "name", "description"]);
+  pick(p, ['uuid', 'name', 'description']);
 
 export const toGitHubAppSummary = (g: Record<string, any>) =>
-  pick(g, ["id", "uuid", "name", "organization", "is_public", "app_id"]);
+  pick(g, ['id', 'uuid', 'name', 'organization', 'is_public', 'app_id']);
 
 /** Apply a projector to an array iff `summary` is truthy; otherwise pass through. */
 export function summarize<T extends Record<string, any>>(
   items: T[],
   projector: (x: Record<string, any>) => Record<string, unknown>,
-  summary: boolean
+  summary: boolean,
 ): unknown[] {
   if (!Array.isArray(items)) return items as unknown[];
   return summary ? items.map((i) => projector(i)) : items;

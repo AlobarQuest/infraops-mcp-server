@@ -33,46 +33,65 @@ export interface ApprovedItem {
   pr_url?: string | null;
 }
 export interface OutcomeBody {
-  outcome: "done" | "failed" | "blocked" | "skipped_conformant";
+  outcome: 'done' | 'failed' | 'blocked' | 'skipped_conformant';
   detail?: string;
   tool_calls?: Record<string, unknown>;
   rollback?: Record<string, unknown>;
 }
 
 export class ChangeMgrClient {
-  constructor(private base: string, private token: string, private actor: string = "executor") {}
+  constructor(
+    private base: string,
+    private token: string,
+    private actor: string = 'executor',
+  ) {}
 
   private async req<T>(path: string, init: RequestInit = {}): Promise<T> {
     const res = await fetch(`${this.base}${path}`, {
       ...init,
-      headers: { Authorization: `Bearer ${this.token}`, "Content-Type": "application/json", ...(init.headers ?? {}) },
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+        ...(init.headers ?? {}),
+      },
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
+      const body = await res.text().catch(() => '');
       throw new Error(`change-mgr ${path} -> ${res.status}: ${body.slice(0, 200)}`);
     }
     return (await res.json()) as T;
   }
 
   postSync(body: SyncBody): Promise<SyncSummary> {
-    return this.req<SyncSummary>("/api/sync", { method: "POST", body: JSON.stringify(body) });
+    return this.req<SyncSummary>('/api/sync', { method: 'POST', body: JSON.stringify(body) });
   }
   getApproved(): Promise<ApprovedItem[]> {
-    return this.req<ApprovedItem[]>("/api/items?status=approved");
+    return this.req<ApprovedItem[]>('/api/items?status=approved');
   }
   getApprovedBySource(source: string): Promise<ApprovedItem[]> {
-    return this.req<ApprovedItem[]>(`/api/items?status=approved&source=${encodeURIComponent(source)}`);
+    return this.req<ApprovedItem[]>(
+      `/api/items?status=approved&source=${encodeURIComponent(source)}`,
+    );
   }
   claim(id: number): Promise<ApprovedItem> {
-    return this.req<ApprovedItem>(`/api/items/${id}/claim`, { method: "POST", body: JSON.stringify({ actor: this.actor }) });
+    return this.req<ApprovedItem>(`/api/items/${id}/claim`, {
+      method: 'POST',
+      body: JSON.stringify({ actor: this.actor }),
+    });
   }
   postOutcome(id: number, body: OutcomeBody): Promise<unknown> {
-    return this.req(`/api/items/${id}/outcome`, { method: "POST", body: JSON.stringify({ ...body, actor: this.actor }) });
+    return this.req(`/api/items/${id}/outcome`, {
+      method: 'POST',
+      body: JSON.stringify({ ...body, actor: this.actor }),
+    });
   }
   startWindow(startedAt: string): Promise<{ id: number }> {
-    return this.req<{ id: number }>("/api/window-runs", { method: "POST", body: JSON.stringify({ started_at: startedAt }) });
+    return this.req<{ id: number }>('/api/window-runs', {
+      method: 'POST',
+      body: JSON.stringify({ started_at: startedAt }),
+    });
   }
   finishWindow(id: number, counts: Record<string, unknown>): Promise<unknown> {
-    return this.req(`/api/window-runs/${id}`, { method: "PATCH", body: JSON.stringify(counts) });
+    return this.req(`/api/window-runs/${id}`, { method: 'PATCH', body: JSON.stringify(counts) });
   }
 }

@@ -3,26 +3,24 @@
  *
  * Works for applications, databases, and services.
  */
-import { z } from "zod";
-import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from "../schemas/common.js";
-import { coolifyPost, coolifyGet, coolifyPatch, handleCoolifyError, } from "../services/coolify-client.js";
-import { jsonResponse } from "../utils/response.js";
-import { summarize, toServerSummary, toProjectSummary, toApplicationSummary, toDatabaseSummary, toServiceSummary, } from "../utils/summaries.js";
+import { z } from 'zod';
+import { CoolifyInstanceSchema, CoolifyInstanceRequiredSchema } from '../schemas/common.js';
+import { coolifyPost, coolifyGet, coolifyPatch, handleCoolifyError, } from '../services/coolify-client.js';
+import { jsonResponse } from '../utils/response.js';
+import { summarize, toServerSummary, toProjectSummary, toApplicationSummary, toDatabaseSummary, toServiceSummary, } from '../utils/summaries.js';
 const ResourceTypeSchema = z
-    .enum(["applications", "databases", "services"])
-    .describe("Resource type: applications, databases, or services");
-const ActionSchema = z
-    .enum(["start", "stop", "restart"])
-    .describe("Action to perform");
+    .enum(['applications', 'databases', 'services'])
+    .describe('Resource type: applications, databases, or services');
+const ActionSchema = z.enum(['start', 'stop', 'restart']).describe('Action to perform');
 export function registerControlTools(server) {
     // ── Start/Stop/Restart ───────────────────────────────────────────
-    server.registerTool("coolify_control", {
-        title: "Control Coolify Resource",
-        description: "Start, stop, or restart an application, database, or service. " +
-            "This is the universal control tool — use it for lifecycle management of any Coolify resource.",
+    server.registerTool('coolify_control', {
+        title: 'Control Coolify Resource',
+        description: 'Start, stop, or restart an application, database, or service. ' +
+            'This is the universal control tool — use it for lifecycle management of any Coolify resource.',
         inputSchema: {
             resource_type: ResourceTypeSchema,
-            uuid: z.string().min(1).describe("UUID of the resource"),
+            uuid: z.string().min(1).describe('UUID of the resource'),
             action: ActionSchema,
             instance: CoolifyInstanceRequiredSchema,
         },
@@ -46,7 +44,7 @@ export function registerControlTools(server) {
             return {
                 content: [
                     {
-                        type: "text",
+                        type: 'text',
                         text: `${action} command sent to ${resource_type.slice(0, -1)} ${uuid}.\n${JSON.stringify(result, null, 2)}`,
                     },
                 ],
@@ -55,21 +53,21 @@ export function registerControlTools(server) {
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleCoolifyError(error) }],
+                content: [{ type: 'text', text: handleCoolifyError(error) }],
             };
         }
     });
     // ── Reset Custom Labels ────────────────────────────────────────────
-    server.registerTool("coolify_reset_labels", {
-        title: "Reset Coolify Application Labels",
-        description: "Clear custom_labels on an application so Coolify auto-generates Traefik labels from the current domain config. " +
-            "Use this after changing domains to fix stale routing rules. Optionally triggers a redeploy.",
+    server.registerTool('coolify_reset_labels', {
+        title: 'Reset Coolify Application Labels',
+        description: 'Clear custom_labels on an application so Coolify auto-generates Traefik labels from the current domain config. ' +
+            'Use this after changing domains to fix stale routing rules. Optionally triggers a redeploy.',
         inputSchema: {
-            uuid: z.string().min(1).describe("Application UUID"),
+            uuid: z.string().min(1).describe('Application UUID'),
             redeploy: z
                 .boolean()
                 .default(true)
-                .describe("Trigger a redeploy after clearing labels (default: true)"),
+                .describe('Trigger a redeploy after clearing labels (default: true)'),
             instance: CoolifyInstanceRequiredSchema,
         },
         annotations: {
@@ -81,33 +79,35 @@ export function registerControlTools(server) {
     }, async ({ uuid, redeploy, instance, }) => {
         try {
             // Clear custom_labels
-            await coolifyPatch(`/applications/${uuid}`, { custom_labels: "" }, instance);
+            await coolifyPatch(`/applications/${uuid}`, { custom_labels: '' }, instance);
             let msg = `Custom labels cleared for application ${uuid}. Coolify will auto-generate labels on next deploy.`;
             // Optionally trigger a full deploy (not restart) so Coolify regenerates labels
             if (redeploy) {
                 try {
                     await coolifyPost(`/applications/${uuid}/deploy`, {}, instance);
-                    msg += "\nDeploy triggered — Coolify will regenerate labels from current domain config.";
+                    msg +=
+                        '\nDeploy triggered — Coolify will regenerate labels from current domain config.';
                 }
                 catch {
-                    msg += "\nNote: deploy trigger failed — you may need to deploy manually via coolify_deploy.";
+                    msg +=
+                        '\nNote: deploy trigger failed — you may need to deploy manually via coolify_deploy.';
                 }
             }
             return {
-                content: [{ type: "text", text: msg }],
+                content: [{ type: 'text', text: msg }],
             };
         }
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleCoolifyError(error) }],
+                content: [{ type: 'text', text: handleCoolifyError(error) }],
             };
         }
     });
     // ── Get Version ──────────────────────────────────────────────────
-    server.registerTool("coolify_version", {
-        title: "Get Coolify Version",
-        description: "Returns the Coolify instance version. Useful for verifying connectivity and API compatibility.",
+    server.registerTool('coolify_version', {
+        title: 'Get Coolify Version',
+        description: 'Returns the Coolify instance version. Useful for verifying connectivity and API compatibility.',
         inputSchema: {
             instance: CoolifyInstanceSchema,
         },
@@ -119,14 +119,12 @@ export function registerControlTools(server) {
         },
     }, async ({ instance }) => {
         try {
-            const version = await coolifyGet("/version", undefined, instance);
+            const version = await coolifyGet('/version', undefined, instance);
             return {
                 content: [
                     {
-                        type: "text",
-                        text: typeof version === "string"
-                            ? version
-                            : JSON.stringify(version),
+                        type: 'text',
+                        text: typeof version === 'string' ? version : JSON.stringify(version),
                     },
                 ],
             };
@@ -134,21 +132,21 @@ export function registerControlTools(server) {
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleCoolifyError(error) }],
+                content: [{ type: 'text', text: handleCoolifyError(error) }],
             };
         }
     });
     // ── Infrastructure Overview ──────────────────────────────────────
-    server.registerTool("coolify_overview", {
-        title: "Coolify Infrastructure Overview",
-        description: "Get a comprehensive snapshot of all servers, projects, applications, databases, and services. " +
-            "This is the best starting point when you need to understand the current state of the infrastructure.",
+    server.registerTool('coolify_overview', {
+        title: 'Coolify Infrastructure Overview',
+        description: 'Get a comprehensive snapshot of all servers, projects, applications, databases, and services. ' +
+            'This is the best starting point when you need to understand the current state of the infrastructure.',
         inputSchema: {
             summary: z
                 .boolean()
                 .default(true)
-                .describe("Project each resource to its essential fields (default true). false returns full " +
-                "objects for every resource and can be very large."),
+                .describe('Project each resource to its essential fields (default true). false returns full ' +
+                'objects for every resource and can be very large.'),
             instance: CoolifyInstanceSchema,
         },
         annotations: {
@@ -161,11 +159,11 @@ export function registerControlTools(server) {
         try {
             // Gather all top-level resources in parallel
             const [servers, projects, applications, databases, services] = await Promise.all([
-                coolifyGet("/servers", undefined, instance).catch(() => []),
-                coolifyGet("/projects", undefined, instance).catch(() => []),
-                coolifyGet("/applications", undefined, instance).catch(() => []),
-                coolifyGet("/databases", undefined, instance).catch(() => []),
-                coolifyGet("/services", undefined, instance).catch(() => []),
+                coolifyGet('/servers', undefined, instance).catch(() => []),
+                coolifyGet('/projects', undefined, instance).catch(() => []),
+                coolifyGet('/applications', undefined, instance).catch(() => []),
+                coolifyGet('/databases', undefined, instance).catch(() => []),
+                coolifyGet('/services', undefined, instance).catch(() => []),
             ]);
             const overview = {
                 summary: {
@@ -186,7 +184,7 @@ export function registerControlTools(server) {
         catch (error) {
             return {
                 isError: true,
-                content: [{ type: "text", text: handleCoolifyError(error) }],
+                content: [{ type: 'text', text: handleCoolifyError(error) }],
             };
         }
     });

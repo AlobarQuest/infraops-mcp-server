@@ -1,4 +1,4 @@
-export type Op = "eq" | "neq" | "contains" | "not_contains" | "present" | "absent" | "empty" | "non_empty" | "starts_with" | "not_starts_with" | "matches";
+export type Op = 'eq' | 'neq' | 'contains' | 'not_contains' | 'present' | 'absent' | 'empty' | 'non_empty' | 'starts_with' | 'not_starts_with' | 'matches';
 export interface Assertion {
     field: string;
     op: Op;
@@ -7,27 +7,27 @@ export interface Assertion {
 export interface StandardCheck {
     rule_id: number;
     rule_text: string;
-    severity: "BLOCK" | "WARN" | "INFO";
+    severity: 'BLOCK' | 'WARN' | 'INFO';
     schema_version: number;
-    resource: "coolify_application" | "coolify_database";
+    resource: 'coolify_application' | 'coolify_database';
     assert: Assertion;
     when?: Assertion;
     remediation_key?: string;
-    kind: "remediation" | "question";
+    kind: 'remediation' | 'question';
 }
-export type Risk = "safe" | "caution" | "destructive";
-export type Confidence = "high" | "medium" | "low";
+export type Risk = 'safe' | 'caution' | 'destructive';
+export type Confidence = 'high' | 'medium' | 'low';
 export interface PlannedAction {
     tool: string;
     args: Record<string, unknown>;
 }
 export interface Proposal {
     id: string;
-    kind: "remediation" | "question";
-    source: "standards-audit";
-    status: "pending";
+    kind: 'remediation' | 'question';
+    source: 'standards-audit';
+    status: 'pending';
     target: {
-        provider: "coolify";
+        provider: 'coolify';
         resource_type: string;
         uuid: string;
         name: string;

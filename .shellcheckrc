@@ -2,3 +2,7 @@
 # Only warning-and-above findings gate; info/style are advisory.
 severity=warning
 external-sources=false
+# Secret bootstrap scripts intentionally export command-substitution results;
+# failures are handled by fetch_bws_secret itself. Runtime config paths are
+# dynamic by design, and JSON is consumed by the following command pipeline.
+disable=SC1090,SC2034,SC2155

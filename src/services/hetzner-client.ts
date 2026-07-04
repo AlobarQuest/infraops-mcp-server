@@ -6,10 +6,10 @@
  * snapshots, networks, floating IPs.
  */
 
-import axios, { AxiosError, AxiosInstance } from "axios";
-import { REQUEST_TIMEOUT } from "../constants.js";
+import axios, { AxiosError, AxiosInstance } from 'axios';
+import { REQUEST_TIMEOUT } from '../constants.js';
 
-const HETZNER_API_BASE = "https://api.hetzner.cloud/v1";
+const HETZNER_API_BASE = 'https://api.hetzner.cloud/v1';
 
 // ── Singleton client ─────────────────────────────────────────────────
 
@@ -21,9 +21,9 @@ function getClient(): AxiosInstance {
   const token = process.env.HETZNER_API_TOKEN;
   if (!token) {
     throw new Error(
-      "HETZNER_API_TOKEN environment variable is required. " +
-        "Generate one in Hetzner Cloud Console → Project → Security → API Tokens. " +
-        "Store it in BWS and set BWS_HETZNER_SECRET_ID in your MCP config."
+      'HETZNER_API_TOKEN environment variable is required. ' +
+        'Generate one in Hetzner Cloud Console → Project → Security → API Tokens. ' +
+        'Store it in BWS and set BWS_HETZNER_SECRET_ID in your MCP config.',
     );
   }
 
@@ -31,8 +31,8 @@ function getClient(): AxiosInstance {
     baseURL: HETZNER_API_BASE,
     timeout: REQUEST_TIMEOUT,
     headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
       Authorization: `Bearer ${token}`,
     },
   });
@@ -44,26 +44,20 @@ function getClient(): AxiosInstance {
 
 export async function hetznerGet<T>(
   endpoint: string,
-  params?: Record<string, unknown>
+  params?: Record<string, unknown>,
 ): Promise<T> {
   const client = getClient();
   const response = await client.get<T>(endpoint, { params });
   return response.data;
 }
 
-export async function hetznerPost<T>(
-  endpoint: string,
-  data?: Record<string, unknown>
-): Promise<T> {
+export async function hetznerPost<T>(endpoint: string, data?: Record<string, unknown>): Promise<T> {
   const client = getClient();
   const response = await client.post<T>(endpoint, data);
   return response.data;
 }
 
-export async function hetznerPut<T>(
-  endpoint: string,
-  data?: Record<string, unknown>
-): Promise<T> {
+export async function hetznerPut<T>(endpoint: string, data?: Record<string, unknown>): Promise<T> {
   const client = getClient();
   const response = await client.put<T>(endpoint, data);
   return response.data;
@@ -85,13 +79,13 @@ export function handleHetznerError(error: unknown): string {
       const status = axErr.response.status;
       const body = axErr.response.data;
       const msg = body?.error?.message ?? JSON.stringify(body);
-      const code = body?.error?.code ?? "";
+      const code = body?.error?.code ?? '';
 
       switch (status) {
         case 401:
           return (
-            "Error: Hetzner authentication failed. Your HETZNER_API_TOKEN may be invalid or expired. " +
-            "Regenerate it in Hetzner Cloud Console → Security → API Tokens."
+            'Error: Hetzner authentication failed. Your HETZNER_API_TOKEN may be invalid or expired. ' +
+            'Regenerate it in Hetzner Cloud Console → Security → API Tokens.'
           );
         case 403:
           return `Error: Hetzner permission denied. ${msg}`;
@@ -102,7 +96,7 @@ export function handleHetznerError(error: unknown): string {
         case 422:
           return `Error: Hetzner validation failed. ${msg}`;
         case 429:
-          return "Error: Hetzner rate limit exceeded. Wait before retrying.";
+          return 'Error: Hetzner rate limit exceeded. Wait before retrying.';
         case 503:
           return `Error: Hetzner service unavailable. Try again in a moment.`;
         default:
@@ -110,8 +104,8 @@ export function handleHetznerError(error: unknown): string {
       }
     }
 
-    if (axErr.code === "ECONNABORTED") {
-      return "Error: Hetzner API request timed out.";
+    if (axErr.code === 'ECONNABORTED') {
+      return 'Error: Hetzner API request timed out.';
     }
   }
 

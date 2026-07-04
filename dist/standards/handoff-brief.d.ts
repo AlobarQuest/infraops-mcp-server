@@ -1,7 +1,7 @@
-import type { Proposal } from "./check-engine.js";
-import type { ProbeResult } from "./executor.js";
-import type { Lane } from "./remediation-registry.js";
-import type { AppResolution } from "../services/appbrain-client.js";
+import type { Proposal } from './check-engine.js';
+import type { ProbeResult } from './executor.js';
+import type { Lane } from './remediation-registry.js';
+import type { AppResolution } from '../services/appbrain-client.js';
 /** Parse a bare host from a URL. http/https only; reject userinfo; return the lowercased hostname
  *  (no port); null on any invalid/unsafe input. Coolify app fields are not a trust boundary. */
 export declare function hostFromUrl(url: string | null | undefined): string | null;

@@ -9,6 +9,6 @@
  * for the function body in some versions. This implementation uses JSON body —
  * adjust to multipart if needed at runtime.
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 export declare function registerSupabaseFunctionTools(server: McpServer): void;
 //# sourceMappingURL=supabase-functions.d.ts.map

@@ -7,11 +7,11 @@ export interface AutoFixOptions {
     getUid?: () => number;
 }
 export type AutoFixResult = {
-    status: "applied";
+    status: 'applied';
     target: string;
     priorMode: number;
 } | {
-    status: "blocked";
+    status: 'blocked';
     target: string;
     reason: string;
 };

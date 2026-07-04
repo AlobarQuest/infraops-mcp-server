@@ -11,18 +11,18 @@
  */
 
 export const SENSITIVE_RESOURCE_FIELDS = [
-  "manual_webhook_secret_github",
-  "manual_webhook_secret_gitlab",
-  "manual_webhook_secret_gitea",
-  "manual_webhook_secret_bitbucket",
-  "http_basic_auth_password",
+  'manual_webhook_secret_github',
+  'manual_webhook_secret_gitlab',
+  'manual_webhook_secret_gitea',
+  'manual_webhook_secret_bitbucket',
+  'http_basic_auth_password',
 ] as const;
 
-const MASKED_VALUE = "***";
+const MASKED_VALUE = '***';
 
 /** Mask sensitive fields on a single resource object (non-mutating). */
 export function maskSensitive<T extends Record<string, any>>(obj: T, reveal = false): T {
-  if (reveal || obj == null || typeof obj !== "object") return obj;
+  if (reveal || obj == null || typeof obj !== 'object') return obj;
   const out: Record<string, any> = { ...obj };
   for (const field of SENSITIVE_RESOURCE_FIELDS) {
     if (out[field] != null) out[field] = MASKED_VALUE;

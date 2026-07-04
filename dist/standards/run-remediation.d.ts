@@ -1,12 +1,12 @@
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import type { AuditResult } from "./run-audit.js";
-import type { Proposal } from "./check-engine.js";
-import type { ApplyResult } from "./executor.js";
-import type { ProbeResult } from "./executor.js";
-import type { RemediationPlan } from "./remediation-plan.js";
-import type { AppResolution } from "../services/appbrain-client.js";
-import { type DriftReport } from "./report.js";
-import { type RemediationReport } from "./remediation-report.js";
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import type { AuditResult } from './run-audit.js';
+import type { Proposal } from './check-engine.js';
+import type { ApplyResult } from './executor.js';
+import type { ProbeResult } from './executor.js';
+import type { RemediationPlan } from './remediation-plan.js';
+import type { AppResolution } from '../services/appbrain-client.js';
+import { type DriftReport } from './report.js';
+import { type RemediationReport } from './remediation-report.js';
 export interface RemediationDeps {
     audit: (inst: CoolifyInstance) => Promise<AuditResult>;
     apply: (p: Proposal, inst: CoolifyInstance, opts: {

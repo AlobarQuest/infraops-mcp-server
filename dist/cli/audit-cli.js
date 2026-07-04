@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import fs from "fs";
-import path from "path";
-import { auditInstance } from "../standards/run-audit.js";
-import { buildDriftReport, renderMarkdown, wasCleanlyAudited } from "../standards/report.js";
+import fs from 'fs';
+import path from 'path';
+import { auditInstance } from '../standards/run-audit.js';
+import { buildDriftReport, renderMarkdown, wasCleanlyAudited } from '../standards/report.js';
 /**
  * Headless drift audit. Runs `coolify_audit_standards` for one or more instances,
  * writes a structured JSON report + day-over-day delta + a human markdown summary,
@@ -18,11 +18,11 @@ function parseArgs(argv) {
     const args = {};
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
-        if (!a.startsWith("--"))
+        if (!a.startsWith('--'))
             continue;
         const key = a.slice(2);
         const next = argv[i + 1];
-        if (next !== undefined && !next.startsWith("--")) {
+        if (next !== undefined && !next.startsWith('--')) {
             args[key] = next;
             i++;
         }
@@ -38,12 +38,12 @@ function loadPreviousReport(dir, todayBasename) {
             return null;
         const files = fs
             .readdirSync(dir)
-            .filter((f) => f.endsWith(".json") && f !== todayBasename)
+            .filter((f) => f.endsWith('.json') && f !== todayBasename)
             .sort();
         const last = files.pop();
         if (!last)
             return null;
-        return JSON.parse(fs.readFileSync(path.join(dir, last), "utf-8"));
+        return JSON.parse(fs.readFileSync(path.join(dir, last), 'utf-8'));
     }
     catch {
         return null;
@@ -51,23 +51,23 @@ function loadPreviousReport(dir, todayBasename) {
 }
 async function main() {
     const args = parseArgs(process.argv.slice(2));
-    const instances = String(args.instance ?? "prod")
-        .split(",")
+    const instances = String(args.instance ?? 'prod')
+        .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-    const reportDir = typeof args["report-dir"] === "string" ? args["report-dir"] : undefined;
-    const generatedAt = typeof args.now === "string" ? args.now : new Date().toISOString();
+    const reportDir = typeof args['report-dir'] === 'string' ? args['report-dir'] : undefined;
+    const generatedAt = typeof args.now === 'string' ? args.now : new Date().toISOString();
     const dateStr = generatedAt.slice(0, 10);
     const toStdout = args.stdout === true || !reportDir;
     const prev = reportDir ? loadPreviousReport(reportDir, `${dateStr}.json`) : null;
     const report = await buildDriftReport(instances, (inst) => auditInstance(inst), prev, generatedAt);
     if (reportDir) {
         fs.mkdirSync(reportDir, { recursive: true });
-        fs.writeFileSync(path.join(reportDir, `${dateStr}.json`), JSON.stringify(report, null, 2), "utf-8");
-        fs.writeFileSync(path.join(reportDir, `${dateStr}.md`), renderMarkdown(report), "utf-8");
+        fs.writeFileSync(path.join(reportDir, `${dateStr}.json`), JSON.stringify(report, null, 2), 'utf-8');
+        fs.writeFileSync(path.join(reportDir, `${dateStr}.md`), renderMarkdown(report), 'utf-8');
     }
     if (toStdout) {
-        process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+        process.stdout.write(JSON.stringify(report, null, 2) + '\n');
     }
     // Exit non-zero unless at least one instance was audited cleanly. This trips the
     // heartbeat on a wholly broken run — e.g. missing tokens make every read error

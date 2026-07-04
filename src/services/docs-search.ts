@@ -8,10 +8,10 @@
  * Instance-agnostic: the docs are global, so this has no Coolify instance/token dependency.
  */
 
-import axios from "axios";
-import MiniSearch from "minisearch";
+import axios from 'axios';
+import MiniSearch from 'minisearch';
 
-const DOCS_URL = "https://coolify.io/docs/llms-full.txt";
+const DOCS_URL = 'https://coolify.io/docs/llms-full.txt';
 const FETCH_TIMEOUT_MS = 15000;
 
 interface DocChunk {
@@ -32,7 +32,7 @@ export interface DocSearchResult {
 
 let indexPromise: Promise<MiniSearch<DocChunk>> | null = null;
 
-const DOCS_BASE = "https://coolify.io";
+const DOCS_BASE = 'https://coolify.io';
 
 /**
  * Parse the llms-full.txt corpus into searchable chunks.
@@ -51,12 +51,18 @@ function parseDocs(raw: string): DocChunk[] {
   const headers: { title: string; path: string; start: number; bodyStart: number }[] = [];
   let m: RegExpExecArray | null;
   while ((m = pageHeader.exec(raw)) !== null) {
-    headers.push({ title: m[1].trim(), path: m[2].trim(), start: m.index, bodyStart: pageHeader.lastIndex });
+    headers.push({
+      title: m[1].trim(),
+      path: m[2].trim(),
+      start: m.index,
+      bodyStart: pageHeader.lastIndex,
+    });
   }
 
   const pushChunk = (title: string, url: string, content: string) => {
     const trimmed = content.trim();
-    if (trimmed.length >= 20) chunks.push({ id: id++, title, url, description: "", content: trimmed });
+    if (trimmed.length >= 20)
+      chunks.push({ id: id++, title, url, description: '', content: trimmed });
   };
 
   for (let i = 0; i < headers.length; i++) {
@@ -86,7 +92,7 @@ function parseDocs(raw: string): DocChunk[] {
       pushChunk(
         `${h.title} > ${markers[j].name}`,
         `${url}#${markers[j].anchor}`,
-        body.slice(markers[j].index, segEnd)
+        body.slice(markers[j].index, segEnd),
       );
     }
   }
@@ -96,13 +102,13 @@ function parseDocs(raw: string): DocChunk[] {
 async function buildIndex(): Promise<MiniSearch<DocChunk>> {
   const resp = await axios.get<string>(DOCS_URL, {
     timeout: FETCH_TIMEOUT_MS,
-    responseType: "text",
+    responseType: 'text',
     transformResponse: [(d) => d],
   });
   const chunks = parseDocs(resp.data);
   const mini = new MiniSearch<DocChunk>({
-    fields: ["title", "description", "content"],
-    storeFields: ["title", "url", "description", "content"],
+    fields: ['title', 'description', 'content'],
+    storeFields: ['title', 'url', 'description', 'content'],
     searchOptions: {
       boost: { title: 3, description: 2, content: 1 },
       prefix: true,
@@ -115,7 +121,7 @@ async function buildIndex(): Promise<MiniSearch<DocChunk>> {
 
 /** Extract a ~300-char window around the best run of query terms. */
 function extractSnippet(content: string, query: string, windowSize = 300): string {
-  const text = content.replace(/\s+/g, " ").trim();
+  const text = content.replace(/\s+/g, ' ').trim();
   if (text.length <= windowSize) return text;
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   const lower = text.toLowerCase();
@@ -130,8 +136,8 @@ function extractSnippet(content: string, query: string, windowSize = 300): strin
     }
   }
   let snippet = text.slice(best, best + windowSize);
-  if (best > 0) snippet = "..." + snippet;
-  if (best + windowSize < text.length) snippet = snippet + "...";
+  if (best > 0) snippet = '...' + snippet;
+  if (best + windowSize < text.length) snippet = snippet + '...';
   return snippet;
 }
 
@@ -149,7 +155,7 @@ export async function searchDocs(query: string, limit = 5): Promise<DocSearchRes
     title: r.title,
     url: r.url,
     description: r.description,
-    snippet: extractSnippet(r.content ?? "", query),
+    snippet: extractSnippet(r.content ?? '', query),
     score: Math.round(r.score * 100) / 100,
   }));
 }

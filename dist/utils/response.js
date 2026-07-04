@@ -6,7 +6,7 @@
  * and is applied centrally by the redaction wrapper (register-sanitized.ts) after
  * redaction, so a secret is never split across a truncation boundary.
  */
-import { CHARACTER_LIMIT } from "../constants.js";
+import { CHARACTER_LIMIT } from '../constants.js';
 /** Truncate text to `charLimit` with an explicit narrowing marker. */
 export function truncateToLimit(text, charLimit = CHARACTER_LIMIT) {
     if (text.length <= charLimit)
@@ -23,20 +23,20 @@ export function truncateToLimit(text, charLimit = CHARACTER_LIMIT) {
  * never be split across the truncation boundary.
  */
 export function jsonResponse(data, _opts = {}) {
-    return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
 }
 /**
  * Tail-truncate a log blob. Page 1 = newest `lineLimit` lines; higher pages walk
  * older. Mirrors coolify-mcp's truncateLogs semantics (lineLimit 200, charLimit 50K).
  */
 export function truncateLogs(logs, lineLimit = 200, charLimit = 50000, page = 1) {
-    const lines = logs.split("\n");
+    const lines = logs.split('\n');
     const total = lines.length;
     const end = Math.max(0, total - (page - 1) * lineLimit);
     const start = Math.max(0, end - lineLimit);
-    let slice = lines.slice(start, end).join("\n");
+    let slice = lines.slice(start, end).join('\n');
     if (slice.length > charLimit) {
-        slice = "…[truncated]…\n" + slice.slice(slice.length - charLimit);
+        slice = '…[truncated]…\n' + slice.slice(slice.length - charLimit);
     }
     return { logs: slice, total_lines: total, showing_start: start, showing_end: end };
 }

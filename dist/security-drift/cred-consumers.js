@@ -9,11 +9,11 @@
 // [[credential.consumer]] / [[credential.exposure]] tables. Anything else throws
 // CredConsumersParseError — deny-by-default: a malformed file yields NO
 // rotation-eligible credentials, never a guessed one.
-import * as fs from "node:fs";
+import * as fs from 'node:fs';
 export class CredConsumersParseError extends Error {
     constructor(message) {
         super(message);
-        this.name = "CredConsumersParseError";
+        this.name = 'CredConsumersParseError';
     }
 }
 function parseValue(raw, line) {
@@ -24,17 +24,17 @@ function parseValue(raw, line) {
             throw new CredConsumersParseError(`line ${line}: embedded quote in string`);
         return inner;
     }
-    if (v === "true")
+    if (v === 'true')
         return true;
-    if (v === "false")
+    if (v === 'false')
         return false;
     if (/^-?\d+$/.test(v))
         return Number.parseInt(v, 10);
-    if (v.startsWith("[") && v.endsWith("]")) {
+    if (v.startsWith('[') && v.endsWith(']')) {
         const body = v.slice(1, -1).trim();
         if (!body)
             return [];
-        return body.split(",").map((part) => {
+        return body.split(',').map((part) => {
             const p = part.trim();
             if (!(p.startsWith('"') && p.endsWith('"') && p.length >= 2)) {
                 throw new CredConsumersParseError(`line ${line}: arrays may contain only quoted strings`);
@@ -54,7 +54,7 @@ function stripComment(line) {
         const ch = line[i];
         if (ch === '"')
             inString = !inString;
-        else if (ch === "#" && !inString)
+        else if (ch === '#' && !inString)
             return line.slice(0, i);
     }
     return line;
@@ -64,34 +64,34 @@ export function parseCredConsumers(text) {
     const creds = [];
     let cred = null;
     let sub = null;
-    const lines = text.split("\n");
+    const lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
         const n = i + 1;
         const line = stripComment(lines[i]).trim();
         if (!line)
             continue;
-        if (line === "[[credential]]") {
-            cred = { id: "", class: "", rotation_preconditions: [], consumers: [], exposures: [] };
+        if (line === '[[credential]]') {
+            cred = { id: '', class: '', rotation_preconditions: [], consumers: [], exposures: [] };
             creds.push(cred);
             sub = null;
             continue;
         }
-        if (line === "[[credential.consumer]]" || line === "[[credential.exposure]]") {
+        if (line === '[[credential.consumer]]' || line === '[[credential.exposure]]') {
             if (!cred)
                 throw new CredConsumersParseError(`line ${n}: ${line} before any [[credential]]`);
-            if (line === "[[credential.consumer]]") {
-                sub = { kind: "" };
+            if (line === '[[credential.consumer]]') {
+                sub = { kind: '' };
                 cred.consumers.push(sub);
             }
             else {
-                sub = { id: "", date: "" };
+                sub = { id: '', date: '' };
                 cred.exposures.push(sub);
             }
             continue;
         }
-        if (line.startsWith("["))
+        if (line.startsWith('['))
             throw new CredConsumersParseError(`line ${n}: unsupported table ${line}`);
-        const eq = line.indexOf("=");
+        const eq = line.indexOf('=');
         if (eq < 1)
             throw new CredConsumersParseError(`line ${n}: expected key = value`);
         const key = line.slice(0, eq).trim();
@@ -104,7 +104,7 @@ export function parseCredConsumers(text) {
         else if (cred) {
             cred[key] = value;
         }
-        else if (key === "version") {
+        else if (key === 'version') {
             if (value !== 1)
                 throw new CredConsumersParseError(`unsupported version ${String(value)}`);
         }
@@ -113,8 +113,8 @@ export function parseCredConsumers(text) {
         }
     }
     for (const c of creds) {
-        if (typeof c.id !== "string" || typeof c.class !== "string" || !c.id || !c.class) {
-            throw new CredConsumersParseError(`credential missing string id/class (id=${String(c.id) || "?"})`);
+        if (typeof c.id !== 'string' || typeof c.class !== 'string' || !c.id || !c.class) {
+            throw new CredConsumersParseError(`credential missing string id/class (id=${String(c.id) || '?'})`);
         }
         for (const consumer of c.consumers) {
             if (!consumer.kind)
@@ -144,7 +144,7 @@ export function loadCredConsumerFiles(files) {
     for (const file of files) {
         let text;
         try {
-            text = fs.readFileSync(file, "utf8");
+            text = fs.readFileSync(file, 'utf8');
         }
         catch (e) {
             throw new CredConsumersParseError(`cannot read ${file}: ${e instanceof Error ? e.message : String(e)}`);
