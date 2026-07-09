@@ -38,14 +38,17 @@ unset _kc_bws
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Helper: fetch a BWS secret by ID, returns empty string if ID not set
+# Helper: fetch a BWS secret by ID, returns empty string if ID not set.
+# --color no is load-bearing: a launching harness may export FORCE_COLOR /
+# CLICOLOR_FORCE, which makes `bws secret get` wrap its JSON in ANSI color
+# codes even when piped, breaking json.load and aborting startup.
 fetch_bws_secret() {
   local secret_id="$1"
   if [ -z "$secret_id" ]; then
     echo ""
     return
   fi
-  bws secret get "$secret_id" --output json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])" 2>/dev/null || echo ""
+  env -u FORCE_COLOR -u CLICOLOR_FORCE bws secret get "$secret_id" --output json --color no 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])" 2>/dev/null || echo ""
 }
 
 # ── Coolify (required) ──────────────────────────────────────────────
