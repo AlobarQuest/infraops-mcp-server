@@ -20,10 +20,10 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.104.1",
+    "@anthropic-ai/sdk": "^0.112.3",
     "@modelcontextprotocol/sdk": "^1.6.1",
     "axios": "^1.7.9",
-    "fast-xml-parser": "^5.5.8",
+    "fast-xml-parser": "^5.10.1",
     "minisearch": "^7.2.0",
     "ssh2": "^1.16.0",
     "zod": "^3.23.8",
@@ -32,11 +32,11 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/ssh2": "^1.15.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.1",
     "typescript": "^5.7.2",
     "vitest": "^4.1.4",
     "eslint": "^9.18.0",
-    "typescript-eslint": "^8.20.0",
+    "typescript-eslint": "^8.64.0",
     "prettier": "^3.4.2"
   }
 }
