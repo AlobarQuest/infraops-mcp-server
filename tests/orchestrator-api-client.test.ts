@@ -56,6 +56,13 @@ describe('OrchestratorClient', () => {
     expect(fetchMock.mock.calls[0][1].headers['User-Agent']).toMatch(/infra-drift/);
   });
 
+  it('bounds every request with an AbortSignal so a hung connection cannot stall the drift job', async () => {
+    fetchMock.mockResolvedValue(ok({ id: 'obs-1' }));
+    const c = new OrchestratorClient('https://sds.example', 'tok', 'k');
+    await c.postObservation(command);
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('strips a trailing slash from the base URL', async () => {
     fetchMock.mockResolvedValue(ok({ id: 'obs-1' }));
     const c = new OrchestratorClient('https://sds.example/', 'tok', 'k');

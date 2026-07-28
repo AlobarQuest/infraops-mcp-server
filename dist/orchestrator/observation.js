@@ -21,6 +21,18 @@
  * errors, proposal descriptions and reasoning -- never crosses this boundary, and rule keys are
  * never used as fact KEYS (the ingest secret scanner rejects any key containing "log", "body",
  * "credential", ...).
+ *
+ * The dedup guarantee above depends on a narrower invariant than "the timestamp is right": `status`,
+ * `severity` and `summary` must stay PURE functions of `facts` (and `facts` a pure function of the
+ * report). If any of them ever reads something outside `facts` -- wall-clock time, an env var, a
+ * random id -- two builds of the "same" observation stop being byte-identical and the re-post that
+ * was supposed to dedup will not.
+ *
+ * Re-posting a DIFFERENT payload under an already-used `(source_system, source_reference)` -- e.g.
+ * a bug that changes `buildInstanceFacts` without changing `generated_at` -- does NOT surface as the
+ * `observation_conflict` this file otherwise reasons about. The idempotency key is `drift-digest:
+ * <generated_at>:<instance>` only; the orchestrator checks idempotency BEFORE the source-reference
+ * path, so a mismatched-but-same-key repost returns `idempotency_conflict` instead.
  */
 import { createHash } from 'crypto';
 /**
@@ -80,8 +92,12 @@ export function buildInstanceFacts(report, instance) {
             remediation: count(byKind.remediation),
             question: count(byKind.question),
         },
-        delta_new: report.delta.new.filter((d) => d.instance === instance).length,
-        delta_resolved: report.delta.resolved.filter((d) => d.instance === instance).length,
+        delta_new: Array.isArray(report.delta?.new)
+            ? report.delta.new.filter((d) => d.instance === instance).length
+            : 0,
+        delta_resolved: Array.isArray(report.delta?.resolved)
+            ? report.delta.resolved.filter((d) => d.instance === instance).length
+            : 0,
         read_error_count: readErrorCount,
     };
 }
@@ -132,8 +148,24 @@ export function buildObservation(report, instance) {
 }
 /** One command per audited instance. Instances with no subject mapping are skipped, not thrown on. */
 export function buildObservations(report) {
-    return Object.keys(report.instances)
-        .map((instance) => buildObservation(report, instance))
-        .filter((o) => o !== null);
+    return buildObservationSet(report).commands;
+}
+/**
+ * Same mapping as {@link buildObservations}, but also names what got dropped. An instance absent
+ * from `INSTANCE_SUBJECTS` (e.g. the report grows a `staging` section before the mapping does) is
+ * silently invisible if only the command count is observed -- this is what makes the drop visible
+ * and counted, per the CLI's `skipped=N (names)` summary clause.
+ */
+export function buildObservationSet(report) {
+    const commands = [];
+    const skipped = [];
+    for (const instance of Object.keys(report.instances)) {
+        const command = buildObservation(report, instance);
+        if (command)
+            commands.push(command);
+        else
+            skipped.push(instance);
+    }
+    return { commands, skipped };
 }
 //# sourceMappingURL=observation.js.map

@@ -13,7 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { OrchestratorClient } from '../orchestrator/api-client.js';
-import { buildObservations } from '../orchestrator/observation.js';
+import { buildObservationSet } from '../orchestrator/observation.js';
 import type { DriftReport } from '../standards/report.js';
 
 export function parseArgs(argv: string[]): Record<string, string | boolean> {
@@ -41,21 +41,57 @@ export function makeClient(): OrchestratorClient {
   return new OrchestratorClient(base, token, keyId);
 }
 
-async function doObserve(reportDir: string, now: string, dryRun: boolean): Promise<void> {
+/** `` unless something was skipped, in which case a leading-space-prefixed `` skipped=N (names)``. */
+function skippedClause(skipped: string[]): string {
+  return skipped.length > 0 ? ` skipped=${skipped.length} (${skipped.join(', ')})` : '';
+}
+
+/**
+ * The counted summary line. Kept as one exported function so a dropped-instance regression (F1)
+ * and a client-construction failure (F4) both go through the same, tested formatting -- neither
+ * path can silently omit the `skipped=` clause or the count.
+ */
+export function formatSummaryLine(
+  posted: number,
+  failed: number,
+  skipped: string[],
+  total: number,
+): string {
+  return `observations: posted=${posted} failed=${failed}${skippedClause(skipped)} of ${total}\n`;
+}
+
+export async function doObserve(reportDir: string, now: string, dryRun: boolean): Promise<void> {
   const date = now.slice(0, 10);
   const file = path.join(reportDir, `${date}.json`);
   const report = JSON.parse(fs.readFileSync(file, 'utf-8')) as DriftReport;
-  const commands = buildObservations(report);
+  const { commands, skipped } = buildObservationSet(report);
 
   if (dryRun) {
     for (const command of commands) {
       process.stdout.write(`${JSON.stringify(command, null, 2)}\n`);
     }
-    process.stdout.write(`observations: would post ${commands.length} (dry run)\n`);
+    process.stdout.write(
+      `observations: would post ${commands.length}${skippedClause(skipped)} (dry run)\n`,
+    );
     return;
   }
 
-  const client = makeClient();
+  let client: OrchestratorClient;
+  try {
+    client = makeClient();
+  } catch (e) {
+    // Client construction fails closed (missing/rotated BWS token, BWS outage) *before* the loop
+    // that normally prints the counted summary. Without this catch that is a single bare stderr
+    // line and no `observations: …` line at all -- the most likely operational failure produces
+    // no counted evidence of it. Every command that would have been posted counts as failed.
+    process.stdout.write(
+      `WARN: observation client unavailable: ${e instanceof Error ? e.message : String(e)}\n`,
+    );
+    process.stdout.write(formatSummaryLine(0, commands.length, skipped, commands.length));
+    process.exitCode = 1;
+    return;
+  }
+
   let posted = 0;
   let failed = 0;
 
@@ -74,7 +110,7 @@ async function doObserve(reportDir: string, now: string, dryRun: boolean): Promi
     }
   }
 
-  process.stdout.write(`observations: posted=${posted} failed=${failed} of ${commands.length}\n`);
+  process.stdout.write(formatSummaryLine(posted, failed, skipped, commands.length));
   if (failed > 0) process.exitCode = 1;
 }
 

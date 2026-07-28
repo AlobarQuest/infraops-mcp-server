@@ -4,6 +4,11 @@
  *
  * `sds.alobar.net` is not Cloudflare-proxied, so a default UA would work — the explicit one is
  * for attribution in access logs, not to get past a bot check.
+ *
+ * Every request carries a default 20s timeout: Node/undici's own default lets a
+ * hung-but-accepted connection stall for ~300s, which -- run before the Resend digest and the
+ * Healthchecks ping -- can trigger a false dead-man's-switch alarm about the whole drift job
+ * while the job itself is fine. Callers may override via `init.signal`.
  */
 export class OrchestratorClient {
     token;
@@ -16,6 +21,7 @@ export class OrchestratorClient {
     }
     async req(path, init = {}) {
         const res = await fetch(`${this.base}${path}`, {
+            signal: AbortSignal.timeout(20_000),
             ...init,
             headers: {
                 Authorization: `Bearer ${this.token}`,

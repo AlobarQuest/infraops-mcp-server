@@ -37,4 +37,14 @@ export declare function buildInstanceFacts(report: DriftReport, instance: string
 export declare function buildObservation(report: DriftReport, instance: string): ObservationCommand | null;
 /** One command per audited instance. Instances with no subject mapping are skipped, not thrown on. */
 export declare function buildObservations(report: DriftReport): ObservationCommand[];
+/**
+ * Same mapping as {@link buildObservations}, but also names what got dropped. An instance absent
+ * from `INSTANCE_SUBJECTS` (e.g. the report grows a `staging` section before the mapping does) is
+ * silently invisible if only the command count is observed -- this is what makes the drop visible
+ * and counted, per the CLI's `skipped=N (names)` summary clause.
+ */
+export declare function buildObservationSet(report: DriftReport): {
+    commands: ObservationCommand[];
+    skipped: string[];
+};
 //# sourceMappingURL=observation.d.ts.map

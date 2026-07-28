@@ -3,6 +3,7 @@ import {
   buildInstanceFacts,
   buildObservation,
   buildObservations,
+  buildObservationSet,
   canonicalJson,
   factDigest,
 } from '../src/orchestrator/observation.js';
@@ -152,6 +153,13 @@ describe('buildInstanceFacts', () => {
     expect(canonicalJson(facts)).not.toContain('/applications');
   });
 
+  it('does not throw when the report has no delta (guards the same way as summary/errors)', () => {
+    const r = report();
+    delete (r as unknown as Record<string, unknown>).delta;
+    expect(() => buildInstanceFacts(r, 'prod')).not.toThrow();
+    expect(buildInstanceFacts(r, 'prod')).toMatchObject({ delta_new: 0, delta_resolved: 0 });
+  });
+
   it('never produces a fact key containing a scanner-banned substring', () => {
     const facts = buildInstanceFacts(report(), 'prod');
     const keys: string[] = [];
@@ -173,7 +181,9 @@ describe('buildInstanceFacts', () => {
   });
 
   it('stays far inside the 4096-byte fact bound', () => {
-    expect(Buffer.byteLength(canonicalJson(buildInstanceFacts(report(), 'prod')), 'utf8')).toBeLessThan(1024);
+    expect(
+      Buffer.byteLength(canonicalJson(buildInstanceFacts(report(), 'prod')), 'utf8'),
+    ).toBeLessThan(1024);
   });
 });
 
@@ -302,5 +312,35 @@ describe('buildObservations', () => {
       },
     } as Partial<DriftReport>);
     expect(buildObservations(r)).toHaveLength(1);
+  });
+});
+
+describe('buildObservationSet', () => {
+  it('names an unmapped instance as skipped rather than dropping it silently', () => {
+    const r = report({
+      instances: {
+        prod: {
+          ok: true,
+          summary: {
+            total_proposals: 0,
+            by_risk: { safe: 0, caution: 0, destructive: 0 },
+            by_kind: { remediation: 0, question: 0 },
+          },
+          proposals: [],
+        },
+        staging: { ok: true },
+      },
+    } as Partial<DriftReport>);
+    const { commands, skipped } = buildObservationSet(r);
+    expect(commands).toHaveLength(1);
+    expect(skipped).toEqual(['staging']);
+  });
+
+  it('reports no skips when every instance has a subject mapping', () => {
+    expect(buildObservationSet(report()).skipped).toEqual([]);
+  });
+
+  it('agrees with buildObservations on the mapped commands', () => {
+    expect(buildObservationSet(report()).commands).toEqual(buildObservations(report()));
   });
 });
