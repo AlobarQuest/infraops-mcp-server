@@ -97,6 +97,17 @@ export CHANGE_MGR_M2M_TOKEN="$(get_secret_by_id "${BWS_CHANGE_MGR_M2M_SECRET_ID:
 node "$REPO/dist/cli/change-mgr-cli.js" sync --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
   && log "change-mgr sync ok" || log "WARN: change-mgr sync failed (non-fatal)"
 
+# ── Best-effort: the day's digest → orchestrator observations (non-fatal) ───────
+# WS-P3.0. Posts one observation per audited Coolify instance to the orchestrator's
+# observation spine. Deliberately outside RC/RC_REMEDIATE: the drift loop is never
+# hostage to the orchestrator being reachable, but a failure is always logged, never
+# silent.
+export ORCHESTRATOR_API_BASE="${ORCHESTRATOR_API_BASE:-https://sds.alobar.net}"
+export ORCHESTRATOR_M2M_TOKEN="$(get_secret_by_id "${BWS_ORCHESTRATOR_OBS_SECRET_ID:-8998c4ea-453c-4ae1-9b5c-b49500b8dacc}")"
+export ORCHESTRATOR_CREDENTIAL_KEY_ID="${ORCHESTRATOR_CREDENTIAL_KEY_ID:-orchestrator-drift-reporter}"
+node "$REPO/dist/cli/orchestrator-cli.js" observe --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
+  && log "orchestrator observation ok" || log "WARN: orchestrator observation failed (non-fatal)"
+
 # ── Best-effort: machine security-posture drift → change manager (non-fatal) ─────
 # Runs security-scan.sh, auto-fixes the narrow set (guarded chmod), posts the rest
 # to the CM (source=security), and emails NEW urgent items immediately. Reuses the
