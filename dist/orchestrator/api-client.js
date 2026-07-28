@@ -43,5 +43,11 @@ export class OrchestratorClient {
             body: JSON.stringify(command),
         });
     }
+    mintFollowUps(idempotencyKey) {
+        return this.req('/api/v1/follow-ups/mint', {
+            method: 'POST',
+            body: JSON.stringify({ idempotency_key: idempotencyKey, expected_version: 0 }),
+        });
+    }
 }
 //# sourceMappingURL=api-client.js.map

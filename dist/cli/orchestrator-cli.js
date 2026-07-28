@@ -55,6 +55,46 @@ function skippedClause(skipped) {
 export function formatSummaryLine(posted, failed, skipped, total) {
     return `observations: posted=${posted} failed=${failed}${skippedClause(skipped)} of ${total}\n`;
 }
+/**
+ * The follow-up minting pass (WS-P2.8). Uses ORCHESTRATOR_MINT_TOKEN / orchestrator-system --
+ * NOT the drift-reporter credential this file's `observe` command uses. That actor's registry
+ * profile is observe-and-propose; minting a work unit is canonical mutation, and agent_id
+ * attribution is permanent.
+ */
+export function makeMintClient() {
+    const base = process.env.ORCHESTRATOR_API_BASE ?? '';
+    const token = process.env.ORCHESTRATOR_MINT_TOKEN ?? '';
+    const keyId = process.env.ORCHESTRATOR_MINT_CREDENTIAL_KEY_ID ?? 'orchestrator-system';
+    if (!base)
+        throw new Error('ORCHESTRATOR_API_BASE must be set');
+    if (!token)
+        throw new Error('ORCHESTRATOR_MINT_TOKEN must be set');
+    return new OrchestratorClient(base, token, keyId);
+}
+export async function doMintFollowUps(dryRun) {
+    if (dryRun) {
+        process.stdout.write('follow-ups: would run one minting pass (dry run)\n');
+        return;
+    }
+    let client;
+    try {
+        client = makeMintClient();
+    }
+    catch (e) {
+        process.stdout.write(`WARN: follow-up mint client unavailable: ${e instanceof Error ? e.message : String(e)}\n`);
+        process.exitCode = 1;
+        return;
+    }
+    try {
+        const result = await client.mintFollowUps(`follow-up-mint:${new Date().toISOString()}`);
+        process.stdout.write(`follow-ups: minted=${result.minted.length} skipped=${result.skipped.length} ` +
+            `considered=${result.considered}\n`);
+    }
+    catch (e) {
+        process.stdout.write(`WARN: follow-up mint failed: ${e instanceof Error ? e.message : String(e)}\n`);
+        process.exitCode = 1;
+    }
+}
 export async function doObserve(reportDir, now, dryRun) {
     const date = now.slice(0, 10);
     const file = path.join(reportDir, `${date}.json`);
@@ -107,8 +147,11 @@ async function main() {
             throw new Error('observe requires --report-dir');
         await doObserve(reportDir, now, args['dry-run'] === true);
     }
+    else if (args.command === 'mint-follow-ups') {
+        await doMintFollowUps(args['dry-run'] === true);
+    }
     else {
-        throw new Error(`unknown command: ${String(args.command)} (use observe)`);
+        throw new Error(`unknown command: ${String(args.command)} (use observe or mint-follow-ups)`);
     }
 }
 if (process.argv[1] && process.argv[1].endsWith('orchestrator-cli.js')) {

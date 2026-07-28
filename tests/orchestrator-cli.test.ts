@@ -7,6 +7,7 @@ import {
   makeClient,
   formatSummaryLine,
   doObserve,
+  doMintFollowUps,
 } from '../src/cli/orchestrator-cli.js';
 import type { DriftReport } from '../src/standards/report.js';
 
@@ -15,6 +16,8 @@ beforeEach(() => {
   delete process.env.ORCHESTRATOR_API_BASE;
   delete process.env.ORCHESTRATOR_M2M_TOKEN;
   delete process.env.ORCHESTRATOR_CREDENTIAL_KEY_ID;
+  delete process.env.ORCHESTRATOR_MINT_TOKEN;
+  delete process.env.ORCHESTRATOR_MINT_CREDENTIAL_KEY_ID;
 });
 afterEach(() => {
   process.env = { ...saved };
@@ -202,5 +205,88 @@ describe('orchestrator-cli doObserve', () => {
     ).toBe(true);
     expect(calls.at(-1)).toBe('observations: posted=1 failed=1 of 2\n');
     expect(process.exitCode).toBe(1);
+  });
+});
+
+describe('orchestrator-cli mint-follow-ups', () => {
+  beforeEach(() => {
+    process.exitCode = 0;
+  });
+
+  it('posts the command envelope and prints a counted summary', async () => {
+    process.env.ORCHESTRATOR_API_BASE = 'https://sds.example';
+    process.env.ORCHESTRATOR_MINT_TOKEN = 'tok';
+    const calls: Array<{ path: string; body: unknown }> = [];
+    const fetchMock = vi.fn().mockImplementation((url: string, init: RequestInit) => {
+      calls.push({ path: new URL(url).pathname, body: JSON.parse(String(init.body)) });
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ minted: [{ work_unit_id: 'w1' }], skipped: [], considered: 1 }),
+        text: async () => '',
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { calls: stdout, restore } = captureStdout();
+    try {
+      await doMintFollowUps(false);
+    } finally {
+      restore();
+      vi.unstubAllGlobals();
+    }
+    expect(calls).toHaveLength(1);
+    expect(calls[0].path).toContain('/api/v1/follow-ups/mint');
+    expect(stdout.at(-1)).toBe('follow-ups: minted=1 skipped=0 considered=1\n');
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('is fail-open: a rejected mint prints a counted WARN and does not throw', async () => {
+    process.env.ORCHESTRATOR_API_BASE = 'https://sds.example';
+    process.env.ORCHESTRATOR_MINT_TOKEN = 'tok';
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+      text: async () => 'boom',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { calls: stdout, restore } = captureStdout();
+    try {
+      await expect(doMintFollowUps(false)).resolves.toBeUndefined();
+    } finally {
+      restore();
+      vi.unstubAllGlobals();
+    }
+    expect(stdout.at(-1)).toMatch(/^WARN: follow-up mint failed:/);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('is fail-open when the client cannot be constructed (missing token) and does not throw', async () => {
+    // ORCHESTRATOR_API_BASE / ORCHESTRATOR_MINT_TOKEN are unset (top-level beforeEach), so
+    // makeMintClient() throws before any network call is attempted.
+    const { calls: stdout, restore } = captureStdout();
+    try {
+      await expect(doMintFollowUps(false)).resolves.toBeUndefined();
+    } finally {
+      restore();
+    }
+    expect(stdout.at(-1)).toMatch(/^WARN: follow-up mint client unavailable:/);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('dry run needs no token and posts nothing', async () => {
+    // No ORCHESTRATOR_API_BASE / ORCHESTRATOR_MINT_TOKEN set at all -- a dry run must not
+    // require them, and must not touch the network.
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { calls: stdout, restore } = captureStdout();
+    try {
+      await doMintFollowUps(true);
+    } finally {
+      restore();
+      vi.unstubAllGlobals();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(stdout.at(-1)).toBe('follow-ups: would run one minting pass (dry run)\n');
   });
 });
