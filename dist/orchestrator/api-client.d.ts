@@ -6,6 +6,18 @@ export interface ObservationResponse {
     received_at: string;
     idempotency_key: string;
 }
+export interface FollowUpMintResponse {
+    minted: Array<{
+        work_unit_id: string;
+        work_package_revision_id: string;
+        due_at: string;
+    }>;
+    skipped: Array<{
+        work_package_revision_id: string;
+        reason: string;
+    }>;
+    considered: number;
+}
 /**
  * Minimal client for the orchestrator's observation spine. Every M2M route requires BOTH the
  * bearer and the credential key id; sending one without the other authenticates as nobody.
@@ -25,5 +37,6 @@ export declare class OrchestratorClient {
     constructor(base: string, token: string, credentialKeyId: string);
     private req;
     postObservation(command: ObservationCommand): Promise<ObservationResponse>;
+    mintFollowUps(idempotencyKey: string): Promise<FollowUpMintResponse>;
 }
 //# sourceMappingURL=api-client.d.ts.map
