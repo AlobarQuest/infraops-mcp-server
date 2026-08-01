@@ -1,3 +1,8 @@
+# LOCALLY OWNED (no code-standards managed block, deliberately). This repo groups
+# npm minor+patch updates into one PR and tracks github-actions, neither of which
+# the generated config expresses; those edits are interleaved with the generated
+# entries rather than sitting around them, so the block model cannot hold them.
+# `code-standards sync` therefore writes nothing here and reports it every run.
 version: 2
 updates:
   - package-ecosystem: npm

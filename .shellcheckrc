@@ -1,18 +1,28 @@
-# code-standards shellcheck config (vendored). Edit upstream and `code-standards sync`.
-# Only warning-and-above findings gate; info/style are advisory.
-severity=warning
-# NOTE: `severity=` above is NOT a supported .shellcheckrc directive — shellcheck reads
-# this file (external-sources below demonstrably takes effect) but silently ignores it.
-# Only the `--severity` CLI flag works. The line is inherited from the upstream template
-# and left in place pending an upstream fix; do not rely on it. Nothing here filters by
-# severity, so info-level findings DO gate. (WS-P2.24)
+# Repo-local overrides. These sit ABOVE the managed block deliberately: in a
+# .shellcheckrc the FIRST directive for a key wins, so a later line cannot
+# override an earlier one. Verified 2026-08-01 with a discriminating control —
+# `external-sources=false` then `=true` still reports SC1091, while `=true` then
+# `=false` is clean. Content placed after the block would be inert.
 #
-# Sources ARE followed: these scripts source a sibling helper in this same directory, and
-# following it lets shellcheck verify the variables it defines instead of reporting that
-# it declined to look (SC1091). Strictly more checking than external-sources=false.
+# NOTE: `severity=` in the block below is NOT a supported .shellcheckrc directive
+# — shellcheck reads this file (external-sources demonstrably takes effect) but
+# silently ignores it. Only the `--severity` CLI flag works. It is inherited from
+# the upstream template and left in place pending an upstream fix; do not rely on
+# it. Nothing here filters by severity, so info-level findings DO gate. (WS-P2.24)
+#
+# Sources ARE followed: these scripts source a sibling helper in this same
+# directory, and following it lets shellcheck verify the variables it defines
+# instead of reporting that it declined to look (SC1091). Strictly more checking
+# than the template's external-sources=false.
 external-sources=true
 source-path=SCRIPTDIR
 # Secret bootstrap scripts intentionally export command-substitution results;
 # failures are handled by fetch_bws_secret itself. Runtime config paths are
 # dynamic by design, and JSON is consumed by the following command pipeline.
 disable=SC1090,SC2034,SC2155
+# code-standards:managed:start — everything down to :end is replaced by `code-standards sync`.
+# code-standards shellcheck config (vendored). Edit upstream and `code-standards sync`.
+# Only warning-and-above findings gate; info/style are advisory.
+severity=warning
+external-sources=false
+# code-standards:managed:end — content OUTSIDE these markers is yours and is preserved. Delete both markers to own the whole file: sync then writes nothing here and says so every run.

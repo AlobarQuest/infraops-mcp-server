@@ -1,3 +1,11 @@
+// LOCALLY OWNED (no code-standards managed block, deliberately). This repo's
+// divergences — `.worktrees/` in the global ignores, `no-explicit-any` off for
+// provider-SDK boundaries, `no-unsafe-function-type` off in tests — are edits
+// INSIDE the template's single `export default tseslint.config(...)` call, not
+// content that can sit around it. A flat-config file has one default export, so
+// there is nowhere outside the block to put them. `code-standards sync` writes
+// nothing here and reports it every run; the standing fix is the per-repo
+// eslint overlay already on code-standards' backlog.
 // @ts-check
 // DEPENDENCY NOTE: This config requires `eslint` and `typescript-eslint` as devDependencies.
 // Install with: npm i -D eslint typescript-eslint
