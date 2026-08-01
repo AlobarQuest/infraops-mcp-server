@@ -1,11 +1,4 @@
-// LOCALLY OWNED (no code-standards managed block, deliberately). This repo's
-// divergences — `.worktrees/` in the global ignores, `no-explicit-any` off for
-// provider-SDK boundaries, `no-unsafe-function-type` off in tests — are edits
-// INSIDE the template's single `export default tseslint.config(...)` call, not
-// content that can sit around it. A flat-config file has one default export, so
-// there is nowhere outside the block to put them. `code-standards sync` writes
-// nothing here and reports it every run; the standing fix is the per-repo
-// eslint overlay already on code-standards' backlog.
+// code-standards:managed:start — everything down to :end is replaced by `code-standards sync`.
 // @ts-check
 // DEPENDENCY NOTE: This config requires `eslint` and `typescript-eslint` as devDependencies.
 // Install with: npm i -D eslint typescript-eslint
@@ -22,7 +15,7 @@ export default tseslint.config(
   // reference that trips @typescript-eslint/triple-slash-reference, and is not
   // hand-editable — never lint it (agent-sites).
   {
-    ignores: ['.next/', '.worktrees/', 'dist/', 'build/', 'node_modules/', 'next-env.d.ts'],
+    ignores: ['.next/', 'dist/', 'build/', 'node_modules/', 'next-env.d.ts'],
   },
   ...tseslint.configs.recommended,
   // Treat `_`-prefixed bindings as the intentional "unused" marker (the
@@ -30,11 +23,6 @@ export default tseslint.config(
   // isn't flagged by no-unused-vars (agent-sites).
   {
     rules: {
-      // Provider SDK responses and MCP tool adapters intentionally cross
-      // dynamic JSON boundaries. TypeScript still checks the surrounding
-      // contracts; forcing decorative `unknown as ...` casts here reduces
-      // clarity without adding runtime validation.
-      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
@@ -50,6 +38,31 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
+// code-standards:managed:end — content OUTSIDE these markers is yours and is preserved. Append your own config objects BELOW this line and ABOVE the closing paren: ESLint flat config is last-wins, so they override what the block sets. Delete both markers to own the whole file: sync then writes nothing here and says so every run.
+
+  // ---- LOCAL — owned by this repo, appended so it survives `code-standards sync`.
+  // ESLint flat config is last-wins, so every object below overrides the block above.
+
+  // `.worktrees/` holds git worktree checkouts of this same repo; linting them
+  // double-reports every finding. Global `ignores` objects accumulate, so this
+  // adds to the managed list rather than replacing it.
+  {
+    ignores: ['.worktrees/'],
+  },
+  {
+    rules: {
+      // Provider SDK responses and MCP tool adapters intentionally cross
+      // dynamic JSON boundaries. TypeScript still checks the surrounding
+      // contracts; forcing decorative `unknown as ...` casts here reduces
+      // clarity without adding runtime validation.
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts'],
+    rules: {
       '@typescript-eslint/no-unsafe-function-type': 'off',
     },
   },
