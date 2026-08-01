@@ -91,11 +91,13 @@ DB_PW_ENC="$(P="$DB_PW" python3 -c 'import os,urllib.parse;print(urllib.parse.qu
 ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N \
   -L "127.0.0.1:${APPBRAIN_SYNC_LOCAL_PORT}:${DB_IP}:5432" "$VPS_USER@$VPS_HOST" &
 SSH_PID=$!
-# shellcheck disable=SC2329  # false positive: `trap cleanup EXIT` on the next line is
-# the invocation. Verified against shellcheck 0.11 — a minimal repro of these two lines
-# alone is NOT flagged, so the analysis loses the trap only in this file's context.
-cleanup() { kill "$SSH_PID" 2>/dev/null; wait "$SSH_PID" 2>/dev/null; }
-trap cleanup EXIT
+# Inlined rather than a `cleanup` function: shellcheck cannot connect `trap cleanup EXIT`
+# to the definition and reports the function as dead — as SC2329 on the definition in
+# 0.11 (local) but as SC2317 on each body command in 0.9 (what CI's apt-get installs).
+# Suppressing that would have meant naming both codes and hoping no third version
+# invents a fourth. With no function there is nothing to call dead. $SSH_PID is set
+# above and expands when the trap fires, exactly as it did inside the function.
+trap 'kill "$SSH_PID" 2>/dev/null; wait "$SSH_PID" 2>/dev/null' EXIT
 
 # Wait for the forward to accept connections (or bail if the tunnel died).
 READY=""
