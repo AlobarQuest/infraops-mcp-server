@@ -19,7 +19,7 @@ Both write paths transport file content to the target VPS by inlining it
 into a single-quoted heredoc:
 
 ```ts
-`cat > ${escapeShell(path)} << 'INFRAOPS_EOF'\n${content}\nINFRAOPS_EOF`
+`cat > ${escapeShell(path)} << 'INFRAOPS_EOF'\n${content}\nINFRAOPS_EOF`;
 ```
 
 The single-quoted delimiter (`'INFRAOPS_EOF'`) disables shell expansion, so
@@ -64,7 +64,7 @@ class of bug that breaks naive SQL quoting.
 ```ts
 if (/^INFRAOPS_EOF\s*$/m.test(content)) {
   throw new Error(
-    "vps_write_file: content contains the reserved heredoc delimiter 'INFRAOPS_EOF' on a line by itself. Refusing to write."
+    "vps_write_file: content contains the reserved heredoc delimiter 'INFRAOPS_EOF' on a line by itself. Refusing to write.",
   );
 }
 ```
@@ -77,7 +77,7 @@ if (/^INFRAOPS_EOF\s*$/m.test(content)) {
 #### B. Randomize the delimiter per call
 
 ```ts
-const delim = `INFRAOPS_EOF_${crypto.randomUUID().replace(/-/g, "")}`;
+const delim = `INFRAOPS_EOF_${crypto.randomUUID().replace(/-/g, '')}`;
 ```
 
 - **Pros:** trivially cheap, makes collision astronomically unlikely, no
@@ -90,10 +90,8 @@ const delim = `INFRAOPS_EOF_${crypto.randomUUID().replace(/-/g, "")}`;
 #### C. Base64-encode content, decode on the VPS (preferred)
 
 ```ts
-const b64 = Buffer.from(content, "utf8").toString("base64");
-await sshExec(
-  `echo ${b64} | base64 -d > ${escapeShell(path)}`
-);
+const b64 = Buffer.from(content, 'utf8').toString('base64');
+await sshExec(`echo ${b64} | base64 -d > ${escapeShell(path)}`);
 ```
 
 - **Pros:** bulletproof against delimiter collisions by construction —
@@ -189,12 +187,14 @@ column is encrypted at the application layer, not the database layer.
 ### Options
 
 #### A. Wait for Coolify to fix it upstream
+
 - **Pros:** zero work on our side, clean solution.
 - **Cons:** unknown timeline; the bug has been reproducible for at least
   3 weeks and no upstream issue filed yet. Blocks real work in the
   meantime. File an upstream issue first either way.
 
 #### B. Discover a compose-specific API endpoint
+
 - **Pros:** if one exists, it's the right answer — use Coolify's intended
   interface.
 - **Cons:** the API docs don't mention one; a code spelunk through
@@ -202,6 +202,7 @@ column is encrypted at the application layer, not the database layer.
   Worth ~30 minutes of investigation before committing to option C.
 
 #### C. Implement via `vps_exec` + `php artisan tinker` Eloquent (preferred fallback)
+
 - **Pros:** known-good pattern — it's exactly what we do manually today.
   Handles encryption correctly. Zero dependency on Coolify API changes.
 - **Cons:** tightly couples the tool to Coolify's internal data model
@@ -218,6 +219,7 @@ column is encrypted at the application layer, not the database layer.
   ```
 
 #### D. Hybrid: probe for the compose endpoint at runtime, fall back to tinker
+
 - **Pros:** upgrade-friendly — if Coolify ever fixes the validation at the
   API, the tool transparently starts using the canonical path.
 - **Cons:** more code to maintain, more test surface.
@@ -261,7 +263,7 @@ removed later.
 
 **Filed:** 2026-06-14
 **Severity:** High — three running Postgres databases have NO backup coverage (data-loss risk); agent-sites is live at agentsweb.site.
-**Component:** `~/Projects/vps-backup/backup.sh` (the `pg_dump_container` target list). *The change lands in the **vps-backup** repo, not this one.*
+**Component:** `~/Projects/vps-backup/backup.sh` (the `pg_dump_container` target list). _The change lands in the **vps-backup** repo, not this one._
 
 ### Problem
 
@@ -320,9 +322,9 @@ escalations with no executor path (handle via defer/wontfix in the GUI).
 Rule #572 asserts `backup_configs non_empty` on the Coolify database resource —
 i.e. it checks Coolify's **native** backup feature, which Devon doesn't use. Real
 backups run via **vps-backup** (Restic/NAS) + per-app `pg_dump`. So #572 both
-(a) keeps flagging DBs that *are* backed up externally, and (b) can't actually
-verify real coverage or freshness. It should check: *is this DB in the vps-backup
-coverage set, and is its last backup fresh?*
+(a) keeps flagging DBs that _are_ backed up externally, and (b) can't actually
+verify real coverage or freshness. It should check: _is this DB in the vps-backup
+coverage set, and is its last backup fresh?_
 
 ### Design challenge
 
@@ -387,17 +389,18 @@ first, then #4 so the check verifies real state.
 
 ---
 
-## 5. Change-window post-verify confirms domain *config*, not async deploy/cert health
+## 5. Change-window post-verify confirms domain _config_, not async deploy/cert health
 
 **Filed:** 2026-06-14
 **Severity:** Low–medium — a failed redeploy on an HTTPS auto-fix can be reported `done` with a stale/missing cert.
 **Component:** `src/change-manager/agent.ts` (`postVerifyOrRevert`), `src/change-manager/tools.ts` (`httpsConformant`).
 
-> **Update — first live run (2026-06-14):** This gap *manifested* on the first real
+> **Update — first live run (2026-06-14):** This gap _manifested_ on the first real
 > HTTPS run (booking-system:preview). The agent set the domain config to https and
 > `redeploy_application` returned **HTTP 404** — the redeploy never fired — yet
 > post-verify (config check) passed and the item was reported `done`; the sslip https
 > URL had no cert until a deploy was triggered manually. Two findings:
+>
 > 1. **Endpoint bug — FIXED.** `redeploy_application` used `POST /applications/{uuid}/deploy`,
 >    which 404s. The canonical working form (verified live) is `POST /deploy?uuid={uuid}`
 >    (what `coolify_deploy` uses). `tools.ts` now uses it. **Note:** `reset_labels` in
@@ -405,7 +408,7 @@ first, then #4 so the check verifies real state.
 >    (wrapped in a try/catch that silently tolerates the failure) — same latent bug,
 >    fix separately.
 > 2. **Verification gap — STILL OPEN (this item).** Even with the endpoint fixed, post-verify
->    confirms only the domain *config*, not that the deploy succeeded or the cert is live.
+>    confirms only the domain _config_, not that the deploy succeeded or the cert is live.
 >    A failed/queued/slow deploy can still land `done`. Options B/C below address this.
 
 ### Problem
@@ -417,7 +420,7 @@ all-https. But `set_application_domains` sets that field synchronously via PATCH
 it is already https regardless of whether the subsequent `redeploy_application`
 (`POST /applications/{uuid}/deploy`, which regenerates the Traefik route + Let's
 Encrypt cert) actually succeeded. If the deploy fails, the agent receives an
-`is_error` tool result and is *instructed* to `report_blocked`, but nothing
+`is_error` tool result and is _instructed_ to `report_blocked`, but nothing
 **deterministically** prevents a `done` with a broken cert.
 
 This matches the drift standard's own conformance definition (rule #571 asserts

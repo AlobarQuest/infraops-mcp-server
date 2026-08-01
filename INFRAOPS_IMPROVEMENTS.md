@@ -28,6 +28,7 @@ During the app-brain migration (Supabase → self-hosted Coolify), multiple infr
 **Infra-brain lessons:** #111, #112, #118
 
 **Current state:** infraops has 3 app creation tools:
+
 - `coolify_create_application_public` — public git repo (HTTPS, no auth)
 - `coolify_create_application_dockerfile` — inline Dockerfile
 - `coolify_create_application_dockerimage` — pre-built image from registry
@@ -37,6 +38,7 @@ None support private GitHub repos. All of Devon's apps are in private repos.
 **Workaround used:** Generated SSH keypair via `php artisan tinker` (phpseclib) inside the Coolify container, added public key to GitHub via `gh api`, linked to app via direct DB update. Took ~30 minutes of trial and error (PKCS8 vs OpenSSH format issues, encryption requirements).
 
 **What's needed:** A tool that:
+
 1. Creates a deploy key in Coolify (properly encrypted, OpenSSH format)
 2. Returns the public key so it can be added to GitHub
 3. Creates the application linked to that key
@@ -51,6 +53,7 @@ None support private GitHub repos. All of Devon's apps are in private repos.
 **Workaround used:** Created env vars via `php artisan tinker` using Eloquent models, which handles encryption automatically. Raw DB inserts fail because the `value` column is encrypted at the application layer.
 
 **What's needed:** Either:
+
 - Investigate if Coolify v4 has a separate API endpoint for compose env vars
 - Or add a `coolify_set_compose_env_via_tinker` tool that uses `vps_exec` + `php artisan tinker` as a reliable fallback
 - The tool must handle Coolify's Laravel encryption transparently
@@ -92,6 +95,7 @@ None support private GitHub repos. All of Devon's apps are in private repos.
 **Current state:** infraops has no GitHub integration. During deployments, repo creation, deploy key management, and Actions checks all required the `gh` CLI.
 
 **What's needed:**
+
 - `github_create_repo` — create public or private repo under a given org/user
 - `github_add_deploy_key` — add an SSH public key to a repo (read-only)
 - `github_list_deploy_keys` — list existing deploy keys for a repo
@@ -106,6 +110,7 @@ These would complete the deploy key workflow: infraops creates the key in Coolif
 **Current state:** The update tool only exposes: name, description, domains, git_branch, git_repository, build_pack, health_check_enabled/path/port, ports_exposes, docker_registry_image_name/tag.
 
 **Missing fields that were needed:**
+
 - `docker_compose_domains` (JSON)
 - `docker_compose_location` (string)
 - `custom_labels` (text, or ability to clear)
@@ -119,6 +124,7 @@ These would complete the deploy key workflow: infraops creates the key in Coolif
 These three tools would have eliminated all manual DB/tinker workarounds during the app-brain migration.
 
 **Tool 1: `coolify_create_application_deploykey`**
+
 - Generates an SSH keypair inside Coolify via `php artisan tinker` (phpseclib Ed25519)
 - Stores the private key encrypted in Coolify's `private_keys` table
 - Creates the application with `source_type = 'App\Models\GithubApp'`, `private_key_id` linked
@@ -127,11 +133,13 @@ These three tools would have eliminated all manual DB/tinker workarounds during 
 - Parameters: `project_uuid, server_uuid, destination_uuid, git_repository, git_branch, build_pack, name, description, public_key_name`
 
 **Tool 2: `coolify_set_compose_config`**
+
 - Sets `docker_compose_domains`, `docker_compose_location`, and optionally clears `custom_labels`
 - Single tool that handles the three most common compose setup fields
 - Parameters: `uuid, domains (dict of service→domain), compose_location (string, default /docker-compose.yml), reset_labels (bool, default true)`
 
 **Tool 3: Fix compose env vars**
+
 - Investigate Coolify v4 API for compose-specific env var endpoints
 - If none exist, implement via `vps_exec` + `php artisan tinker` Eloquent approach
 - Must handle Laravel encryption automatically
@@ -140,26 +148,32 @@ These three tools would have eliminated all manual DB/tinker workarounds during 
 ### Tier 2: GitHub integration
 
 **Tool 4: `github_create_repo`**
+
 - Parameters: `name, org (optional), private (bool), description`
 - Uses GitHub API via personal access token or GitHub App
 
 **Tool 5: `github_add_deploy_key`**
+
 - Parameters: `repo (owner/name), title, public_key, read_only (bool, default true)`
 - Returns: `{ key_id }`
 
 **Tool 6: `github_list_deploy_keys`**
+
 - Parameters: `repo (owner/name)`
 
 **Tool 7: `github_remove_deploy_key`**
+
 - Parameters: `repo (owner/name), key_id`
 
 ### Tier 3: Expand update surface
 
 **Tool 8: Extend `coolify_update_application`**
+
 - Add optional parameters: `docker_compose_domains, docker_compose_location, custom_labels, health_check_start_period, private_key_id`
 - For `custom_labels`, accept either a string or `null` (to clear/reset)
 
 **Tool 9: `coolify_reset_labels`**
+
 - Clears `custom_labels` to empty string, forcing Coolify to auto-generate from current domain config
 - Optionally triggers a redeploy after clearing
 - Parameters: `uuid, redeploy (bool, default true)`

@@ -12,15 +12,17 @@ You can escalate to the **infraops provider agent**: a gated agent running insid
 `~/Projects/infraops-mcp-server` that can reason about the server and **add or
 extend a tool** to close the gap.
 
-This is an *escalation lane*, not basic usage. If the MCP already has a tool for
+This is an _escalation lane_, not basic usage. If the MCP already has a tool for
 what you need, just call it.
 
 ## When to escalate
+
 - The capability you need has no infraops tool at all.
 - An existing tool is close but missing a parameter / option you need.
 - A provider endpoint isn't covered and adding it is in scope for infraops.
 
 ## When NOT to escalate
+
 - Routine work an existing tool covers → just call the tool.
 - The fix is an infrastructure mutation (deploy, restart, destructive op) → that's
   Devon's call; the provider agent will refuse it and emit it as a PROPOSAL anyway.
@@ -51,6 +53,7 @@ thread keeps context across turns.
   only Devon should authorize. Stop and surface the `PROPOSALS` block to Devon.
 
 ## Important
+
 The provider agent extends the infraops **source**; it does not run infra. So a
 `resolved` means "the tool now exists in code on a review branch," not "the tool
 ran." Plan for the review → merge → rebuild step before relying on the new

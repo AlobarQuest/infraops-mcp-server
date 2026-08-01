@@ -105,76 +105,80 @@ The Coolify client already has exactly the pattern the SSH client needs: `COOLIF
 Cleanest because it requires **zero user-side setup** — OrbStack is already installed and managing the `ubuntu` machine; the `orb` CLI is available on macOS. Keeps `instance: "prod"` on the existing SSH path unchanged.
 
 1. **Add a new low-level exec backend** `src/services/orb-client.ts`:
-    ```ts
-    import { execFile } from "node:child_process";
-    import { promisify } from "node:util";
 
-    const execFileAsync = promisify(execFile);
+   ```ts
+   import { execFile } from 'node:child_process';
+   import { promisify } from 'node:util';
 
-    export async function orbExec(
-      machine: string,
-      command: string,
-      opts: { timeout: number; allowFailure?: boolean }
-    ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-      // Use `orb run -m <machine> bash -c '<command>'`
-      try {
-        const { stdout, stderr } = await execFileAsync(
-          "orb",
-          ["run", "-m", machine, "bash", "-c", command],
-          { timeout: opts.timeout, maxBuffer: 10 * 1024 * 1024 }
-        );
-        return { stdout, stderr, exitCode: 0 };
-      } catch (err: any) {
-        if (opts.allowFailure) {
-          return {
-            stdout: err.stdout ?? "",
-            stderr: err.stderr ?? String(err),
-            exitCode: typeof err.code === "number" ? err.code : 1,
-          };
-        }
-        throw err;
-      }
-    }
-    ```
+   const execFileAsync = promisify(execFile);
+
+   export async function orbExec(
+     machine: string,
+     command: string,
+     opts: { timeout: number; allowFailure?: boolean },
+   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+     // Use `orb run -m <machine> bash -c '<command>'`
+     try {
+       const { stdout, stderr } = await execFileAsync(
+         'orb',
+         ['run', '-m', machine, 'bash', '-c', command],
+         { timeout: opts.timeout, maxBuffer: 10 * 1024 * 1024 },
+       );
+       return { stdout, stderr, exitCode: 0 };
+     } catch (err: any) {
+       if (opts.allowFailure) {
+         return {
+           stdout: err.stdout ?? '',
+           stderr: err.stderr ?? String(err),
+           exitCode: typeof err.code === 'number' ? err.code : 1,
+         };
+       }
+       throw err;
+     }
+   }
+   ```
 
 2. **Introduce a dispatcher** `src/services/vps-dispatch.ts`:
-    ```ts
-    export type VpsInstance = "prod" | "dev";
 
-    export async function vpsExec(
-      instance: VpsInstance,
-      command: string,
-      opts: { timeout: number; allowFailure?: boolean }
-    ) {
-      if (instance === "dev") {
-        const machine = process.env.VPS_DEV_ORB_MACHINE ?? "ubuntu";
-        return orbExec(machine, command, opts);
-      }
-      return sshExec(command, opts); // existing prod path, unchanged
-    }
-    ```
-    Add sibling helpers for read/write/docker operations (they can all be expressed in terms of `vpsExec`, e.g. `vpsReadFile` = `vpsExec(instance, "cat $path", …)`).
+   ```ts
+   export type VpsInstance = 'prod' | 'dev';
+
+   export async function vpsExec(
+     instance: VpsInstance,
+     command: string,
+     opts: { timeout: number; allowFailure?: boolean },
+   ) {
+     if (instance === 'dev') {
+       const machine = process.env.VPS_DEV_ORB_MACHINE ?? 'ubuntu';
+       return orbExec(machine, command, opts);
+     }
+     return sshExec(command, opts); // existing prod path, unchanged
+   }
+   ```
+
+   Add sibling helpers for read/write/docker operations (they can all be expressed in terms of `vpsExec`, e.g. `vpsReadFile` = `vpsExec(instance, "cat $path", …)`).
 
 3. **Update every tool in `src/tools/vps.ts`** to accept and forward `instance`:
-    ```ts
-    inputSchema: {
-      instance: z
-        .enum(["prod", "dev"])
-        .default("prod")
-        .describe("Which VPS to target: 'prod' (Hetzner) or 'dev' (OrbStack ubuntu machine). Default: prod."),
-      command: z.string().min(1)...,
-      timeout: z.number().int()....default(30000)...,
-    },
-    ...
-    async ({ instance, command, timeout }) => {
-      const result = await vpsExec(instance, command, { timeout, allowFailure: true });
-      ...
-    }
-    ```
+
+   ```ts
+   inputSchema: {
+     instance: z
+       .enum(["prod", "dev"])
+       .default("prod")
+       .describe("Which VPS to target: 'prod' (Hetzner) or 'dev' (OrbStack ubuntu machine). Default: prod."),
+     command: z.string().min(1)...,
+     timeout: z.number().int()....default(30000)...,
+   },
+   ...
+   async ({ instance, command, timeout }) => {
+     const result = await vpsExec(instance, command, { timeout, allowFailure: true });
+     ...
+   }
+   ```
 
 4. **Document the new env vars** in `CLAUDE.md` / `RUNBOOK.md`:
-    - `VPS_DEV_ORB_MACHINE` (default `ubuntu`) — OrbStack machine name for dev
-    - `VPS_PROD_HOST` / `VPS_HOST` — unchanged for prod (Hetzner)
+   - `VPS_DEV_ORB_MACHINE` (default `ubuntu`) — OrbStack machine name for dev
+   - `VPS_PROD_HOST` / `VPS_HOST` — unchanged for prod (Hetzner)
 
 ### Option A (fallback): extend SSH client to multi-host
 
@@ -185,10 +189,10 @@ If `orb run` is not acceptable for any reason (e.g., wanting remote-user SSH par
 3. Cache one `Client` per instance (same pattern as `coolify-client.ts`'s `_clients` Map).
 4. Add the same `instance` parameter to every tool in `src/tools/vps.ts`.
 5. User must then:
-    - Enable sshd on the OrbStack `ubuntu` machine (`sudo systemctl enable --now ssh`)
-    - Add the Mac's pubkey to `/home/devon/.ssh/authorized_keys`
-    - Set `VPS_DEV_HOST=192.168.139.217`, `VPS_DEV_USER=devon`, `VPS_DEV_SSH_KEY_PATH=~/.ssh/...`
-    - Grant sudo or add `devon` to the `docker` group so commands don't need `sudo docker`
+   - Enable sshd on the OrbStack `ubuntu` machine (`sudo systemctl enable --now ssh`)
+   - Add the Mac's pubkey to `/home/devon/.ssh/authorized_keys`
+   - Set `VPS_DEV_HOST=192.168.139.217`, `VPS_DEV_USER=devon`, `VPS_DEV_SSH_KEY_PATH=~/.ssh/...`
+   - Grant sudo or add `devon` to the `docker` group so commands don't need `sudo docker`
 
 Option A works but forces setup on every user of the MCP. Option B works out of the box.
 

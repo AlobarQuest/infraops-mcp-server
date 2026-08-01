@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-06-14-change-manager-design.md` → "Sub-project A — the web app" (GUI pages + Auth).
 
 **Conventions:**
+
 - Repo `~/Projects/change-manager`; venv `.venv`. Run tests via `cd ~/Projects/change-manager && ./.venv/bin/python -m pytest`.
 - TDD; commit after each task; push to `origin/main` at the end.
 - Existing tests (28) must stay green — the Task 1 refactor is guarded by them.
@@ -20,17 +21,17 @@
 
 ## File Structure
 
-| File | Change |
-|---|---|
-| `app/transitions.py` (**new**) | `decide()`, `reactivate()`, `TransitionError` — the shared status-transition service. |
-| `app/api.py` (**modify**) | Decision + reactivate routes call `transitions.*` instead of the inline `_decide`. |
-| `app/config.py` (**modify**) | Add `sso_user_header` + `dev_user` settings. |
-| `app/web_auth.py` (**new**) | `current_user(request)` dependency (SSO header → email; dev fallback; 401). |
-| `app/templates_env.py` (**new**) | `templates = Jinja2Templates("app/templates")`. |
-| `app/web.py` (**new**) | The GUI router: `/`, `/items/{id}`, `/items/{id}/{action}`, `/windows`. |
-| `app/templates/*.html` (**new**) | `base.html`, `dashboard.html`, `item_detail.html`, `_row.html`, `windows.html`. |
-| `app/main.py` (**modify**) | Mount the web router. |
-| `tests/test_*.py` (**new**) | `test_transitions.py`, `test_web_auth.py`, `test_web.py`. |
+| File                             | Change                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------- |
+| `app/transitions.py` (**new**)   | `decide()`, `reactivate()`, `TransitionError` — the shared status-transition service. |
+| `app/api.py` (**modify**)        | Decision + reactivate routes call `transitions.*` instead of the inline `_decide`.    |
+| `app/config.py` (**modify**)     | Add `sso_user_header` + `dev_user` settings.                                          |
+| `app/web_auth.py` (**new**)      | `current_user(request)` dependency (SSO header → email; dev fallback; 401).           |
+| `app/templates_env.py` (**new**) | `templates = Jinja2Templates("app/templates")`.                                       |
+| `app/web.py` (**new**)           | The GUI router: `/`, `/items/{id}`, `/items/{id}/{action}`, `/windows`.               |
+| `app/templates/*.html` (**new**) | `base.html`, `dashboard.html`, `item_detail.html`, `_row.html`, `windows.html`.       |
+| `app/main.py` (**modify**)       | Mount the web router.                                                                 |
+| `tests/test_*.py` (**new**)      | `test_transitions.py`, `test_web_auth.py`, `test_web.py`.                             |
 
 ---
 
@@ -297,25 +298,55 @@ templates = Jinja2Templates(directory="app/templates")
 ```html
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Change Manager</title>
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
-    h1 { font-size: 1.4rem; } a { color: #2563eb; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid #eee; font-size: .9rem; }
-    .tabs a { margin-right: .8rem; } .tabs a.active { font-weight: 700; }
-    .badge { padding: .1rem .45rem; border-radius: .35rem; font-size: .75rem; background: #eef; }
-    button { cursor: pointer; }
-  </style>
-</head>
-<body>
-  <h1><a href="/">Change Manager</a> <span class="badge">{{ user }}</span></h1>
-  {% block content %}{% endblock %}
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Change Manager</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 1.4rem;
+      }
+      a {
+        color: #2563eb;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.5rem 0.6rem;
+        border-bottom: 1px solid #eee;
+        font-size: 0.9rem;
+      }
+      .tabs a {
+        margin-right: 0.8rem;
+      }
+      .tabs a.active {
+        font-weight: 700;
+      }
+      .badge {
+        padding: 0.1rem 0.45rem;
+        border-radius: 0.35rem;
+        font-size: 0.75rem;
+        background: #eef;
+      }
+      button {
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1><a href="/">Change Manager</a> <span class="badge">{{ user }}</span></h1>
+    {% block content %}{% endblock %}
+  </body>
 </html>
 ```
 
@@ -330,11 +361,23 @@ templates = Jinja2Templates(directory="app/templates")
   <td><span class="badge">{{ it.status }}</span></td>
   <td>
     {% if it.status in ["pending", "deferred"] %}
-      <button hx-post="/items/{{ it.id }}/approve" hx-target="#item-{{ it.id }}" hx-swap="outerHTML">Approve</button>
-      <button hx-post="/items/{{ it.id }}/defer"   hx-target="#item-{{ it.id }}" hx-swap="outerHTML">Defer</button>
-      <button hx-post="/items/{{ it.id }}/wontfix" hx-target="#item-{{ it.id }}" hx-swap="outerHTML">Won't-fix</button>
+    <button hx-post="/items/{{ it.id }}/approve" hx-target="#item-{{ it.id }}" hx-swap="outerHTML">
+      Approve
+    </button>
+    <button hx-post="/items/{{ it.id }}/defer" hx-target="#item-{{ it.id }}" hx-swap="outerHTML">
+      Defer
+    </button>
+    <button hx-post="/items/{{ it.id }}/wontfix" hx-target="#item-{{ it.id }}" hx-swap="outerHTML">
+      Won't-fix
+    </button>
     {% elif it.status == "wontfix" %}
-      <button hx-post="/items/{{ it.id }}/reactivate" hx-target="#item-{{ it.id }}" hx-swap="outerHTML">Reactivate</button>
+    <button
+      hx-post="/items/{{ it.id }}/reactivate"
+      hx-target="#item-{{ it.id }}"
+      hx-swap="outerHTML"
+    >
+      Reactivate
+    </button>
     {% endif %}
   </td>
 </tr>
@@ -343,18 +386,29 @@ templates = Jinja2Templates(directory="app/templates")
 - [ ] **Step 6: Create `app/templates/dashboard.html`**
 
 ```html
-{% extends "base.html" %}
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <p class="tabs">
   {% for t in ["pending","approved","blocked","done","wontfix","resolved","all"] %}
-    <a href="/?status={{ t }}" class="{{ 'active' if t == current_status else '' }}">{{ t }}</a>
+  <a href="/?status={{ t }}" class="{{ 'active' if t == current_status else '' }}">{{ t }}</a>
   {% endfor %}
 </p>
 <table>
-  <thead><tr><th>Instance</th><th>Resource</th><th>Rule</th><th>Risk</th><th>Status</th><th>Actions</th></tr></thead>
+  <thead>
+    <tr>
+      <th>Instance</th>
+      <th>Resource</th>
+      <th>Rule</th>
+      <th>Risk</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
   <tbody>
-    {% for it in items %}{% include "_row.html" %}{% endfor %}
-    {% if not items %}<tr><td colspan="6"><em>nothing here</em></td></tr>{% endif %}
+    {% for it in items %}{% include "_row.html" %}{% endfor %} {% if not items %}
+    <tr>
+      <td colspan="6"><em>nothing here</em></td>
+    </tr>
+    {% endif %}
   </tbody>
 </table>
 {% endblock %}
@@ -438,29 +492,53 @@ def test_item_detail_404(client):
 - [ ] **Step 3: Create `app/templates/item_detail.html`**
 
 ```html
-{% extends "base.html" %}
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <p><a href="/">&larr; back</a></p>
 <h2>{{ it.resource_type }} '{{ it.resource_name }}' <span class="badge">{{ it.status }}</span></h2>
-<p><strong>Instance:</strong> {{ it.instance }} &middot; <strong>Rule:</strong> {{ it.rule_key }}
-   &middot; <strong>Risk:</strong> {{ it.risk }} &middot; <strong>Kind:</strong> {{ it.kind }}</p>
+<p>
+  <strong>Instance:</strong> {{ it.instance }} &middot; <strong>Rule:</strong> {{ it.rule_key }}
+  &middot; <strong>Risk:</strong> {{ it.risk }} &middot; <strong>Kind:</strong> {{ it.kind }}
+</p>
 <p><strong>Why:</strong> {{ it.reasoning }}</p>
-{% if it.note %}<p><strong>Auto-fix held:</strong> {{ it.note }}</p>{% endif %}
+{% if it.note %}
+<p><strong>Auto-fix held:</strong> {{ it.note }}</p>
+{% endif %}
 
 <h3>Plan</h3>
 <p><strong>Root cause:</strong> {{ it.plan.get("root_cause", "—") }}</p>
-{% if it.plan.get("steps") %}<ol>{% for s in it.plan["steps"] %}<li>{{ s }}</li>{% endfor %}</ol>{% endif %}
+{% if it.plan.get("steps") %}
+<ol>
+  {% for s in it.plan["steps"] %}
+  <li>{{ s }}</li>
+  {% endfor %}
+</ol>
+{% endif %}
 <p><strong>Tools:</strong> {{ (it.plan.get("infraops_tools") or []) | join(", ") or "—" }}</p>
-<p><strong>Rollback:</strong> {{ it.plan.get("rollback", "—") }} &middot;
-   <strong>Window hint:</strong> {{ it.plan.get("cm_window_hint", "—") }}</p>
+<p>
+  <strong>Rollback:</strong> {{ it.plan.get("rollback", "—") }} &middot;
+  <strong>Window hint:</strong> {{ it.plan.get("cm_window_hint", "—") }}
+</p>
 
 <h3>History</h3>
 <table>
-  <thead><tr><th>When</th><th>Actor</th><th>Event</th><th>From → To</th><th>Detail</th></tr></thead>
+  <thead>
+    <tr>
+      <th>When</th>
+      <th>Actor</th>
+      <th>Event</th>
+      <th>From → To</th>
+      <th>Detail</th>
+    </tr>
+  </thead>
   <tbody>
     {% for ev in events %}
-    <tr><td>{{ ev.at }}</td><td>{{ ev.actor }}</td><td>{{ ev.event_type }}</td>
-        <td>{{ ev.from_status or "" }} &rarr; {{ ev.to_status or "" }}</td><td>{{ ev.detail or "" }}</td></tr>
+    <tr>
+      <td>{{ ev.at }}</td>
+      <td>{{ ev.actor }}</td>
+      <td>{{ ev.event_type }}</td>
+      <td>{{ ev.from_status or "" }} &rarr; {{ ev.to_status or "" }}</td>
+      <td>{{ ev.detail or "" }}</td>
+    </tr>
     {% endfor %}
   </tbody>
 </table>
@@ -617,21 +695,39 @@ def test_windows_requires_sso(client):
 - [ ] **Step 3: Create `app/templates/windows.html`**
 
 ```html
-{% extends "base.html" %}
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <p><a href="/">&larr; back</a></p>
 <h2>Window runs</h2>
 <table>
-  <thead><tr><th>Started</th><th>Finished</th><th>Status</th><th>Considered</th>
-             <th>Applied</th><th>Failed</th><th>Blocked</th><th>Skipped</th></tr></thead>
+  <thead>
+    <tr>
+      <th>Started</th>
+      <th>Finished</th>
+      <th>Status</th>
+      <th>Considered</th>
+      <th>Applied</th>
+      <th>Failed</th>
+      <th>Blocked</th>
+      <th>Skipped</th>
+    </tr>
+  </thead>
   <tbody>
     {% for w in runs %}
-    <tr><td>{{ w.started_at }}</td><td>{{ w.finished_at or "" }}</td>
-        <td><span class="badge">{{ w.status }}</span></td>
-        <td>{{ w.considered }}</td><td>{{ w.applied }}</td><td>{{ w.failed }}</td>
-        <td>{{ w.blocked }}</td><td>{{ w.skipped }}</td></tr>
-    {% endfor %}
-    {% if not runs %}<tr><td colspan="8"><em>no runs yet</em></td></tr>{% endif %}
+    <tr>
+      <td>{{ w.started_at }}</td>
+      <td>{{ w.finished_at or "" }}</td>
+      <td><span class="badge">{{ w.status }}</span></td>
+      <td>{{ w.considered }}</td>
+      <td>{{ w.applied }}</td>
+      <td>{{ w.failed }}</td>
+      <td>{{ w.blocked }}</td>
+      <td>{{ w.skipped }}</td>
+    </tr>
+    {% endfor %} {% if not runs %}
+    <tr>
+      <td colspan="8"><em>no runs yet</em></td>
+    </tr>
+    {% endif %}
   </tbody>
 </table>
 {% endblock %}
@@ -671,6 +767,7 @@ git commit -q -m "feat: window-run history page"
 ```bash
 ./.venv/bin/python -c "from app.main import app; print(sorted({r.path for r in app.routes}))"
 ```
+
 Expected: includes `/`, `/items/{item_id}`, `/items/{item_id}/{action}`, `/windows`, plus the `/api/*` routes and `/api/health`.
 
 - [ ] **Step 3: Push**

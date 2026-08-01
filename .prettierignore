@@ -24,6 +24,15 @@ eslint.config.mjs
 .prettierrc
 tsconfig.base.json
 
+# code-standards-GENERATED files. Same rule, different mechanism: these are not
+# copied from a template but rendered/merged by the tool itself (dependabot.yml by
+# `vendor_dependabot`, the CLAUDE.md stanza by `inject_stanza`), so prettier
+# reformatting them starts a tug-of-war with the next `sync`. Omitting these two
+# is why agent-sites and rate-shift-calculator have had a red CI since
+# 2026-06-30 on files neither repo wrote.
+.github/dependabot.yml
+CLAUDE.md
+
 # portfolio-toolkit-managed (owned by project-standards, not code-standards) —
 # the backlog skill / `portfolio add` rewrite this; formatting it just starts a
 # tug-of-war the next portfolio write undoes.

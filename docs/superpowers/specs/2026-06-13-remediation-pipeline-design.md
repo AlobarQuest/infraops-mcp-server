@@ -38,7 +38,7 @@ operator's morning).
 
 1. **Autonomy: full closed loop, scoped to `safe` only.** The pipeline applies
    `safe` + `confidence=high` remediations unattended. `caution`, `destructive`,
-   and all `question` proposals are *never* auto-applied — they escalate. This
+   and all `question` proposals are _never_ auto-applied — they escalate. This
    intentionally narrows the proposal-queue spec's "never auto-apply" default to
    "auto-apply only the provably-safe, reversible class."
 2. **Deterministic execution, no LLM in the write path.** The audit already
@@ -81,7 +81,7 @@ drift-audit.sh  (launchd com.devon.infra-drift, 03:00, Mac mini)
 **Why re-audit live rather than trust the morning JSON:** the morning report can
 be minutes-to-hours stale. Re-running `auditInstance()` (two list calls per
 instance — cheap) yields the authoritative current drift; we apply only what is
-*still* drifted. Reconciling against the morning report lets the digest report
+_still_ drifted. Reconciling against the morning report lets the digest report
 self-resolution ("12 found at 03:00, 12 still drifted → fixed; 0 self-resolved").
 The morning `<date>.json` remains the durable audit artifact and the email
 fallback; the live re-audit is what we act on.
@@ -93,16 +93,16 @@ raw audit `.md`, so a broken remediation step never leaves the operator blind.
 
 ## Components
 
-| Component | New/changed | Responsibility |
-|---|---|---|
-| `src/standards/executor.ts` | **new** | Whitelisted apply engine. A `SAFE_TOOLS` dispatch map (today: `coolify_update_application` → client PATCH). `applyAction(action, target)` enforces the four-gate check, performs the no-op idempotency re-fetch, calls the client, returns `{status: "applied"\|"skipped"\|"failed", detail}`. **The only place an autonomous write can originate.** |
-| `src/standards/remediation-plan.ts` | **new** | Sonnet plan-gen for one escalated proposal → structured `RemediationPlan`. Best-effort: on API error returns a `raw` fallback. Never throws. |
-| `src/standards/remediation-report.ts` | **new** | Builds `<date>.remediation.json` (versioned contract) and renders `<date>.remediation.md` (email body). Mirrors `report.ts`. |
-| `src/cli/remediate-cli.ts` | **new** | Orchestrates a→f. Mirrors `audit-cli.ts` arg-parsing, `--report-dir`/`--now`/`--stdout`/`--dry-run` flags, exit-code semantics. |
-| `scripts/drift-audit.sh` | **changed** | Add the remediate step; move email to the consolidated digest with raw-audit fallback; combine rc for the heartbeat; fetch `ANTHROPIC_API_KEY` from BWS by name. |
-| `scripts/com.devon.infra-drift.plist.template` | **changed** | `StartCalendarInterval` `Hour` 7 → 3. Re-install via `install-drift-launchd.sh`. |
-| `scripts/README.md` | **changed** | Document the remediate step, the new artifacts, the dry-run smoke test, and the change-manager future consumer. |
-| BWS | **changed** | Add `ANTHROPIC_API_KEY` (fetched by-name like the other secrets), used only by plan-gen. |
+| Component                                      | New/changed | Responsibility                                                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/standards/executor.ts`                    | **new**     | Whitelisted apply engine. A `SAFE_TOOLS` dispatch map (today: `coolify_update_application` → client PATCH). `applyAction(action, target)` enforces the four-gate check, performs the no-op idempotency re-fetch, calls the client, returns `{status: "applied"\|"skipped"\|"failed", detail}`. **The only place an autonomous write can originate.** |
+| `src/standards/remediation-plan.ts`            | **new**     | Sonnet plan-gen for one escalated proposal → structured `RemediationPlan`. Best-effort: on API error returns a `raw` fallback. Never throws.                                                                                                                                                                                                         |
+| `src/standards/remediation-report.ts`          | **new**     | Builds `<date>.remediation.json` (versioned contract) and renders `<date>.remediation.md` (email body). Mirrors `report.ts`.                                                                                                                                                                                                                         |
+| `src/cli/remediate-cli.ts`                     | **new**     | Orchestrates a→f. Mirrors `audit-cli.ts` arg-parsing, `--report-dir`/`--now`/`--stdout`/`--dry-run` flags, exit-code semantics.                                                                                                                                                                                                                      |
+| `scripts/drift-audit.sh`                       | **changed** | Add the remediate step; move email to the consolidated digest with raw-audit fallback; combine rc for the heartbeat; fetch `ANTHROPIC_API_KEY` from BWS by name.                                                                                                                                                                                     |
+| `scripts/com.devon.infra-drift.plist.template` | **changed** | `StartCalendarInterval` `Hour` 7 → 3. Re-install via `install-drift-launchd.sh`.                                                                                                                                                                                                                                                                     |
+| `scripts/README.md`                            | **changed** | Document the remediate step, the new artifacts, the dry-run smoke test, and the change-manager future consumer.                                                                                                                                                                                                                                      |
+| BWS                                            | **changed** | Add `ANTHROPIC_API_KEY` (fetched by-name like the other secrets), used only by plan-gen.                                                                                                                                                                                                                                                             |
 
 The `executor.ts` whitelist reuses the same `coolify-client` seam `auditInstance`
 already uses — no new provider surface.
@@ -141,7 +141,7 @@ Defense in depth, outermost first:
    a complete nightly record despite infraops staying stateless.
    `ANTHROPIC_API_KEY` is used only by plan-gen and never logged.
 
-Keystone: gates 1 + 6 mean the autonomous loop can *only ever* enable health
+Keystone: gates 1 + 6 mean the autonomous loop can _only ever_ enable health
 checks (and whatever future genuinely-safe, reversible action is explicitly
 whitelisted); everything else is physically incapable of auto-applying.
 
@@ -155,40 +155,52 @@ whitelisted); everything else is physically incapable of auto-applying.
   "generated_at": "2026-06-13T07:00:05Z",
   "source_report": "2026-06-13.json",
   "totals": {
-    "applied": 12, "skipped": 0, "failed": 0,
-    "escalated": 3, "self_resolved": 0,
-    "runaway_tripped": false
+    "applied": 12,
+    "skipped": 0,
+    "failed": 0,
+    "escalated": 3,
+    "self_resolved": 0,
+    "runaway_tripped": false,
   },
   "applied": [
     {
       "proposal_id": "coolify.enable_healthcheck:72f55467",
-      "target": { "provider": "coolify", "resource_type": "application",
-                  "uuid": "...", "name": "AlobarQuest/github-to-bitbucket-mirror" },
+      "target": {
+        "provider": "coolify",
+        "resource_type": "application",
+        "uuid": "...",
+        "name": "AlobarQuest/github-to-bitbucket-mirror",
+      },
       "tool": "coolify_update_application",
       "args": { "uuid": "...", "health_check_enabled": true, "...": "..." },
-      "status": "applied",            // applied | skipped | failed
-      "detail": "health_check_enabled false → true"
-    }
+      "status": "applied", // applied | skipped | failed
+      "detail": "health_check_enabled false → true",
+    },
   ],
-  "escalations": [                     // ← the change-manager input contract
+  "escalations": [
+    // ← the change-manager input contract
     {
       "proposal_id": "572:e4f2022e",
-      "target": { "provider": "coolify", "resource_type": "database",
-                  "uuid": "...", "name": "agent-sites-postgres" },
-      "risk": "safe",                  // (question-kind; no planned_action)
+      "target": {
+        "provider": "coolify",
+        "resource_type": "database",
+        "uuid": "...",
+        "name": "agent-sites-postgres",
+      },
+      "risk": "safe", // (question-kind; no planned_action)
       "kind": "question",
       "reasoning": "infra-brain rule #572 (WARN): databases must have backups",
       "plan": {
-        "generated_by": "sonnet",      // sonnet | raw (fallback)
+        "generated_by": "sonnet", // sonnet | raw (fallback)
         "root_cause": "...",
         "steps": ["..."],
         "infraops_tools": ["coolify_create_scheduled_task"],
         "risk": "caution",
         "rollback": "...",
-        "cm_window_hint": "off-peak; backup job is additive/non-disruptive"
-      }
-    }
-  ]
+        "cm_window_hint": "off-peak; backup job is additive/non-disruptive",
+      },
+    },
+  ],
 }
 ```
 
@@ -205,8 +217,8 @@ Human digest: a headline (`N fixed, M need you`), an "Applied" table, and an
 ## Future consumers
 
 - **Change manager (planned).** A more-supervised process that reads the
-  `escalations` contract and implements the hard changes *inside change-management
-  windows*, with human oversight and richer pre/post checks. This pipeline is
+  `escalations` contract and implements the hard changes _inside change-management
+  windows_, with human oversight and richer pre/post checks. This pipeline is
   explicitly the change manager's upstream: it never implements escalated items
   itself — it only produces the package. The `cm_window_hint` field is the first
   affordance for that handoff.

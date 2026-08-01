@@ -6,7 +6,8 @@ purpose: Multi-provider MCP server executing infra ops across Coolify, Hetzner, 
   Namecheap, Cloudflare, and GitHub.
 version: 3.4.0
 version_source: package.json
-updated: '2026-06-26'
+updated: '2026-08-01'
+delivery_profile: dependency-update
 foundation: true
 foundation_contract: 1
 applicable_standards:

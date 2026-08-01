@@ -8,7 +8,7 @@
 
 Infraops manages how Devon's infrastructure is configured, scanned, and remediated.
 But the layer that governs **whether Claude can touch that infrastructure at all** — the
-Claude Code control plane — is almost entirely *loose* (not under version control, no
+Claude Code control plane — is almost entirely _loose_ (not under version control, no
 drift baseline, no rollback). An inventory on 2026-06-17 found that everything under
 `~/.claude/` is unmanaged because `~/.claude` is not a git repo:
 
@@ -28,7 +28,7 @@ Two compounding properties make this the real exposure:
    `~/Projects/security-standards` dependency going missing (3 hooks lose teeth) silently
    removes protection — with no error, no rollback, and no review trail.
 2. **The detector watches the control plane but has no baseline to diff against.**
-   `~/.claude/bin/security-scan.sh` already checks *some* of this (hook registration,
+   `~/.claude/bin/security-scan.sh` already checks _some_ of this (hook registration,
    read-guard health, settings regressions), but with the files not in git there is no
    source-of-truth to diff or revert to.
 
@@ -47,16 +47,17 @@ explicitly **out of v1 scope** — see Future Trajectory.
 - No tracking of `skills/`, `agents/`, `agent-memory/` (a separate, larger question).
 - No change to the `bin/` detectors' ownership — they stay owned + hash-verified by infraops.
 
-## Approach: the directory *is* the repo
+## Approach: the directory _is_ the repo
 
 `git init` directly in `~/.claude`, with a **deny-by-default `.gitignore`** that tracks only an
 explicit control-plane allow-list. Private remote at `AlobarQuest/claude-control-plane`.
 
 Unlike the `security-scan.sh` source→deploy pattern, there is **no deploy indirection**: the
-live files Claude actually reads *are* the tracked files. Therefore `git status` / `git diff`
+live files Claude actually reads _are_ the tracked files. Therefore `git status` / `git diff`
 in `~/.claude` **is** the tamper check — there is no source/deployed two-copy gap to reconcile.
 
 ### Why not a separate repo + installer / fold into security-standards
+
 - **Separate repo + installer** (the `security-scan.sh` pattern) was rejected for the control
   plane: it re-introduces a deployed-vs-source gap, which is exactly the indirection that makes
   tamper-evidence harder (you'd hash-compare instead of `git diff`).
@@ -68,17 +69,18 @@ in `~/.claude` **is** the tamper check — there is no source/deployed two-copy 
 
 The `.gitignore` ignores `/*` then un-ignores exactly:
 
-| Path | Layer | Notes |
-|------|-------|-------|
-| `CLAUDE.md`, `RTK.md` | instruction | core security policy |
-| `settings.json` | permission | **critical**: deny list, hook wiring, bypass flag |
-| `settings.local.json` | permission | per-project allowlists; expected to be churny — kept anyway so a malicious allow-add is visible. Tracked but **not escalated** (WARN severity, dropped by taxonomy — see Tamper-evidence). Revisit if noise is unmanageable. |
-| `.mcp.json` | config | MCP server registry |
-| `hooks/` (excl. `*.bak*`) | enforcement | all 8 hook scripts |
-| `statusline-command.sh` | misc | script Claude runs |
-| `README.md` (new) | docs | documents repo purpose + tracked set + tamper mechanism |
+| Path                      | Layer       | Notes                                                                                                                                                                                                                        |
+| ------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLAUDE.md`, `RTK.md`     | instruction | core security policy                                                                                                                                                                                                         |
+| `settings.json`           | permission  | **critical**: deny list, hook wiring, bypass flag                                                                                                                                                                            |
+| `settings.local.json`     | permission  | per-project allowlists; expected to be churny — kept anyway so a malicious allow-add is visible. Tracked but **not escalated** (WARN severity, dropped by taxonomy — see Tamper-evidence). Revisit if noise is unmanageable. |
+| `.mcp.json`               | config      | MCP server registry                                                                                                                                                                                                          |
+| `hooks/` (excl. `*.bak*`) | enforcement | all 8 hook scripts                                                                                                                                                                                                           |
+| `statusline-command.sh`   | misc        | script Claude runs                                                                                                                                                                                                           |
+| `README.md` (new)         | docs        | documents repo purpose + tracked set + tamper mechanism                                                                                                                                                                      |
 
 **Excluded:**
+
 - **`bin/` (gitignored):** `security-scan.sh` / `skills-security-scan.sh` are owned and
   hash-verified by infraops (`self-check.ts`). Tracking them here would re-create the
   two-owner problem just resolved in the infraops consolidation.
@@ -88,7 +90,8 @@ The `.gitignore` ignores `/*` then un-ignores exactly:
   `history.jsonl`, `audit/`, `file-history/`, caches, `tasks/`, `sessions/`, `.DS_Store`, etc.
 
 ### Secrets hygiene
-Tracked files were verified to contain **no secret values** — only BWS secret *IDs*
+
+Tracked files were verified to contain **no secret values** — only BWS secret _IDs_
 (non-secret, stable references — explicitly allowed by the secure-way-of-working rules),
 tool-name allowlists, and config (`AUTH_METHOD`, etc.). The deny-by-default `.gitignore`
 prevents accidental capture of the sensitive bulk. Because `~/.claude` becomes a repo, the
@@ -100,7 +103,7 @@ will be added only if a tracked file produces a benign BLOCK finding.
 Two layers, both reusing existing machinery:
 
 1. **Passive (always-on):** the tracked files being the live files means `git -C ~/.claude
-   status` shows any change to a control-plane file as uncommitted drift since the last
+status` shows any change to a control-plane file as uncommitted drift since the last
    reviewed commit.
 2. **Active (the alarm) — one new check in `security-scan.sh` (infraops):** each run
    (daily 03:00 embedded + Mon 09:00 standalone) executes `git -C ~/.claude status --porcelain`
@@ -121,13 +124,13 @@ Two layers, both reusing existing machinery:
 
 ## Components & boundaries
 
-| Unit | Responsibility | Depends on |
-|------|----------------|-----------|
-| `~/.claude/.gitignore` | deny-by-default allow-list | — |
-| `~/.claude/README.md` | document repo purpose + tracked set | — |
-| `~/.claude` git repo + `AlobarQuest/claude-control-plane` remote | history, rollback, offsite backup | `gh` / `github_create_repo` |
-| new check in `security-standards/scripts/security-scan.sh` | detect control-plane drift, emit finding | the `~/.claude` repo existing |
-| existing security-drift pipeline | classify + escalate + email | unchanged |
+| Unit                                                             | Responsibility                           | Depends on                    |
+| ---------------------------------------------------------------- | ---------------------------------------- | ----------------------------- |
+| `~/.claude/.gitignore`                                           | deny-by-default allow-list               | —                             |
+| `~/.claude/README.md`                                            | document repo purpose + tracked set      | —                             |
+| `~/.claude` git repo + `AlobarQuest/claude-control-plane` remote | history, rollback, offsite backup        | `gh` / `github_create_repo`   |
+| new check in `security-standards/scripts/security-scan.sh`       | detect control-plane drift, emit finding | the `~/.claude` repo existing |
+| existing security-drift pipeline                                 | classify + escalate + email              | unchanged                     |
 
 ## Bootstrap (one-time)
 

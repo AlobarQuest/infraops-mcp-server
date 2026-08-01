@@ -24,10 +24,12 @@
 ### Task 1: `appbrain-client.ts` — the HTTP resolver client
 
 **Files:**
+
 - Create: `src/services/appbrain-client.ts`
 - Test: `tests/appbrain-client.test.ts`
 
 **Interfaces:**
+
 - Consumes: `REQUEST_TIMEOUT` from `../constants.js` (= 30000); `axios`.
 - Produces:
   - `interface AppResolution { github_repo: string | null; name: string; branch: string | null; url: string | null }`
@@ -40,9 +42,9 @@
 Create `tests/appbrain-client.test.ts` (mirrors `tests/infrabrain-client.test.ts` mocking style):
 
 ```typescript
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock("axios", () => {
+vi.mock('axios', () => {
   const instance = { get: vi.fn() };
   const create = vi.fn(() => instance);
   return {
@@ -53,14 +55,14 @@ vi.mock("axios", () => {
   };
 });
 
-import axios from "axios";
+import axios from 'axios';
 
 const setEnv = () => {
-  process.env.APPBRAIN_BASE_URL = "https://app-brain.devonwatkins.com";
-  process.env.APPBRAIN_ACCESS_KEY = "secret-key-value";
+  process.env.APPBRAIN_BASE_URL = 'https://app-brain.devonwatkins.com';
+  process.env.APPBRAIN_ACCESS_KEY = 'secret-key-value';
 };
 
-describe("appbrain-client", () => {
+describe('appbrain-client', () => {
   const saved: Record<string, string | undefined> = {};
   beforeEach(() => {
     saved.APPBRAIN_BASE_URL = process.env.APPBRAIN_BASE_URL;
@@ -73,95 +75,125 @@ describe("appbrain-client", () => {
     vi.restoreAllMocks();
   });
 
-  describe("isAppbrainConfigured", () => {
-    it("true when both env vars set", async () => {
+  describe('isAppbrainConfigured', () => {
+    it('true when both env vars set', async () => {
       setEnv();
-      const { isAppbrainConfigured } = await import("../src/services/appbrain-client.js");
+      const { isAppbrainConfigured } = await import('../src/services/appbrain-client.js');
       expect(isAppbrainConfigured()).toBe(true);
     });
-    it("false when key missing", async () => {
-      process.env.APPBRAIN_BASE_URL = "https://app-brain.devonwatkins.com";
+    it('false when key missing', async () => {
+      process.env.APPBRAIN_BASE_URL = 'https://app-brain.devonwatkins.com';
       delete process.env.APPBRAIN_ACCESS_KEY;
-      const { isAppbrainConfigured } = await import("../src/services/appbrain-client.js");
+      const { isAppbrainConfigured } = await import('../src/services/appbrain-client.js');
       expect(isAppbrainConfigured()).toBe(false);
     });
   });
 
-  describe("validateResolution", () => {
-    it("accepts a full booking body", async () => {
-      const { validateResolution } = await import("../src/services/appbrain-client.js");
-      expect(validateResolution({ github_repo: "AlobarQuest/booking-system", name: "prod", branch: "master", url: "https://booking.devonwatkins.com" }))
-        .toEqual({ github_repo: "AlobarQuest/booking-system", name: "prod", branch: "master", url: "https://booking.devonwatkins.com" });
+  describe('validateResolution', () => {
+    it('accepts a full booking body', async () => {
+      const { validateResolution } = await import('../src/services/appbrain-client.js');
+      expect(
+        validateResolution({
+          github_repo: 'AlobarQuest/booking-system',
+          name: 'prod',
+          branch: 'master',
+          url: 'https://booking.devonwatkins.com',
+        }),
+      ).toEqual({
+        github_repo: 'AlobarQuest/booking-system',
+        name: 'prod',
+        branch: 'master',
+        url: 'https://booking.devonwatkins.com',
+      });
     });
-    it("accepts null github_repo/branch/url (valid-but-incomplete)", async () => {
-      const { validateResolution } = await import("../src/services/appbrain-client.js");
-      expect(validateResolution({ github_repo: null, name: "prod", branch: null, url: null }))
-        .toEqual({ github_repo: null, name: "prod", branch: null, url: null });
+    it('accepts null github_repo/branch/url (valid-but-incomplete)', async () => {
+      const { validateResolution } = await import('../src/services/appbrain-client.js');
+      expect(
+        validateResolution({ github_repo: null, name: 'prod', branch: null, url: null }),
+      ).toEqual({ github_repo: null, name: 'prod', branch: null, url: null });
     });
-    it("throws on wrong-typed branch", async () => {
-      const { validateResolution } = await import("../src/services/appbrain-client.js");
-      expect(() => validateResolution({ github_repo: "o/r", name: "prod", branch: 123, url: null })).toThrow();
+    it('throws on wrong-typed branch', async () => {
+      const { validateResolution } = await import('../src/services/appbrain-client.js');
+      expect(() =>
+        validateResolution({ github_repo: 'o/r', name: 'prod', branch: 123, url: null }),
+      ).toThrow();
     });
-    it("throws on missing/empty name", async () => {
-      const { validateResolution } = await import("../src/services/appbrain-client.js");
-      expect(() => validateResolution({ github_repo: "o/r", name: "", branch: "master", url: null })).toThrow();
+    it('throws on missing/empty name', async () => {
+      const { validateResolution } = await import('../src/services/appbrain-client.js');
+      expect(() =>
+        validateResolution({ github_repo: 'o/r', name: '', branch: 'master', url: null }),
+      ).toThrow();
     });
-    it("throws on non-object", async () => {
-      const { validateResolution } = await import("../src/services/appbrain-client.js");
+    it('throws on non-object', async () => {
+      const { validateResolution } = await import('../src/services/appbrain-client.js');
       expect(() => validateResolution(null)).toThrow();
     });
   });
 
-  describe("resolveApp", () => {
+  describe('resolveApp', () => {
     const mockGet = () => (axios as any).__mockInstance.get as ReturnType<typeof vi.fn>;
-    it("200 → validated body; sends uuid param + x-brain-key header", async () => {
+    it('200 → validated body; sends uuid param + x-brain-key header', async () => {
       setEnv();
-      const { resolveApp } = await import("../src/services/appbrain-client.js");
-      mockGet().mockResolvedValue({ status: 200, data: { github_repo: "AlobarQuest/booking-system", name: "prod", branch: "master", url: "https://booking.devonwatkins.com" } });
-      const r = await resolveApp({ coolifyAppUuid: "hkw488ggssgcskk0ooc0ksk0", fqdn: null });
-      expect(r?.branch).toBe("master");
+      const { resolveApp } = await import('../src/services/appbrain-client.js');
+      mockGet().mockResolvedValue({
+        status: 200,
+        data: {
+          github_repo: 'AlobarQuest/booking-system',
+          name: 'prod',
+          branch: 'master',
+          url: 'https://booking.devonwatkins.com',
+        },
+      });
+      const r = await resolveApp({ coolifyAppUuid: 'hkw488ggssgcskk0ooc0ksk0', fqdn: null });
+      expect(r?.branch).toBe('master');
       const createCfg = (axios.create as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      expect(createCfg.headers["x-brain-key"]).toBe("secret-key-value");
+      expect(createCfg.headers['x-brain-key']).toBe('secret-key-value');
       const getCall = mockGet().mock.calls[0];
-      expect(getCall[0]).toBe("/api/apps/resolve");
-      expect(getCall[1].params).toEqual({ coolify_app_uuid: "hkw488ggssgcskk0ooc0ksk0" }); // fqdn omitted when null
+      expect(getCall[0]).toBe('/api/apps/resolve');
+      expect(getCall[1].params).toEqual({ coolify_app_uuid: 'hkw488ggssgcskk0ooc0ksk0' }); // fqdn omitted when null
     });
-    it("includes fqdn param when provided", async () => {
+    it('includes fqdn param when provided', async () => {
       setEnv();
-      const { resolveApp } = await import("../src/services/appbrain-client.js");
-      mockGet().mockResolvedValue({ status: 200, data: { github_repo: "o/r", name: "preview", branch: "preview", url: null } });
-      await resolveApp({ coolifyAppUuid: "u1", fqdn: "preview.booking.devonwatkins.com" });
-      expect(mockGet().mock.calls[0][1].params).toEqual({ coolify_app_uuid: "u1", fqdn: "preview.booking.devonwatkins.com" });
+      const { resolveApp } = await import('../src/services/appbrain-client.js');
+      mockGet().mockResolvedValue({
+        status: 200,
+        data: { github_repo: 'o/r', name: 'preview', branch: 'preview', url: null },
+      });
+      await resolveApp({ coolifyAppUuid: 'u1', fqdn: 'preview.booking.devonwatkins.com' });
+      expect(mockGet().mock.calls[0][1].params).toEqual({
+        coolify_app_uuid: 'u1',
+        fqdn: 'preview.booking.devonwatkins.com',
+      });
     });
-    it("404 → null", async () => {
+    it('404 → null', async () => {
       setEnv();
-      const { resolveApp } = await import("../src/services/appbrain-client.js");
-      mockGet().mockResolvedValue({ status: 404, data: { error: "not_found" } });
-      expect(await resolveApp({ coolifyAppUuid: "nope", fqdn: null })).toBeNull();
+      const { resolveApp } = await import('../src/services/appbrain-client.js');
+      mockGet().mockResolvedValue({ status: 404, data: { error: 'not_found' } });
+      expect(await resolveApp({ coolifyAppUuid: 'nope', fqdn: null })).toBeNull();
     });
-    it("malformed 200 body → throws", async () => {
+    it('malformed 200 body → throws', async () => {
       setEnv();
-      const { resolveApp } = await import("../src/services/appbrain-client.js");
-      mockGet().mockResolvedValue({ status: 200, data: { name: "prod", branch: 5 } });
-      await expect(resolveApp({ coolifyAppUuid: "u1", fqdn: null })).rejects.toThrow();
+      const { resolveApp } = await import('../src/services/appbrain-client.js');
+      mockGet().mockResolvedValue({ status: 200, data: { name: 'prod', branch: 5 } });
+      await expect(resolveApp({ coolifyAppUuid: 'u1', fqdn: null })).rejects.toThrow();
     });
-    it("network error → throws", async () => {
+    it('network error → throws', async () => {
       setEnv();
-      const { resolveApp } = await import("../src/services/appbrain-client.js");
-      mockGet().mockRejectedValue(new Error("ECONNREFUSED"));
-      await expect(resolveApp({ coolifyAppUuid: "u1", fqdn: null })).rejects.toThrow();
+      const { resolveApp } = await import('../src/services/appbrain-client.js');
+      mockGet().mockRejectedValue(new Error('ECONNREFUSED'));
+      await expect(resolveApp({ coolifyAppUuid: 'u1', fqdn: null })).rejects.toThrow();
     });
-    it("rejects an http:// base URL (cleartext key)", async () => {
-      process.env.APPBRAIN_BASE_URL = "http://app-brain.devonwatkins.com";
-      process.env.APPBRAIN_ACCESS_KEY = "k";
-      const { resolveApp } = await import("../src/services/appbrain-client.js");
-      await expect(resolveApp({ coolifyAppUuid: "u1", fqdn: null })).rejects.toThrow(/https/i);
+    it('rejects an http:// base URL (cleartext key)', async () => {
+      process.env.APPBRAIN_BASE_URL = 'http://app-brain.devonwatkins.com';
+      process.env.APPBRAIN_ACCESS_KEY = 'k';
+      const { resolveApp } = await import('../src/services/appbrain-client.js');
+      await expect(resolveApp({ coolifyAppUuid: 'u1', fqdn: null })).rejects.toThrow(/https/i);
     });
-    it("rejects a credentialed base URL", async () => {
-      process.env.APPBRAIN_BASE_URL = "https://user:pass@app-brain.devonwatkins.com";
-      process.env.APPBRAIN_ACCESS_KEY = "k";
-      const { resolveApp } = await import("../src/services/appbrain-client.js");
-      await expect(resolveApp({ coolifyAppUuid: "u1", fqdn: null })).rejects.toThrow(/credential/i);
+    it('rejects a credentialed base URL', async () => {
+      process.env.APPBRAIN_BASE_URL = 'https://user:pass@app-brain.devonwatkins.com';
+      process.env.APPBRAIN_ACCESS_KEY = 'k';
+      const { resolveApp } = await import('../src/services/appbrain-client.js');
+      await expect(resolveApp({ coolifyAppUuid: 'u1', fqdn: null })).rejects.toThrow(/credential/i);
     });
   });
 });
@@ -177,8 +209,8 @@ Expected: FAIL — `Cannot find module '../src/services/appbrain-client.js'`.
 Create `src/services/appbrain-client.ts`:
 
 ```typescript
-import axios, { AxiosInstance } from "axios";
-import { REQUEST_TIMEOUT } from "../constants.js";
+import axios, { AxiosInstance } from 'axios';
+import { REQUEST_TIMEOUT } from '../constants.js';
 
 /** A resolved app-brain environment. github_repo/branch/url may be null per the contract;
  *  the handoff builder treats a null/empty repo OR branch as UNCONFIRMED. */
@@ -197,7 +229,7 @@ function getClient(): AxiosInstance {
   const baseURL = process.env.APPBRAIN_BASE_URL;
   const key = process.env.APPBRAIN_ACCESS_KEY;
   if (!baseURL || !key) {
-    throw new Error("app-brain is not configured. Set APPBRAIN_BASE_URL and APPBRAIN_ACCESS_KEY.");
+    throw new Error('app-brain is not configured. Set APPBRAIN_BASE_URL and APPBRAIN_ACCESS_KEY.');
   }
 
   // Config hardening: this client ships a secret-bearing x-brain-key, so refuse to send it
@@ -208,37 +240,39 @@ function getClient(): AxiosInstance {
   } catch {
     throw new Error(`APPBRAIN_BASE_URL is not a valid URL: ${baseURL}`);
   }
-  if (parsed.protocol !== "https:") {
+  if (parsed.protocol !== 'https:') {
     throw new Error(`APPBRAIN_BASE_URL must be https — refusing to send x-brain-key in cleartext.`);
   }
   if (parsed.username || parsed.password) {
-    throw new Error("APPBRAIN_BASE_URL must not contain credentials.");
+    throw new Error('APPBRAIN_BASE_URL must not contain credentials.');
   }
 
   _client = axios.create({
     baseURL,
     timeout: REQUEST_TIMEOUT,
     headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "x-brain-key": key,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'x-brain-key': key,
     },
   });
   return _client;
 }
 
-const strOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
+const strOrNull = (v: unknown): v is string | null => v === null || typeof v === 'string';
 
 /** Type-validate the 200 body. Throws on a malformed shape (treated as a resolver error upstream,
  *  never confirmed). github_repo/branch/url may legitimately be null — that is incomplete, not
  *  malformed, and is resolved to UNCONFIRMED by the handoff builder. */
 export function validateResolution(body: unknown): AppResolution {
   const b = body as Record<string, unknown> | null;
-  if (!b || typeof b !== "object") throw new Error("app-brain resolve: body is not an object");
-  if (typeof b.name !== "string" || b.name.trim() === "") throw new Error("app-brain resolve: name missing/empty");
-  if (!strOrNull(b.github_repo)) throw new Error("app-brain resolve: github_repo must be string or null");
-  if (!strOrNull(b.branch)) throw new Error("app-brain resolve: branch must be string or null");
-  if (!strOrNull(b.url)) throw new Error("app-brain resolve: url must be string or null");
+  if (!b || typeof b !== 'object') throw new Error('app-brain resolve: body is not an object');
+  if (typeof b.name !== 'string' || b.name.trim() === '')
+    throw new Error('app-brain resolve: name missing/empty');
+  if (!strOrNull(b.github_repo))
+    throw new Error('app-brain resolve: github_repo must be string or null');
+  if (!strOrNull(b.branch)) throw new Error('app-brain resolve: branch must be string or null');
+  if (!strOrNull(b.url)) throw new Error('app-brain resolve: url must be string or null');
   return {
     github_repo: (b.github_repo as string | null) ?? null,
     name: b.name,
@@ -248,11 +282,14 @@ export function validateResolution(body: unknown): AppResolution {
 }
 
 /** Resolve a Coolify app to its repo+branch. 200 → validated body; 404 → null; anything else throws. */
-export async function resolveApp(args: { coolifyAppUuid: string; fqdn: string | null }): Promise<AppResolution | null> {
+export async function resolveApp(args: {
+  coolifyAppUuid: string;
+  fqdn: string | null;
+}): Promise<AppResolution | null> {
   const client = getClient();
   const params: Record<string, string> = { coolify_app_uuid: args.coolifyAppUuid };
   if (args.fqdn) params.fqdn = args.fqdn;
-  const res = await client.get("/api/apps/resolve", {
+  const res = await client.get('/api/apps/resolve', {
     params,
     validateStatus: (s) => s === 200 || s === 404,
   });
@@ -282,10 +319,12 @@ git commit -m "feat(appbrain): HTTP resolve client (uuid/fqdn -> repo+branch), h
 ### Task 2: `hostFromUrl` — safe host extraction
 
 **Files:**
+
 - Modify: `src/standards/handoff-brief.ts` (add the exported function; leave existing code untouched for now)
 - Test: `tests/handoff-brief.test.ts` (add a new `describe` block)
 
 **Interfaces:**
+
 - Produces: `function hostFromUrl(url: string | null | undefined): string | null`
 
 - [ ] **Step 1: Write the failing test**
@@ -293,22 +332,25 @@ git commit -m "feat(appbrain): HTTP resolve client (uuid/fqdn -> repo+branch), h
 Add to `tests/handoff-brief.test.ts` (and add `hostFromUrl` to the import on line 2):
 
 ```typescript
-describe("hostFromUrl", () => {
-  it("extracts lowercased hostname", () =>
-    expect(hostFromUrl("https://Booking.DevonWatkins.com/api/health")).toBe("booking.devonwatkins.com"));
-  it("drops a :port", () =>
-    expect(hostFromUrl("https://booking.devonwatkins.com:8443/api/health")).toBe("booking.devonwatkins.com"));
-  it("strips path / trailing slash", () =>
-    expect(hostFromUrl("https://booking.devonwatkins.com/")).toBe("booking.devonwatkins.com"));
-  it("rejects userinfo (credential spoofing) → null", () =>
-    expect(hostFromUrl("https://user:pass@booking.devonwatkins.com/x")).toBeNull());
-  it("rejects non-http scheme → null", () =>
-    expect(hostFromUrl("file:///etc/passwd")).toBeNull());
-  it("null / empty / garbage → null", () => {
+describe('hostFromUrl', () => {
+  it('extracts lowercased hostname', () =>
+    expect(hostFromUrl('https://Booking.DevonWatkins.com/api/health')).toBe(
+      'booking.devonwatkins.com',
+    ));
+  it('drops a :port', () =>
+    expect(hostFromUrl('https://booking.devonwatkins.com:8443/api/health')).toBe(
+      'booking.devonwatkins.com',
+    ));
+  it('strips path / trailing slash', () =>
+    expect(hostFromUrl('https://booking.devonwatkins.com/')).toBe('booking.devonwatkins.com'));
+  it('rejects userinfo (credential spoofing) → null', () =>
+    expect(hostFromUrl('https://user:pass@booking.devonwatkins.com/x')).toBeNull());
+  it('rejects non-http scheme → null', () => expect(hostFromUrl('file:///etc/passwd')).toBeNull());
+  it('null / empty / garbage → null', () => {
     expect(hostFromUrl(null)).toBeNull();
-    expect(hostFromUrl("")).toBeNull();
-    expect(hostFromUrl("not a url")).toBeNull();
-    expect(hostFromUrl("booking.devonwatkins.com, other.com")).toBeNull();
+    expect(hostFromUrl('')).toBeNull();
+    expect(hostFromUrl('not a url')).toBeNull();
+    expect(hostFromUrl('booking.devonwatkins.com, other.com')).toBeNull();
   });
 });
 ```
@@ -326,17 +368,17 @@ Add to `src/standards/handoff-brief.ts` (near the top, after the imports):
 /** Parse a bare host from a URL. http/https only; reject userinfo; return the lowercased hostname
  *  (no port); null on any invalid/unsafe input. Coolify app fields are not a trust boundary. */
 export function hostFromUrl(url: string | null | undefined): string | null {
-  if (typeof url !== "string" || url.trim() === "") return null;
+  if (typeof url !== 'string' || url.trim() === '') return null;
   let parsed: URL;
   try {
     parsed = new URL(url.trim());
   } catch {
     return null;
   }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
   if (parsed.username || parsed.password) return null;
   const host = parsed.hostname.toLowerCase();
-  return host === "" ? null : host;
+  return host === '' ? null : host;
 }
 ```
 
@@ -357,10 +399,12 @@ git commit -m "feat(handoff): hostFromUrl — safe host extraction (new URL, no 
 ### Task 3: Rework the handoff seam — delete the resource_name parse, wire the resolver
 
 **Files:**
+
 - Modify: `src/standards/handoff-brief.ts` (delete `resolveRepo`, `parseTargetBranch`, old `HandoffDeps`; new `HandoffDeps`; rework `buildHandoff`; normalize `buildHandoffPackage`)
 - Test: `tests/handoff-brief.test.ts` (delete the `resolveRepo` describe block; rework `buildHandoff` block; extend `buildHandoffPackage` block)
 
 **Interfaces:**
+
 - Consumes: `AppResolution` + `resolveApp` signature from Task 1 (`src/services/appbrain-client.js`); `hostFromUrl` from Task 2; `axios` (for `isAxiosError` status classification in the catch).
 - Produces:
   - `interface HandoffDeps { appBrainResolve?: (args: { coolifyAppUuid: string; fqdn: string | null }) => Promise<AppResolution | null> }`
@@ -372,75 +416,171 @@ git commit -m "feat(handoff): hostFromUrl — safe host extraction (new URL, no 
 In `tests/handoff-brief.test.ts`: (a) remove the entire `describe("resolveRepo", …)` block and drop `resolveRepo` from the import; (b) replace the `describe("buildHandoff", …)` block and extend `buildHandoffPackage` with:
 
 ```typescript
-describe("buildHandoffPackage normalization", () => {
+describe('buildHandoffPackage normalization', () => {
   it("repo null + branch 'main' → BOTH UNCONFIRMED (no half-confirmed target)", () => {
-    const p = buildHandoffPackage({ repo: null, targetBranch: "main", rule: "r", path: "/api/health", url: null, probeReason: "HTTP 404" });
-    expect(p.repo).toBe("UNCONFIRMED");
-    expect(p.target_branch).toBe("UNCONFIRMED");
+    const p = buildHandoffPackage({
+      repo: null,
+      targetBranch: 'main',
+      rule: 'r',
+      path: '/api/health',
+      url: null,
+      probeReason: 'HTTP 404',
+    });
+    expect(p.repo).toBe('UNCONFIRMED');
+    expect(p.target_branch).toBe('UNCONFIRMED');
   });
-  it("repo set + branch null → BOTH UNCONFIRMED", () => {
-    const p = buildHandoffPackage({ repo: "AlobarQuest/booking-system", targetBranch: null, rule: "r", path: "/api/health", url: null, probeReason: "HTTP 404" });
-    expect(p.repo).toBe("UNCONFIRMED");
-    expect(p.target_branch).toBe("UNCONFIRMED");
+  it('repo set + branch null → BOTH UNCONFIRMED', () => {
+    const p = buildHandoffPackage({
+      repo: 'AlobarQuest/booking-system',
+      targetBranch: null,
+      rule: 'r',
+      path: '/api/health',
+      url: null,
+      probeReason: 'HTTP 404',
+    });
+    expect(p.repo).toBe('UNCONFIRMED');
+    expect(p.target_branch).toBe('UNCONFIRMED');
   });
-  it("both set → confirmed, verbatim (no lowercasing)", () => {
-    const p = buildHandoffPackage({ repo: "AlobarQuest/booking-system", targetBranch: "master", rule: "r", path: "/api/health", url: null, probeReason: "HTTP 404" });
-    expect(p.repo).toBe("AlobarQuest/booking-system");
-    expect(p.target_branch).toBe("master");
+  it('both set → confirmed, verbatim (no lowercasing)', () => {
+    const p = buildHandoffPackage({
+      repo: 'AlobarQuest/booking-system',
+      targetBranch: 'master',
+      rule: 'r',
+      path: '/api/health',
+      url: null,
+      probeReason: 'HTTP 404',
+    });
+    expect(p.repo).toBe('AlobarQuest/booking-system');
+    expect(p.target_branch).toBe('master');
   });
 });
 
-describe("buildHandoff resolution via app-brain", () => {
-  const hc = (path = "/api/health") => ({
-    id: "coolify.enable_healthcheck:u1",
-    target: { provider: "coolify", resource_type: "application", uuid: "hkw488ggssgcskk0ooc0ksk0", name: "alobar-quest/booking-system:main" },
-    planned_action: { tool: "coolify_update_application", args: { health_check_path: path } },
-  } as any);
-  const probe = { status: 404, reason: "HTTP 404" };
+describe('buildHandoff resolution via app-brain', () => {
+  const hc = (path = '/api/health') =>
+    ({
+      id: 'coolify.enable_healthcheck:u1',
+      target: {
+        provider: 'coolify',
+        resource_type: 'application',
+        uuid: 'hkw488ggssgcskk0ooc0ksk0',
+        name: 'alobar-quest/booking-system:main',
+      },
+      planned_action: { tool: 'coolify_update_application', args: { health_check_path: path } },
+    }) as any;
+  const probe = { status: 404, reason: 'HTTP 404' };
 
-  it("confirmed: resolver returns repo+branch (uuid primary)", async () => {
-    const resolve = async () => ({ github_repo: "AlobarQuest/booking-system", name: "prod", branch: "master", url: "https://booking.devonwatkins.com" });
-    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod", { appBrainResolve: resolve });
-    expect(out.lane).toBe("app-conformance");
-    expect(out.handoff?.repo).toBe("AlobarQuest/booking-system");
-    expect(out.handoff?.target_branch).toBe("master");
+  it('confirmed: resolver returns repo+branch (uuid primary)', async () => {
+    const resolve = async () => ({
+      github_repo: 'AlobarQuest/booking-system',
+      name: 'prod',
+      branch: 'master',
+      url: 'https://booking.devonwatkins.com',
+    });
+    const out = await buildHandoff(
+      hc(),
+      probe,
+      'https://booking.devonwatkins.com/api/health',
+      'prod',
+      { appBrainResolve: resolve },
+    );
+    expect(out.lane).toBe('app-conformance');
+    expect(out.handoff?.repo).toBe('AlobarQuest/booking-system');
+    expect(out.handoff?.target_branch).toBe('master');
   });
-  it("passes uuid + parsed fqdn to the resolver", async () => {
+  it('passes uuid + parsed fqdn to the resolver', async () => {
     let seen: any;
-    const resolve = async (a: any) => { seen = a; return { github_repo: "o/r", name: "preview", branch: "preview", url: null }; };
-    await buildHandoff(hc(), probe, "https://preview.booking.devonwatkins.com/api/health", "prod", { appBrainResolve: resolve });
-    expect(seen).toEqual({ coolifyAppUuid: "hkw488ggssgcskk0ooc0ksk0", fqdn: "preview.booking.devonwatkins.com" });
+    const resolve = async (a: any) => {
+      seen = a;
+      return { github_repo: 'o/r', name: 'preview', branch: 'preview', url: null };
+    };
+    await buildHandoff(hc(), probe, 'https://preview.booking.devonwatkins.com/api/health', 'prod', {
+      appBrainResolve: resolve,
+    });
+    expect(seen).toEqual({
+      coolifyAppUuid: 'hkw488ggssgcskk0ooc0ksk0',
+      fqdn: 'preview.booking.devonwatkins.com',
+    });
   });
-  it("404 (null) → UNCONFIRMED", async () => {
-    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod", { appBrainResolve: async () => null });
-    expect(out.handoff?.repo).toBe("UNCONFIRMED");
-    expect(out.handoff?.target_branch).toBe("UNCONFIRMED");
+  it('404 (null) → UNCONFIRMED', async () => {
+    const out = await buildHandoff(
+      hc(),
+      probe,
+      'https://booking.devonwatkins.com/api/health',
+      'prod',
+      { appBrainResolve: async () => null },
+    );
+    expect(out.handoff?.repo).toBe('UNCONFIRMED');
+    expect(out.handoff?.target_branch).toBe('UNCONFIRMED');
   });
-  it("null branch → UNCONFIRMED (both)", async () => {
-    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod",
-      { appBrainResolve: async () => ({ github_repo: "AlobarQuest/booking-system", name: "prod", branch: null, url: null }) });
-    expect(out.handoff?.repo).toBe("UNCONFIRMED");
-    expect(out.handoff?.target_branch).toBe("UNCONFIRMED");
+  it('null branch → UNCONFIRMED (both)', async () => {
+    const out = await buildHandoff(
+      hc(),
+      probe,
+      'https://booking.devonwatkins.com/api/health',
+      'prod',
+      {
+        appBrainResolve: async () => ({
+          github_repo: 'AlobarQuest/booking-system',
+          name: 'prod',
+          branch: null,
+          url: null,
+        }),
+      },
+    );
+    expect(out.handoff?.repo).toBe('UNCONFIRMED');
+    expect(out.handoff?.target_branch).toBe('UNCONFIRMED');
   });
-  it("null github_repo → UNCONFIRMED (both)", async () => {
-    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod",
-      { appBrainResolve: async () => ({ github_repo: null, name: "prod", branch: "master", url: null }) });
-    expect(out.handoff?.repo).toBe("UNCONFIRMED");
-    expect(out.handoff?.target_branch).toBe("UNCONFIRMED");
+  it('null github_repo → UNCONFIRMED (both)', async () => {
+    const out = await buildHandoff(
+      hc(),
+      probe,
+      'https://booking.devonwatkins.com/api/health',
+      'prod',
+      {
+        appBrainResolve: async () => ({
+          github_repo: null,
+          name: 'prod',
+          branch: 'master',
+          url: null,
+        }),
+      },
+    );
+    expect(out.handoff?.repo).toBe('UNCONFIRMED');
+    expect(out.handoff?.target_branch).toBe('UNCONFIRMED');
   });
-  it("resolver throws → UNCONFIRMED, no propagation", async () => {
-    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod",
-      { appBrainResolve: async () => { throw new Error("ECONNREFUSED"); } });
-    expect(out.handoff?.repo).toBe("UNCONFIRMED");
+  it('resolver throws → UNCONFIRMED, no propagation', async () => {
+    const out = await buildHandoff(
+      hc(),
+      probe,
+      'https://booking.devonwatkins.com/api/health',
+      'prod',
+      {
+        appBrainResolve: async () => {
+          throw new Error('ECONNREFUSED');
+        },
+      },
+    );
+    expect(out.handoff?.repo).toBe('UNCONFIRMED');
   });
-  it("no resolver injected → UNCONFIRMED (never the resource_name parse)", async () => {
-    const out = await buildHandoff(hc(), probe, "https://booking.devonwatkins.com/api/health", "prod");
-    expect(out.handoff?.repo).toBe("UNCONFIRMED");
-    expect(out.handoff?.target_branch).toBe("UNCONFIRMED");
+  it('no resolver injected → UNCONFIRMED (never the resource_name parse)', async () => {
+    const out = await buildHandoff(
+      hc(),
+      probe,
+      'https://booking.devonwatkins.com/api/health',
+      'prod',
+    );
+    expect(out.handoff?.repo).toBe('UNCONFIRMED');
+    expect(out.handoff?.target_branch).toBe('UNCONFIRMED');
   });
-  it("timeout → infra-config, no handoff", async () => {
-    const out = await buildHandoff(hc(), { status: null, reason: "AbortError" }, undefined, "prod", { appBrainResolve: async () => null });
-    expect(out.lane).toBe("infra-config");
+  it('timeout → infra-config, no handoff', async () => {
+    const out = await buildHandoff(
+      hc(),
+      { status: null, reason: 'AbortError' },
+      undefined,
+      'prod',
+      { appBrainResolve: async () => null },
+    );
+    expect(out.lane).toBe('infra-config');
     expect(out.handoff).toBeUndefined();
   });
 });
@@ -458,11 +598,11 @@ In `src/standards/handoff-brief.ts`:
 (a) Update imports at the top:
 
 ```typescript
-import axios from "axios";
-import type { Proposal } from "./check-engine.js";
-import type { ProbeResult } from "./executor.js";
-import type { Lane } from "./remediation-registry.js";
-import type { AppResolution } from "../services/appbrain-client.js";
+import axios from 'axios';
+import type { Proposal } from './check-engine.js';
+import type { ProbeResult } from './executor.js';
+import type { Lane } from './remediation-registry.js';
+import type { AppResolution } from '../services/appbrain-client.js';
 ```
 
 (b) Replace the old `HandoffDeps` interface (lines 5-8) and DELETE `resolveRepo` (lines 23-38) and `parseTargetBranch` (lines 52-57). New seam:
@@ -471,37 +611,51 @@ import type { AppResolution } from "../services/appbrain-client.js";
 /** Injected app-brain resolver seam. Production wires the real resolveApp; tests inject a fake.
  *  Returns the matched env (repo/branch may be null) or null on no-match. */
 export interface HandoffDeps {
-  appBrainResolve?: (args: { coolifyAppUuid: string; fqdn: string | null }) => Promise<AppResolution | null>;
+  appBrainResolve?: (args: {
+    coolifyAppUuid: string;
+    fqdn: string | null;
+  }) => Promise<AppResolution | null>;
 }
 
-const isNonEmpty = (v: string | null | undefined): v is string => typeof v === "string" && v.trim() !== "";
+const isNonEmpty = (v: string | null | undefined): v is string =>
+  typeof v === 'string' && v.trim() !== '';
 ```
 
 (c) Normalize `buildHandoffPackage` — change its `targetBranch` param to `string | null` and force both-or-neither:
 
 ```typescript
 export function buildHandoffPackage(args: {
-  repo: string | null; targetBranch: string | null; rule: string; path: string; url: string | null; probeReason: string;
+  repo: string | null;
+  targetBranch: string | null;
+  rule: string;
+  path: string;
+  url: string | null;
+  probeReason: string;
 }): HandoffPackage {
   const { repo, targetBranch, rule, path, url, probeReason } = args;
   // repo and branch travel together: if either is missing/unconfirmed, BOTH are UNCONFIRMED —
   // a half-confirmed dispatch target must be unrepresentable (panel MED-5 / HIGH-1).
-  const confirmed = isNonEmpty(repo) && repo !== "UNCONFIRMED" && isNonEmpty(targetBranch) && targetBranch !== "UNCONFIRMED";
-  const finalRepo = confirmed ? (repo as string) : "UNCONFIRMED";
-  const finalBranch = confirmed ? (targetBranch as string) : "UNCONFIRMED";
+  const confirmed =
+    isNonEmpty(repo) &&
+    repo !== 'UNCONFIRMED' &&
+    isNonEmpty(targetBranch) &&
+    targetBranch !== 'UNCONFIRMED';
+  const finalRepo = confirmed ? (repo as string) : 'UNCONFIRMED';
+  const finalBranch = confirmed ? (targetBranch as string) : 'UNCONFIRMED';
   const target = url ?? `https://<fqdn>${path}`;
   return {
     repo: finalRepo,
     target_branch: finalBranch,
     rule,
     verified_gap: `Probe ${target} → ${probeReason}; the app does not serve the standard health path ${path}. The infra health-check enable was correctly held by the probe-guard.`,
-    required_change: `In repo ${finalRepo}${finalRepo === "UNCONFIRMED" ? " — confirm before dispatch" : ""} (branch ${finalBranch}): add a handler serving ${path} returning 2xx (mirror the app's existing health response). Keep any existing health path working.`,
+    required_change: `In repo ${finalRepo}${finalRepo === 'UNCONFIRMED' ? ' — confirm before dispatch' : ''} (branch ${finalBranch}): add a handler serving ${path} returning 2xx (mirror the app's existing health response). Keep any existing health path working.`,
     acceptance_check: `GET ${target} returns 2xx. Once it does, the next drift scan's probe-guard passes and the infra health-check auto-enables; the change-manager item then auto-resolves.`,
-    scope_guard: "App repo only. Open a PR; do NOT deploy. Do NOT use any infra/Coolify/secret tools.",
+    scope_guard:
+      'App repo only. Open a PR; do NOT deploy. Do NOT use any infra/Coolify/secret tools.',
     do_nots: [
-      "Do NOT hand-resolve or wontfix the change-manager item.",
-      "Do NOT touch Coolify config or enable the health check manually.",
-      "Do NOT change unrelated routes.",
+      'Do NOT hand-resolve or wontfix the change-manager item.',
+      'Do NOT touch Coolify config or enable the health check manually.',
+      'Do NOT change unrelated routes.',
     ],
   };
 }
@@ -518,14 +672,15 @@ export async function buildHandoff(
   deps: HandoffDeps = {},
 ): Promise<{ lane: Lane; handoff?: HandoffPackage; handoff_brief?: string }> {
   const lane = classifyLane(probe);
-  if (lane !== "app-conformance") return { lane: "infra-config" };
+  if (lane !== 'app-conformance') return { lane: 'infra-config' };
   const path = String(
-    (proposal.planned_action?.args as Record<string, unknown> | undefined)?.health_check_path ?? "/api/health",
+    (proposal.planned_action?.args as Record<string, unknown> | undefined)?.health_check_path ??
+      '/api/health',
   );
 
   // Authoritative resolution via app-brain. PRIMARY key = the stable Coolify app UUID
   // (proposal.target.uuid); FALLBACK = the host from the probe URL. Never the resource_name.
-  const coolifyAppUuid = String(proposal.target.uuid ?? "");
+  const coolifyAppUuid = String(proposal.target.uuid ?? '');
   const fqdn = hostFromUrl(url);
   let repo: string | null = null;
   let targetBranch: string | null = null;
@@ -533,27 +688,42 @@ export async function buildHandoff(
     try {
       const r = await deps.appBrainResolve({ coolifyAppUuid, fqdn });
       if (r === null) {
-        console.info(`[handoff] no app-brain match (uuid=${coolifyAppUuid} fqdn=${fqdn ?? "—"}) → UNCONFIRMED`);
+        console.info(
+          `[handoff] no app-brain match (uuid=${coolifyAppUuid} fqdn=${fqdn ?? '—'}) → UNCONFIRMED`,
+        );
       } else if (isNonEmpty(r.github_repo) && isNonEmpty(r.branch)) {
         repo = r.github_repo;
         targetBranch = r.branch;
       } else {
-        console.warn(`[handoff] app-brain matched (name=${r.name}) but repo/branch incomplete (repo=${r.github_repo ?? "null"} branch=${r.branch ?? "null"}) → UNCONFIRMED`);
+        console.warn(
+          `[handoff] app-brain matched (name=${r.name}) but repo/branch incomplete (repo=${r.github_repo ?? 'null'} branch=${r.branch ?? 'null'}) → UNCONFIRMED`,
+        );
       }
     } catch (e) {
       const status = axios.isAxiosError(e) ? e.response?.status : undefined;
       if (status === 401 || status === 403) {
-        console.error(`[handoff] app-brain auth rejected (HTTP ${status}) — check APPBRAIN_ACCESS_KEY → UNCONFIRMED`);
+        console.error(
+          `[handoff] app-brain auth rejected (HTTP ${status}) — check APPBRAIN_ACCESS_KEY → UNCONFIRMED`,
+        );
       } else {
-        console.error(`[handoff] app-brain resolver unreachable (${e instanceof Error ? e.message : String(e)}) → UNCONFIRMED`);
+        console.error(
+          `[handoff] app-brain resolver unreachable (${e instanceof Error ? e.message : String(e)}) → UNCONFIRMED`,
+        );
       }
     }
   } else {
-    console.info("[handoff] no app-brain resolver configured → UNCONFIRMED");
+    console.info('[handoff] no app-brain resolver configured → UNCONFIRMED');
   }
 
-  const rule = proposal.id.split(":")[0];
-  const handoff = buildHandoffPackage({ repo, targetBranch, rule, path, url: url ?? null, probeReason: probe?.reason ?? "non-2xx" });
+  const rule = proposal.id.split(':')[0];
+  const handoff = buildHandoffPackage({
+    repo,
+    targetBranch,
+    rule,
+    path,
+    url: url ?? null,
+    probeReason: probe?.reason ?? 'non-2xx',
+  });
   return { lane, handoff, handoff_brief: renderHandoffBrief(handoff) };
 }
 ```
@@ -579,10 +749,12 @@ yield 'main' when the real branch is 'master')."
 ### Task 4: Thread the resolver through `run-remediation.ts`
 
 **Files:**
+
 - Modify: `src/standards/run-remediation.ts` (rename `appBrainLookup` → `appBrainResolve` in `RemediationDeps`; pass to `buildHandoff`)
 - Test: `tests/run-remediation-handoff.test.ts` (inject the fake resolver so the confirmed-repo assertion still holds)
 
 **Interfaces:**
+
 - Consumes: `HandoffDeps`/`AppResolution` shape from Task 3 + `src/services/appbrain-client.js`.
 - Produces: `RemediationDeps.appBrainResolve?: (args: { coolifyAppUuid: string; fqdn: string | null }) => Promise<AppResolution | null>`.
 
@@ -591,24 +763,54 @@ yield 'main' when the real branch is 'master')."
 In `tests/run-remediation-handoff.test.ts`, add an injected resolver to `baseDeps` and update the confirmed-repo expectation. Change the `baseDeps` factory to accept and pass a resolver, and in the first test inject one returning booking:
 
 ```typescript
-import type { AppResolution } from "../src/services/appbrain-client.js";
+import type { AppResolution } from '../src/services/appbrain-client.js';
 
 const baseDeps = (verify: any, appBrainResolve?: any) => ({
-  audit: async () => ({ proposals: [hcProposal("u1")], meta: { errors: [] } } as any),
-  apply: async () => ({ status: "applied", tool: "t", target: { name: "x" }, detail: "" } as any),
-  plan: async () => ({ generated_by: "test", root_cause: "x", steps: ["s"], infraops_tools: [], risk: "caution", rollback: "r", cm_window_hint: "h" } as any),
-  verify, appBrainResolve, maxAutoApplies: 20, dryRun: false,
+  audit: async () => ({ proposals: [hcProposal('u1')], meta: { errors: [] } }) as any,
+  apply: async () => ({ status: 'applied', tool: 't', target: { name: 'x' }, detail: '' }) as any,
+  plan: async () =>
+    ({
+      generated_by: 'test',
+      root_cause: 'x',
+      steps: ['s'],
+      infraops_tools: [],
+      risk: 'caution',
+      rollback: 'r',
+      cm_window_hint: 'h',
+    }) as any,
+  verify,
+  appBrainResolve,
+  maxAutoApplies: 20,
+  dryRun: false,
 });
 
 // in the "404 hold" test, inject a resolver returning the confirmed booking record:
-const resolve = async (): Promise<AppResolution> => ({ github_repo: "AlobarQuest/booking-system", name: "prod", branch: "master", url: "https://booking/api/health" });
-const { report } = await runRemediation(["prod"] as any, null, "t", "r.json",
-  baseDeps(async () => ({ ok: false, reason: "held", probe: { status: 404, reason: "HTTP 404" }, url: "https://booking.devonwatkins.com/api/health" }), resolve));
+const resolve = async (): Promise<AppResolution> => ({
+  github_repo: 'AlobarQuest/booking-system',
+  name: 'prod',
+  branch: 'master',
+  url: 'https://booking/api/health',
+});
+const { report } = await runRemediation(
+  ['prod'] as any,
+  null,
+  't',
+  'r.json',
+  baseDeps(
+    async () => ({
+      ok: false,
+      reason: 'held',
+      probe: { status: 404, reason: 'HTTP 404' },
+      url: 'https://booking.devonwatkins.com/api/health',
+    }),
+    resolve,
+  ),
+);
 const e = report.escalations[0];
-expect(e.lane).toBe("app-conformance");
-expect(e.handoff?.repo).toBe("AlobarQuest/booking-system");
-expect(e.handoff?.target_branch).toBe("master");
-expect(e.handoff_brief).toContain("AlobarQuest/booking-system");
+expect(e.lane).toBe('app-conformance');
+expect(e.handoff?.repo).toBe('AlobarQuest/booking-system');
+expect(e.handoff?.target_branch).toBe('master');
+expect(e.handoff_brief).toContain('AlobarQuest/booking-system');
 ```
 
 (The timeout test is unchanged — it still yields infra-config with no handoff.)
@@ -625,7 +827,7 @@ In `src/standards/run-remediation.ts`:
 (a) Add the import near the other type imports:
 
 ```typescript
-import type { AppResolution } from "../services/appbrain-client.js";
+import type { AppResolution } from '../services/appbrain-client.js';
 ```
 
 (b) Replace line 22 (`appBrainLookup?: …`) in `RemediationDeps`:
@@ -637,10 +839,13 @@ import type { AppResolution } from "../services/appbrain-client.js";
 (c) Replace the `buildHandoff` call (lines 104-107):
 
 ```typescript
-    const { lane, handoff, handoff_brief } = await buildHandoff(
-      t.proposal, t.probe, t.url, t.instance,
-      deps.appBrainResolve ? { appBrainResolve: deps.appBrainResolve } : {},
-    );
+const { lane, handoff, handoff_brief } = await buildHandoff(
+  t.proposal,
+  t.probe,
+  t.url,
+  t.instance,
+  deps.appBrainResolve ? { appBrainResolve: deps.appBrainResolve } : {},
+);
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -660,9 +865,11 @@ git commit -m "feat(remediation): thread appBrainResolve through to the handoff 
 ### Task 5: Wire the real client in `remediate-cli.ts`
 
 **Files:**
+
 - Modify: `src/cli/remediate-cli.ts` (construct `appBrainResolve` from the real `resolveApp` when configured)
 
 **Interfaces:**
+
 - Consumes: `resolveApp`, `isAppbrainConfigured` from `../services/appbrain-client.js`; `RemediationDeps.appBrainResolve` from Task 4.
 
 - [ ] **Step 1: Implementation (no new unit test — covered by Task 4's injected path; this is the production wiring)**
@@ -672,7 +879,7 @@ In `src/cli/remediate-cli.ts`:
 (a) Add the import after line 9:
 
 ```typescript
-import { resolveApp, isAppbrainConfigured } from "../services/appbrain-client.js";
+import { resolveApp, isAppbrainConfigured } from '../services/appbrain-client.js';
 ```
 
 (b) In the `runRemediation` deps object literal (lines 87-94), add the conditional resolver. Replace the object with:
@@ -708,6 +915,7 @@ git commit -m "feat(cli): wire real app-brain resolver into remediate-cli when c
 ### Task 6: Env wiring — `drift-audit.sh`, `start.sh`, `scripts/README.md`
 
 **Files:**
+
 - Modify: `scripts/drift-audit.sh` (after the infra-brain block, ~line 55)
 - Modify: `start.sh` (after the infra-brain block, ~line 161)
 - Modify: `scripts/README.md` (env table)
@@ -761,6 +969,7 @@ git commit -m "feat(env): wire APPBRAIN_BASE_URL/ACCESS_KEY into drift-audit.sh 
 ### Task 7: Build, full suite, live verify, commit `dist/`
 
 **Files:**
+
 - Modify: `dist/**` (compiled output — tracked, must match a fresh build)
 
 - [ ] **Step 1: Full test suite**

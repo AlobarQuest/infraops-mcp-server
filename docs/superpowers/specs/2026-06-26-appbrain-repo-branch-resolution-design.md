@@ -35,10 +35,10 @@ brief.
 
 Two stable identifiers, both already available where the handoff is built:
 
-| Key | Role | Source in code |
-|-----|------|----------------|
-| `coolify_app_uuid` | **PRIMARY** (exact) | `proposal.target.uuid` — the stable Coolify **application** UUID = the drift item's `resource_uuid` (verified: booking prod `hkw488ggssgcskk0ooc0ksk0`, preview `yscogs0wggcgco8g4wwk0o0g`). Stable across rolling redeploys. |
-| `fqdn` | **FALLBACK** (host) | host parsed from `url` — the health-probe URL `buildHealthProbeUrl(app.fqdn, path)` already passed into `buildHandoff` (e.g. `https://booking.devonwatkins.com/api/health` → `booking.devonwatkins.com`). `null` when the app has no FQDN. |
+| Key                | Role                | Source in code                                                                                                                                                                                                                             |
+| ------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `coolify_app_uuid` | **PRIMARY** (exact) | `proposal.target.uuid` — the stable Coolify **application** UUID = the drift item's `resource_uuid` (verified: booking prod `hkw488ggssgcskk0ooc0ksk0`, preview `yscogs0wggcgco8g4wwk0o0g`). Stable across rolling redeploys.              |
+| `fqdn`             | **FALLBACK** (host) | host parsed from `url` — the health-probe URL `buildHealthProbeUrl(app.fqdn, path)` already passed into `buildHandoff` (e.g. `https://booking.devonwatkins.com/api/health` → `booking.devonwatkins.com`). `null` when the app has no FQDN. |
 
 The endpoint does uuid-primary / fqdn-fallback **server-side**; the consumer passes both and reads the
 result. We never walk the environments array ourselves, and **never** touch the `resource_name` suffix.
@@ -88,8 +88,10 @@ GET /api/apps/resolve?coolify_app_uuid=<uuid>&fqdn=<host>
 
 ```ts
 export interface HandoffDeps {
-  appBrainResolve?: (args: { coolifyAppUuid: string; fqdn: string | null })
-    => Promise<AppResolution | null>;
+  appBrainResolve?: (args: {
+    coolifyAppUuid: string;
+    fqdn: string | null;
+  }) => Promise<AppResolution | null>;
 }
 
 /** Parse a bare host from a URL with `new URL()`. http/https only; reject userinfo; return
@@ -112,13 +114,13 @@ misleading fallback key and misjoin to the wrong app when the uuid is absent/sta
    `branch` to be non-empty trimmed strings** (panel HIGH-1 — a `{github_repo:null, branch:"master"}`
    response must NOT yield repo=UNCONFIRMED + branch=master):
    - **`github_repo` non-empty AND `branch` non-empty** → `repo = github_repo`, `target_branch = branch`.
-   - **`null` (404)** → UNCONFIRMED. Log (info): *no app-brain match for `<uuid>`/`<fqdn>`*.
-   - **matched but `github_repo` or `branch` empty/null** → UNCONFIRMED. Log (warn): *app-brain matched
-     but repo/branch incomplete*.
-   - **throws with axios 401/403** → UNCONFIRMED. Log (error, distinct): *app-brain auth rejected —
-     check APPBRAIN_ACCESS_KEY* (a misconfiguration, not an outage).
+   - **`null` (404)** → UNCONFIRMED. Log (info): _no app-brain match for `<uuid>`/`<fqdn>`_.
+   - **matched but `github_repo` or `branch` empty/null** → UNCONFIRMED. Log (warn): _app-brain matched
+     but repo/branch incomplete_.
+   - **throws with axios 401/403** → UNCONFIRMED. Log (error, distinct): _app-brain auth rejected —
+     check APPBRAIN_ACCESS_KEY_ (a misconfiguration, not an outage).
    - **throws otherwise (network/timeout/5xx/malformed body)** → UNCONFIRMED. Log (error, distinct):
-     *app-brain resolver unreachable* — so a persistent outage is a visible signal, not a silent
+     _app-brain resolver unreachable_ — so a persistent outage is a visible signal, not a silent
      stream of UNCONFIRMED briefs.
 4. `UNCONFIRMED` repo **and** branch always travel together; we never substitute a parsed/guessed value.
 
@@ -151,7 +153,7 @@ export APPBRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_APPBRAIN_SECRET_ID:-45eb08
 
 (`start.sh` uses its `fetch_bws_secret` helper.) The default base URL is overridable; the secret ID is
 overridable via its own `BWS_APPBRAIN_SECRET_ID` var. **Decision (Devon, 2026-06-26): keep the shared
-key for v1** — `BWS_APPBRAIN_SECRET_ID` *defaults to* infra-brain's `45eb083f-…` because app-brain
+key for v1** — `BWS_APPBRAIN_SECRET_ID` _defaults to_ infra-brain's `45eb083f-…` because app-brain
 currently shares the MCP_ACCESS_KEY value. Using a **separate env var name** (not literally reusing
 `BWS_INFRABRAIN_SECRET_ID`) future-proofs the wiring: when app-brain gets a distinct key later, only the
 secret value/UUID changes — no code change (this also partially addresses panel MED — blast-radius
@@ -205,8 +207,8 @@ No network in any test (injected fake / mocked HTTP), mirroring the existing sui
 ## Panel review (2026-06-26)
 
 Reviewed adversarially by a cross-vendor panel: **Opus 4.8** (this author) + **Codex/OpenAI** (grounded
-review — read the actual repo files). *Gemini was disqualified mid-run — its CLI auth is deprecated
-(`IneligibleTierError`).* **Verdict: architecture sound, no blockers** — both models independently
+review — read the actual repo files). _Gemini was disqualified mid-run — its CLI auth is deprecated
+(`IneligibleTierError`)._ **Verdict: architecture sound, no blockers** — both models independently
 affirmed uuid-primary + server-side join + deleting the `resource_name` parse, and independently
 converged on the same top issues. All findings were implementation-contract hardenings, folded in above:
 
@@ -218,12 +220,13 @@ converged on the same top issues. All findings were implementation-contract hard
 - **MED (shared key)** → Devon decision: keep shared for v1; separate `BWS_APPBRAIN_SECRET_ID` var future-proofs rotation.
 
 **Optional producer follow-up (panel LOW-6, not blocking):** ask app-brain to add `matched_by:
-"coolify_app_uuid" | "fqdn"` to the resolve response. It would let the consumer log *how* a match was
+"coolify_app_uuid" | "fqdn"` to the resolve response. It would let the consumer log _how_ a match was
 made (uuid vs fqdn fallback) and document/guarantee server-side uuid-wins precedence. Out of scope for
 this consumer PR; note it in the PR for the app-brain side.
 
 ## Constraints
 
 infraops conventions: `dist/` committed and must match a fresh build; `main` branch-protected (branch
-+ PR); TDD; no secrets in tracked files. Deliver as a PR noting the FQDN/uuid-as-join-key decision
-(rolling deploys make resource ids ephemeral) and any app-brain HTTP gap hit.
+
+- PR); TDD; no secrets in tracked files. Deliver as a PR noting the FQDN/uuid-as-join-key decision
+  (rolling deploys make resource ids ephemeral) and any app-brain HTTP gap hit.

@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-06-13-remediation-pipeline-design.md`
 
 **Conventions in this repo (follow exactly):**
+
 - Source imports use `.js` specifiers even from `.ts` files (`import { x } from "./y.js"`).
 - Tests live in `tests/`, import from `../src/...js`, mock with `vi.mock("../src/services/X.js", () => ({...}))`.
 - Each tool/client module already exists; reuse `coolifyGet` / `coolifyPatch` from `src/services/coolify-client.ts`.
@@ -21,24 +22,25 @@
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `src/standards/executor.ts` (new) | `SAFE_TOOLS` whitelist, `isAutoApplicable`, `wouldChange`, `applyAction`, `maxAutoApplies`. The only place an autonomous write originates. |
-| `src/standards/remediation-plan.ts` (new) | `RemediationPlanSchema`/`RemediationPlan`, `buildPlanPrompt`, `rawFallback`, `planEscalation` (Sonnet via injected SDK client). |
-| `src/standards/remediation-report.ts` (new) | `Escalation`/`RemediationReport` types, `buildRemediationReport`, `renderRemediationMarkdown`. |
-| `src/standards/run-remediation.ts` (new) | `runRemediation` — dep-injected core: re-audit, partition, runaway guard, apply, plan, self-resolved, assemble report. |
-| `src/cli/remediate-cli.ts` (new) | Arg parsing, wires real deps (auditInstance, applyAction, planEscalation), writes artifacts, exit codes. |
-| `scripts/drift-audit.sh` (modify) | Add remediate step; consolidated email with raw-audit fallback; combined rc. |
-| `scripts/com.devon.infra-drift.plist.template` (modify) | `Hour` 7 → 3. |
-| `scripts/README.md` (modify) | Document the remediate step, artifacts, dry-run smoke test, change-manager consumer. |
-| `package.json` (modify) | Add `@anthropic-ai/sdk` dependency. |
-| `tests/executor.test.ts`, `tests/remediation-plan.test.ts`, `tests/remediation-report.test.ts`, `tests/run-remediation.test.ts`, `tests/remediate-cli.test.ts` (new) | Tests. |
+| File                                                                                                                                                                 | Responsibility                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/standards/executor.ts` (new)                                                                                                                                    | `SAFE_TOOLS` whitelist, `isAutoApplicable`, `wouldChange`, `applyAction`, `maxAutoApplies`. The only place an autonomous write originates. |
+| `src/standards/remediation-plan.ts` (new)                                                                                                                            | `RemediationPlanSchema`/`RemediationPlan`, `buildPlanPrompt`, `rawFallback`, `planEscalation` (Sonnet via injected SDK client).            |
+| `src/standards/remediation-report.ts` (new)                                                                                                                          | `Escalation`/`RemediationReport` types, `buildRemediationReport`, `renderRemediationMarkdown`.                                             |
+| `src/standards/run-remediation.ts` (new)                                                                                                                             | `runRemediation` — dep-injected core: re-audit, partition, runaway guard, apply, plan, self-resolved, assemble report.                     |
+| `src/cli/remediate-cli.ts` (new)                                                                                                                                     | Arg parsing, wires real deps (auditInstance, applyAction, planEscalation), writes artifacts, exit codes.                                   |
+| `scripts/drift-audit.sh` (modify)                                                                                                                                    | Add remediate step; consolidated email with raw-audit fallback; combined rc.                                                               |
+| `scripts/com.devon.infra-drift.plist.template` (modify)                                                                                                              | `Hour` 7 → 3.                                                                                                                              |
+| `scripts/README.md` (modify)                                                                                                                                         | Document the remediate step, artifacts, dry-run smoke test, change-manager consumer.                                                       |
+| `package.json` (modify)                                                                                                                                              | Add `@anthropic-ai/sdk` dependency.                                                                                                        |
+| `tests/executor.test.ts`, `tests/remediation-plan.test.ts`, `tests/remediation-report.test.ts`, `tests/run-remediation.test.ts`, `tests/remediate-cli.test.ts` (new) | Tests.                                                                                                                                     |
 
 ---
 
 ## Task 1: Add the Anthropic SDK dependency
 
 **Files:**
+
 - Modify: `package.json`
 
 - [ ] **Step 1: Install the SDK**
@@ -52,9 +54,11 @@ Expected: `package.json` gains `"@anthropic-ai/sdk": "^0.6x.x"` (or current) und
 Create a throwaway check, run it, then delete it:
 
 Run:
+
 ```bash
 node --input-type=module -e "import Anthropic from '@anthropic-ai/sdk'; console.log(typeof Anthropic)"
 ```
+
 Expected: prints `function` (the default export is the client class).
 
 - [ ] **Step 3: Confirm the build still passes**
@@ -74,6 +78,7 @@ git commit -m "build: add @anthropic-ai/sdk for remediation plan generation"
 ## Task 2: executor — `wouldChange` and `isAutoApplicable` (pure logic)
 
 **Files:**
+
 - Create: `src/standards/executor.ts`
 - Test: `tests/executor.test.ts`
 
@@ -82,60 +87,84 @@ git commit -m "build: add @anthropic-ai/sdk for remediation plan generation"
 Create `tests/executor.test.ts`:
 
 ```typescript
-import { describe, it, expect } from "vitest";
-import { wouldChange, isAutoApplicable } from "../src/standards/executor.js";
-import type { Proposal } from "../src/standards/check-engine.js";
+import { describe, it, expect } from 'vitest';
+import { wouldChange, isAutoApplicable } from '../src/standards/executor.js';
+import type { Proposal } from '../src/standards/check-engine.js';
 
 function makeProposal(overrides: Partial<Proposal> = {}): Proposal {
   return {
-    id: "coolify.enable_healthcheck:deadbeef",
-    kind: "remediation",
-    source: "standards-audit",
-    status: "pending",
-    target: { provider: "coolify", resource_type: "application", uuid: "u1", name: "app1" },
+    id: 'coolify.enable_healthcheck:deadbeef',
+    kind: 'remediation',
+    source: 'standards-audit',
+    status: 'pending',
+    target: { provider: 'coolify', resource_type: 'application', uuid: 'u1', name: 'app1' },
     description: "App 'app1' violates standard",
-    reasoning: "infra-brain rule #570",
-    confidence: "high",
-    risk: "safe",
-    planned_action: { tool: "coolify_update_application", args: { uuid: "u1", health_check_enabled: true } },
+    reasoning: 'infra-brain rule #570',
+    confidence: 'high',
+    risk: 'safe',
+    planned_action: {
+      tool: 'coolify_update_application',
+      args: { uuid: 'u1', health_check_enabled: true },
+    },
     question: null,
     ...overrides,
   };
 }
 
-describe("wouldChange", () => {
-  it("returns true when a non-uuid arg differs from current state", () => {
-    expect(wouldChange({ uuid: "u1", health_check_enabled: false }, { uuid: "u1", health_check_enabled: true })).toBe(true);
+describe('wouldChange', () => {
+  it('returns true when a non-uuid arg differs from current state', () => {
+    expect(
+      wouldChange(
+        { uuid: 'u1', health_check_enabled: false },
+        { uuid: 'u1', health_check_enabled: true },
+      ),
+    ).toBe(true);
   });
-  it("returns false when all non-uuid args already match (idempotent no-op)", () => {
-    expect(wouldChange({ uuid: "u1", health_check_enabled: true, extra: "x" }, { uuid: "u1", health_check_enabled: true })).toBe(false);
+  it('returns false when all non-uuid args already match (idempotent no-op)', () => {
+    expect(
+      wouldChange(
+        { uuid: 'u1', health_check_enabled: true, extra: 'x' },
+        { uuid: 'u1', health_check_enabled: true },
+      ),
+    ).toBe(false);
   });
-  it("ignores the uuid field when comparing", () => {
-    expect(wouldChange({ uuid: "DIFFERENT", health_check_enabled: true }, { uuid: "u1", health_check_enabled: true })).toBe(false);
+  it('ignores the uuid field when comparing', () => {
+    expect(
+      wouldChange(
+        { uuid: 'DIFFERENT', health_check_enabled: true },
+        { uuid: 'u1', health_check_enabled: true },
+      ),
+    ).toBe(false);
   });
 });
 
-describe("isAutoApplicable", () => {
-  it("accepts a safe, high-confidence remediation whose tool is whitelisted", () => {
+describe('isAutoApplicable', () => {
+  it('accepts a safe, high-confidence remediation whose tool is whitelisted', () => {
     expect(isAutoApplicable(makeProposal())).toBe(true);
   });
-  it("rejects caution risk", () => {
-    expect(isAutoApplicable(makeProposal({ risk: "caution" }))).toBe(false);
+  it('rejects caution risk', () => {
+    expect(isAutoApplicable(makeProposal({ risk: 'caution' }))).toBe(false);
   });
-  it("rejects destructive risk", () => {
-    expect(isAutoApplicable(makeProposal({ risk: "destructive" }))).toBe(false);
+  it('rejects destructive risk', () => {
+    expect(isAutoApplicable(makeProposal({ risk: 'destructive' }))).toBe(false);
   });
-  it("rejects non-high confidence", () => {
-    expect(isAutoApplicable(makeProposal({ confidence: "medium" }))).toBe(false);
+  it('rejects non-high confidence', () => {
+    expect(isAutoApplicable(makeProposal({ confidence: 'medium' }))).toBe(false);
   });
-  it("rejects kind=question", () => {
-    expect(isAutoApplicable(makeProposal({ kind: "question", planned_action: null }))).toBe(false);
+  it('rejects kind=question', () => {
+    expect(isAutoApplicable(makeProposal({ kind: 'question', planned_action: null }))).toBe(false);
   });
-  it("rejects a null planned_action", () => {
+  it('rejects a null planned_action', () => {
     expect(isAutoApplicable(makeProposal({ planned_action: null }))).toBe(false);
   });
-  it("rejects a tool that is not in SAFE_TOOLS", () => {
-    expect(isAutoApplicable(makeProposal({ planned_action: { tool: "coolify_delete_application", args: { uuid: "u1" } } }))).toBe(false);
+  it('rejects a tool that is not in SAFE_TOOLS', () => {
+    expect(
+      isAutoApplicable(
+        makeProposal({
+          planned_action: { tool: 'coolify_delete_application', args: { uuid: 'u1' } },
+        }),
+      ),
+    ).toBe(false);
   });
 });
 ```
@@ -150,9 +179,9 @@ Expected: FAIL — `Cannot find module '../src/standards/executor.js'`.
 Create `src/standards/executor.ts`:
 
 ```typescript
-import { coolifyGet, coolifyPatch } from "../services/coolify-client.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import type { Proposal } from "./check-engine.js";
+import { coolifyGet, coolifyPatch } from '../services/coolify-client.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import type { Proposal } from './check-engine.js';
 
 /**
  * A whitelisted safe remediation: how to re-read the live resource (for the
@@ -160,7 +189,10 @@ import type { Proposal } from "./check-engine.js";
  * keystone — only tools present here can ever be auto-applied.
  */
 interface SafeTool {
-  fetch: (args: Record<string, unknown>, instance: CoolifyInstance) => Promise<Record<string, unknown>>;
+  fetch: (
+    args: Record<string, unknown>,
+    instance: CoolifyInstance,
+  ) => Promise<Record<string, unknown>>;
   apply: (args: Record<string, unknown>, instance: CoolifyInstance) => Promise<unknown>;
 }
 
@@ -176,9 +208,12 @@ export const SAFE_TOOLS: Record<string, SafeTool> = {
 };
 
 /** True if applying `args` would actually change the resource (uuid is the selector, not a field). */
-export function wouldChange(current: Record<string, unknown>, args: Record<string, unknown>): boolean {
+export function wouldChange(
+  current: Record<string, unknown>,
+  args: Record<string, unknown>,
+): boolean {
   for (const [k, v] of Object.entries(args)) {
-    if (k === "uuid") continue;
+    if (k === 'uuid') continue;
     if (current[k] !== v) return true;
   }
   return false;
@@ -187,9 +222,9 @@ export function wouldChange(current: Record<string, unknown>, args: Record<strin
 /** The four-gate check: only safe, high-confidence, whitelisted remediations may auto-apply. */
 export function isAutoApplicable(p: Proposal): boolean {
   return (
-    p.kind === "remediation" &&
-    p.risk === "safe" &&
-    p.confidence === "high" &&
+    p.kind === 'remediation' &&
+    p.risk === 'safe' &&
+    p.confidence === 'high' &&
     p.planned_action !== null &&
     Object.prototype.hasOwnProperty.call(SAFE_TOOLS, p.planned_action.tool)
   );
@@ -213,6 +248,7 @@ git commit -m "feat: executor gate + idempotency primitives (wouldChange, isAuto
 ## Task 3: executor — `applyAction` + `maxAutoApplies`
 
 **Files:**
+
 - Modify: `src/standards/executor.ts`
 - Test: `tests/executor.test.ts` (add a mock + new describe blocks)
 
@@ -221,11 +257,11 @@ git commit -m "feat: executor gate + idempotency primitives (wouldChange, isAuto
 At the **very top** of `tests/executor.test.ts` (before the existing imports), add the mock and import `vi`:
 
 ```typescript
-import { vi } from "vitest";
+import { vi } from 'vitest';
 
 const coolifyGet = vi.fn();
 const coolifyPatch = vi.fn();
-vi.mock("../src/services/coolify-client.js", () => ({
+vi.mock('../src/services/coolify-client.js', () => ({
   coolifyGet: (...a: unknown[]) => coolifyGet(...a),
   coolifyPatch: (...a: unknown[]) => coolifyPatch(...a),
 }));
@@ -234,71 +270,86 @@ vi.mock("../src/services/coolify-client.js", () => ({
 Then add `applyAction`, `maxAutoApplies`, and `beforeEach` to the existing imports line:
 
 ```typescript
-import { describe, it, expect, beforeEach } from "vitest";
-import { wouldChange, isAutoApplicable, applyAction, maxAutoApplies } from "../src/standards/executor.js";
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  wouldChange,
+  isAutoApplicable,
+  applyAction,
+  maxAutoApplies,
+} from '../src/standards/executor.js';
 ```
 
 Append these describe blocks to `tests/executor.test.ts`:
 
 ```typescript
-describe("applyAction", () => {
+describe('applyAction', () => {
   beforeEach(() => {
     coolifyGet.mockReset();
     coolifyPatch.mockReset();
   });
 
-  it("applies a drifted safe remediation: one PATCH with the args minus uuid", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: false });
+  it('applies a drifted safe remediation: one PATCH with the args minus uuid', async () => {
+    coolifyGet.mockResolvedValue({ uuid: 'u1', health_check_enabled: false });
     coolifyPatch.mockResolvedValue({});
-    const res = await applyAction(makeProposal(), "prod");
-    expect(res.status).toBe("applied");
+    const res = await applyAction(makeProposal(), 'prod');
+    expect(res.status).toBe('applied');
     expect(coolifyPatch).toHaveBeenCalledTimes(1);
-    expect(coolifyPatch).toHaveBeenCalledWith("/applications/u1", { health_check_enabled: true }, "prod");
+    expect(coolifyPatch).toHaveBeenCalledWith(
+      '/applications/u1',
+      { health_check_enabled: true },
+      'prod',
+    );
   });
 
-  it("skips (no PATCH) when the resource already conforms — idempotent", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: true });
-    const res = await applyAction(makeProposal(), "prod");
-    expect(res.status).toBe("skipped");
+  it('skips (no PATCH) when the resource already conforms — idempotent', async () => {
+    coolifyGet.mockResolvedValue({ uuid: 'u1', health_check_enabled: true });
+    const res = await applyAction(makeProposal(), 'prod');
+    expect(res.status).toBe('skipped');
     expect(coolifyPatch).not.toHaveBeenCalled();
   });
 
-  it("dry-run previews without PATCHing even when drifted", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: false });
-    const res = await applyAction(makeProposal(), "prod", { dryRun: true });
-    expect(res.status).toBe("skipped");
+  it('dry-run previews without PATCHing even when drifted', async () => {
+    coolifyGet.mockResolvedValue({ uuid: 'u1', health_check_enabled: false });
+    const res = await applyAction(makeProposal(), 'prod', { dryRun: true });
+    expect(res.status).toBe('skipped');
     expect(res.detail).toMatch(/dry-run/i);
     expect(coolifyPatch).not.toHaveBeenCalled();
   });
 
-  it("records failed (no throw) when the client errors, leaving the batch to continue", async () => {
-    coolifyGet.mockResolvedValue({ uuid: "u1", health_check_enabled: false });
-    coolifyPatch.mockRejectedValue(new Error("boom"));
-    const res = await applyAction(makeProposal(), "prod");
-    expect(res.status).toBe("failed");
-    expect(res.detail).toContain("boom");
+  it('records failed (no throw) when the client errors, leaving the batch to continue', async () => {
+    coolifyGet.mockResolvedValue({ uuid: 'u1', health_check_enabled: false });
+    coolifyPatch.mockRejectedValue(new Error('boom'));
+    const res = await applyAction(makeProposal(), 'prod');
+    expect(res.status).toBe('failed');
+    expect(res.detail).toContain('boom');
   });
 
-  it("refuses (failed, no fetch) a non-auto-applicable proposal as defense in depth", async () => {
-    const res = await applyAction(makeProposal({ risk: "destructive" }), "prod");
-    expect(res.status).toBe("failed");
+  it('refuses (failed, no fetch) a non-auto-applicable proposal as defense in depth', async () => {
+    const res = await applyAction(makeProposal({ risk: 'destructive' }), 'prod');
+    expect(res.status).toBe('failed');
     expect(coolifyGet).not.toHaveBeenCalled();
     expect(coolifyPatch).not.toHaveBeenCalled();
   });
 });
 
-describe("maxAutoApplies", () => {
+describe('maxAutoApplies', () => {
   const orig = process.env.MAX_AUTO_APPLIES;
-  beforeEach(() => { delete process.env.MAX_AUTO_APPLIES; });
-  afterAll(() => { if (orig !== undefined) process.env.MAX_AUTO_APPLIES = orig; });
+  beforeEach(() => {
+    delete process.env.MAX_AUTO_APPLIES;
+  });
+  afterAll(() => {
+    if (orig !== undefined) process.env.MAX_AUTO_APPLIES = orig;
+  });
 
-  it("defaults to 20", () => { expect(maxAutoApplies()).toBe(20); });
-  it("reads a positive integer from env", () => {
-    process.env.MAX_AUTO_APPLIES = "5";
+  it('defaults to 20', () => {
+    expect(maxAutoApplies()).toBe(20);
+  });
+  it('reads a positive integer from env', () => {
+    process.env.MAX_AUTO_APPLIES = '5';
     expect(maxAutoApplies()).toBe(5);
   });
-  it("falls back to 20 on a non-numeric env value", () => {
-    process.env.MAX_AUTO_APPLIES = "nonsense";
+  it('falls back to 20 on a non-numeric env value', () => {
+    process.env.MAX_AUTO_APPLIES = 'nonsense';
     expect(maxAutoApplies()).toBe(20);
   });
 });
@@ -318,10 +369,10 @@ Append to `src/standards/executor.ts`:
 ```typescript
 export interface ApplyResult {
   proposal_id: string;
-  target: Proposal["target"];
+  target: Proposal['target'];
   tool: string;
   args: Record<string, unknown>;
-  status: "applied" | "skipped" | "failed";
+  status: 'applied' | 'skipped' | 'failed';
   detail: string;
 }
 
@@ -347,12 +398,12 @@ export async function applyAction(
   const base = {
     proposal_id: p.id,
     target: p.target,
-    tool: p.planned_action?.tool ?? "",
+    tool: p.planned_action?.tool ?? '',
     args: p.planned_action?.args ?? {},
   };
 
   if (!isAutoApplicable(p)) {
-    return { ...base, status: "failed", detail: "not auto-applicable (gate failed)" };
+    return { ...base, status: 'failed', detail: 'not auto-applicable (gate failed)' };
   }
 
   const tool = SAFE_TOOLS[p.planned_action!.tool];
@@ -361,15 +412,15 @@ export async function applyAction(
   try {
     const current = await tool.fetch(args, instance);
     if (!wouldChange(current, args)) {
-      return { ...base, status: "skipped", detail: "already conformant" };
+      return { ...base, status: 'skipped', detail: 'already conformant' };
     }
     if (opts.dryRun) {
-      return { ...base, status: "skipped", detail: "dry-run (would apply)" };
+      return { ...base, status: 'skipped', detail: 'dry-run (would apply)' };
     }
     await tool.apply(args, instance);
-    return { ...base, status: "applied", detail: "applied successfully" };
+    return { ...base, status: 'applied', detail: 'applied successfully' };
   } catch (e) {
-    return { ...base, status: "failed", detail: e instanceof Error ? e.message : String(e) };
+    return { ...base, status: 'failed', detail: e instanceof Error ? e.message : String(e) };
   }
 }
 ```
@@ -391,6 +442,7 @@ git commit -m "feat: executor applyAction (live re-check, dry-run, failure isola
 ## Task 4: remediation-plan — schema, prompt, raw fallback (pure logic)
 
 **Files:**
+
 - Create: `src/standards/remediation-plan.ts`
 - Test: `tests/remediation-plan.test.ts`
 
@@ -399,44 +451,53 @@ git commit -m "feat: executor applyAction (live re-check, dry-run, failure isola
 Create `tests/remediation-plan.test.ts`:
 
 ```typescript
-import { describe, it, expect } from "vitest";
-import { buildPlanPrompt, rawFallback, RemediationPlanSchema } from "../src/standards/remediation-plan.js";
-import type { Proposal } from "../src/standards/check-engine.js";
+import { describe, it, expect } from 'vitest';
+import {
+  buildPlanPrompt,
+  rawFallback,
+  RemediationPlanSchema,
+} from '../src/standards/remediation-plan.js';
+import type { Proposal } from '../src/standards/check-engine.js';
 
 function questionProposal(): Proposal {
   return {
-    id: "572:e4f2022e",
-    kind: "question",
-    source: "standards-audit",
-    status: "pending",
-    target: { provider: "coolify", resource_type: "database", uuid: "db1", name: "agent-sites-postgres" },
+    id: '572:e4f2022e',
+    kind: 'question',
+    source: 'standards-audit',
+    status: 'pending',
+    target: {
+      provider: 'coolify',
+      resource_type: 'database',
+      uuid: 'db1',
+      name: 'agent-sites-postgres',
+    },
     description: "Database 'agent-sites-postgres' violates standard: backups must be defined.",
-    reasoning: "infra-brain rule #572 (WARN): databases must have backups.",
-    confidence: "high",
-    risk: "safe",
+    reasoning: 'infra-brain rule #572 (WARN): databases must have backups.',
+    confidence: 'high',
+    risk: 'safe',
     planned_action: null,
     question: "Database 'agent-sites-postgres' violates standard. Review and fix manually?",
   };
 }
 
-describe("buildPlanPrompt", () => {
-  it("includes the resource name, the violated rule reasoning, and the description", () => {
+describe('buildPlanPrompt', () => {
+  it('includes the resource name, the violated rule reasoning, and the description', () => {
     const prompt = buildPlanPrompt(questionProposal());
-    expect(prompt).toContain("agent-sites-postgres");
-    expect(prompt).toContain("rule #572");
-    expect(prompt).toContain("backups must be defined");
+    expect(prompt).toContain('agent-sites-postgres');
+    expect(prompt).toContain('rule #572');
+    expect(prompt).toContain('backups must be defined');
   });
-  it("is deterministic (no timestamps / randomness)", () => {
+  it('is deterministic (no timestamps / randomness)', () => {
     expect(buildPlanPrompt(questionProposal())).toBe(buildPlanPrompt(questionProposal()));
   });
 });
 
-describe("rawFallback", () => {
-  it("produces a schema-valid plan tagged generated_by=raw from the proposal alone", () => {
+describe('rawFallback', () => {
+  it('produces a schema-valid plan tagged generated_by=raw from the proposal alone', () => {
     const plan = rawFallback(questionProposal());
-    expect(plan.generated_by).toBe("raw");
+    expect(plan.generated_by).toBe('raw');
     expect(() => RemediationPlanSchema.parse(plan)).not.toThrow();
-    expect(plan.root_cause).toContain("rule #572");
+    expect(plan.root_cause).toContain('rule #572');
   });
 });
 ```
@@ -451,16 +512,16 @@ Expected: FAIL — module not found.
 Create `src/standards/remediation-plan.ts`:
 
 ```typescript
-import { z } from "zod";
-import type { Proposal } from "./check-engine.js";
+import { z } from 'zod';
+import type { Proposal } from './check-engine.js';
 
 /** The structured remediation plan Sonnet returns for one escalated proposal. */
 export const RemediationPlanSchema = z.object({
-  generated_by: z.enum(["sonnet", "raw"]),
+  generated_by: z.enum(['sonnet', 'raw']),
   root_cause: z.string(),
   steps: z.array(z.string()),
   infraops_tools: z.array(z.string()),
-  risk: z.enum(["safe", "caution", "destructive"]),
+  risk: z.enum(['safe', 'caution', 'destructive']),
   rollback: z.string(),
   cm_window_hint: z.string(),
 });
@@ -472,36 +533,39 @@ export const PlanModelSchema = RemediationPlanSchema.omit({ generated_by: true }
 /** Deterministic prompt for one escalated proposal. No timestamps/randomness (keeps tests + caching stable). */
 export function buildPlanPrompt(p: Proposal): string {
   return [
-    "You are an infrastructure change planner for a Coolify-based platform.",
-    "A daily standards audit flagged the following deviation that cannot be auto-fixed.",
-    "Write a concrete remediation plan a careful operator (or a change-manager process) can execute.",
-    "",
+    'You are an infrastructure change planner for a Coolify-based platform.',
+    'A daily standards audit flagged the following deviation that cannot be auto-fixed.',
+    'Write a concrete remediation plan a careful operator (or a change-manager process) can execute.',
+    '',
     `Resource: ${p.target.resource_type} '${p.target.name}' (uuid ${p.target.uuid}, provider ${p.target.provider})`,
     `Deviation: ${p.description}`,
     `Why it matters: ${p.reasoning}`,
-    p.question ? `Open question: ${p.question}` : "",
-    "",
+    p.question ? `Open question: ${p.question}` : '',
+    '',
     "Infrastructure context: changes are made via the infraops MCP server's coolify_* tools",
-    "(e.g. coolify_update_application, coolify_create_scheduled_task, coolify_update_database).",
-    "Domains follow appname.devonwatkins.com; secrets live in Bitwarden Secrets Manager.",
-    "",
-    "Return: root cause, ordered concrete steps, which infraops tools to use, the risk of",
-    "the fix itself (safe/caution/destructive), how to roll back, and a change-window hint.",
+    '(e.g. coolify_update_application, coolify_create_scheduled_task, coolify_update_database).',
+    'Domains follow appname.devonwatkins.com; secrets live in Bitwarden Secrets Manager.',
+    '',
+    'Return: root cause, ordered concrete steps, which infraops tools to use, the risk of',
+    'the fix itself (safe/caution/destructive), how to roll back, and a change-window hint.',
   ]
     .filter(Boolean)
-    .join("\n");
+    .join('\n');
 }
 
 /** Deterministic fallback when Sonnet is unreachable — keeps the pipeline flowing. */
 export function rawFallback(p: Proposal): RemediationPlan {
   return {
-    generated_by: "raw",
+    generated_by: 'raw',
     root_cause: p.reasoning,
-    steps: [p.question ?? p.description, "Review manually and choose the appropriate infraops remediation."],
+    steps: [
+      p.question ?? p.description,
+      'Review manually and choose the appropriate infraops remediation.',
+    ],
     infraops_tools: [],
     risk: p.risk,
-    rollback: "n/a — manual review required before any change.",
-    cm_window_hint: "Review during the next scheduled change-management window.",
+    rollback: 'n/a — manual review required before any change.',
+    cm_window_hint: 'Review during the next scheduled change-management window.',
   };
 }
 ```
@@ -523,6 +587,7 @@ git commit -m "feat: remediation plan schema, deterministic prompt, raw fallback
 ## Task 5: remediation-plan — `planEscalation` (Sonnet via injected client)
 
 **Files:**
+
 - Modify: `src/standards/remediation-plan.ts`
 - Test: `tests/remediation-plan.test.ts`
 
@@ -531,39 +596,41 @@ git commit -m "feat: remediation plan schema, deterministic prompt, raw fallback
 Append to `tests/remediation-plan.test.ts`:
 
 ```typescript
-import { planEscalation } from "../src/standards/remediation-plan.js";
+import { planEscalation } from '../src/standards/remediation-plan.js';
 
 function fakeClient(impl: () => Promise<unknown>) {
-  return { messages: { parse: impl } } as unknown as import("@anthropic-ai/sdk").default;
+  return { messages: { parse: impl } } as unknown as import('@anthropic-ai/sdk').default;
 }
 
-describe("planEscalation", () => {
-  it("returns a sonnet-tagged plan when the model responds with valid structured output", async () => {
+describe('planEscalation', () => {
+  it('returns a sonnet-tagged plan when the model responds with valid structured output', async () => {
     const client = fakeClient(async () => ({
       parsed_output: {
-        root_cause: "No backup schedule configured.",
-        steps: ["Create a nightly backup scheduled task."],
-        infraops_tools: ["coolify_create_scheduled_task"],
-        risk: "caution",
-        rollback: "Delete the scheduled task.",
-        cm_window_hint: "Off-peak; additive and non-disruptive.",
+        root_cause: 'No backup schedule configured.',
+        steps: ['Create a nightly backup scheduled task.'],
+        infraops_tools: ['coolify_create_scheduled_task'],
+        risk: 'caution',
+        rollback: 'Delete the scheduled task.',
+        cm_window_hint: 'Off-peak; additive and non-disruptive.',
       },
     }));
     const plan = await planEscalation(questionProposal(), client);
-    expect(plan.generated_by).toBe("sonnet");
-    expect(plan.infraops_tools).toContain("coolify_create_scheduled_task");
+    expect(plan.generated_by).toBe('sonnet');
+    expect(plan.infraops_tools).toContain('coolify_create_scheduled_task');
   });
 
-  it("falls back to raw when parsed_output is null", async () => {
+  it('falls back to raw when parsed_output is null', async () => {
     const client = fakeClient(async () => ({ parsed_output: null }));
     const plan = await planEscalation(questionProposal(), client);
-    expect(plan.generated_by).toBe("raw");
+    expect(plan.generated_by).toBe('raw');
   });
 
-  it("falls back to raw (never throws) when the API call rejects", async () => {
-    const client = fakeClient(async () => { throw new Error("api down"); });
+  it('falls back to raw (never throws) when the API call rejects', async () => {
+    const client = fakeClient(async () => {
+      throw new Error('api down');
+    });
     const plan = await planEscalation(questionProposal(), client);
-    expect(plan.generated_by).toBe("raw");
+    expect(plan.generated_by).toBe('raw');
   });
 });
 ```
@@ -578,8 +645,8 @@ Expected: FAIL — `planEscalation` not exported.
 Add imports at the top of `src/standards/remediation-plan.ts`:
 
 ```typescript
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import Anthropic from '@anthropic-ai/sdk';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 ```
 
 Append:
@@ -597,15 +664,16 @@ export async function planEscalation(p: Proposal, client?: Anthropic): Promise<R
   const anthropic = client ?? new Anthropic();
   try {
     const res = await anthropic.messages.parse({
-      model: "claude-sonnet-4-6",
+      model: 'claude-sonnet-4-6',
       max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium", format: zodOutputFormat(PlanModelSchema) },
-      messages: [{ role: "user", content: buildPlanPrompt(p) }],
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'medium', format: zodOutputFormat(PlanModelSchema) },
+      messages: [{ role: 'user', content: buildPlanPrompt(p) }],
     });
-    const parsed = (res as { parsed_output?: z.infer<typeof PlanModelSchema> | null }).parsed_output;
+    const parsed = (res as { parsed_output?: z.infer<typeof PlanModelSchema> | null })
+      .parsed_output;
     if (!parsed) return rawFallback(p);
-    return { ...parsed, generated_by: "sonnet" };
+    return { ...parsed, generated_by: 'sonnet' };
   } catch {
     return rawFallback(p);
   }
@@ -634,6 +702,7 @@ git commit -m "feat: planEscalation via Sonnet structured output with raw fallba
 ## Task 6: remediation-report — `buildRemediationReport`
 
 **Files:**
+
 - Create: `src/standards/remediation-report.ts`
 - Test: `tests/remediation-report.test.ts`
 
@@ -642,31 +711,88 @@ git commit -m "feat: planEscalation via Sonnet structured output with raw fallba
 Create `tests/remediation-report.test.ts`:
 
 ```typescript
-import { describe, it, expect } from "vitest";
-import { buildRemediationReport, type Escalation } from "../src/standards/remediation-report.js";
-import type { ApplyResult } from "../src/standards/executor.js";
+import { describe, it, expect } from 'vitest';
+import { buildRemediationReport, type Escalation } from '../src/standards/remediation-report.js';
+import type { ApplyResult } from '../src/standards/executor.js';
 
 const applied: ApplyResult[] = [
-  { proposal_id: "a1", target: { provider: "coolify", resource_type: "application", uuid: "u1", name: "app1" }, tool: "coolify_update_application", args: { uuid: "u1" }, status: "applied", detail: "ok" },
-  { proposal_id: "a2", target: { provider: "coolify", resource_type: "application", uuid: "u2", name: "app2" }, tool: "coolify_update_application", args: { uuid: "u2" }, status: "skipped", detail: "already conformant" },
-  { proposal_id: "a3", target: { provider: "coolify", resource_type: "application", uuid: "u3", name: "app3" }, tool: "coolify_update_application", args: { uuid: "u3" }, status: "failed", detail: "boom" },
+  {
+    proposal_id: 'a1',
+    target: { provider: 'coolify', resource_type: 'application', uuid: 'u1', name: 'app1' },
+    tool: 'coolify_update_application',
+    args: { uuid: 'u1' },
+    status: 'applied',
+    detail: 'ok',
+  },
+  {
+    proposal_id: 'a2',
+    target: { provider: 'coolify', resource_type: 'application', uuid: 'u2', name: 'app2' },
+    tool: 'coolify_update_application',
+    args: { uuid: 'u2' },
+    status: 'skipped',
+    detail: 'already conformant',
+  },
+  {
+    proposal_id: 'a3',
+    target: { provider: 'coolify', resource_type: 'application', uuid: 'u3', name: 'app3' },
+    tool: 'coolify_update_application',
+    args: { uuid: 'u3' },
+    status: 'failed',
+    detail: 'boom',
+  },
 ];
 
 const escalations: Escalation[] = [
-  { proposal_id: "q1", target: { provider: "coolify", resource_type: "database", uuid: "db1", name: "pg1" }, risk: "safe", kind: "question", reasoning: "rule #572", plan: { generated_by: "sonnet", root_cause: "x", steps: ["s"], infraops_tools: [], risk: "caution", rollback: "r", cm_window_hint: "h" } },
+  {
+    proposal_id: 'q1',
+    target: { provider: 'coolify', resource_type: 'database', uuid: 'db1', name: 'pg1' },
+    risk: 'safe',
+    kind: 'question',
+    reasoning: 'rule #572',
+    plan: {
+      generated_by: 'sonnet',
+      root_cause: 'x',
+      steps: ['s'],
+      infraops_tools: [],
+      risk: 'caution',
+      rollback: 'r',
+      cm_window_hint: 'h',
+    },
+  },
 ];
 
-describe("buildRemediationReport", () => {
-  it("computes totals from applied results and escalations", () => {
-    const r = buildRemediationReport({ generatedAt: "2026-06-13T07:00:00Z", sourceReport: "2026-06-13.json", applied, escalations, selfResolved: 2, runawayTripped: false });
+describe('buildRemediationReport', () => {
+  it('computes totals from applied results and escalations', () => {
+    const r = buildRemediationReport({
+      generatedAt: '2026-06-13T07:00:00Z',
+      sourceReport: '2026-06-13.json',
+      applied,
+      escalations,
+      selfResolved: 2,
+      runawayTripped: false,
+    });
     expect(r.schema_version).toBe(1);
-    expect(r.totals).toEqual({ applied: 1, skipped: 1, failed: 1, escalated: 1, self_resolved: 2, runaway_tripped: false });
-    expect(r.source_report).toBe("2026-06-13.json");
+    expect(r.totals).toEqual({
+      applied: 1,
+      skipped: 1,
+      failed: 1,
+      escalated: 1,
+      self_resolved: 2,
+      runaway_tripped: false,
+    });
+    expect(r.source_report).toBe('2026-06-13.json');
     expect(r.applied).toHaveLength(3);
     expect(r.escalations).toHaveLength(1);
   });
-  it("carries the runaway flag through", () => {
-    const r = buildRemediationReport({ generatedAt: "t", sourceReport: "s", applied: [], escalations, selfResolved: 0, runawayTripped: true });
+  it('carries the runaway flag through', () => {
+    const r = buildRemediationReport({
+      generatedAt: 't',
+      sourceReport: 's',
+      applied: [],
+      escalations,
+      selfResolved: 0,
+      runawayTripped: true,
+    });
     expect(r.totals.runaway_tripped).toBe(true);
   });
 });
@@ -682,14 +808,14 @@ Expected: FAIL — module not found.
 Create `src/standards/remediation-report.ts`:
 
 ```typescript
-import type { ApplyResult } from "./executor.js";
-import type { Proposal } from "./check-engine.js";
-import type { RemediationPlan } from "./remediation-plan.js";
+import type { ApplyResult } from './executor.js';
+import type { Proposal } from './check-engine.js';
+import type { RemediationPlan } from './remediation-plan.js';
 
 /** One escalated (non-auto-fixable) item plus its Sonnet/raw plan. The change-manager contract. */
 export interface Escalation {
   proposal_id: string;
-  target: Proposal["target"];
+  target: Proposal['target'];
   risk: string;
   kind: string;
   reasoning: string;
@@ -720,15 +846,15 @@ export function buildRemediationReport(args: {
   selfResolved: number;
   runawayTripped: boolean;
 }): RemediationReport {
-  const count = (s: ApplyResult["status"]) => args.applied.filter((a) => a.status === s).length;
+  const count = (s: ApplyResult['status']) => args.applied.filter((a) => a.status === s).length;
   return {
     schema_version: 1,
     generated_at: args.generatedAt,
     source_report: args.sourceReport,
     totals: {
-      applied: count("applied"),
-      skipped: count("skipped"),
-      failed: count("failed"),
+      applied: count('applied'),
+      skipped: count('skipped'),
+      failed: count('failed'),
       escalated: args.escalations.length,
       self_resolved: args.selfResolved,
       runaway_tripped: args.runawayTripped,
@@ -756,6 +882,7 @@ git commit -m "feat: buildRemediationReport (versioned contract + totals)"
 ## Task 7: remediation-report — `renderRemediationMarkdown`
 
 **Files:**
+
 - Modify: `src/standards/remediation-report.ts`
 - Test: `tests/remediation-report.test.ts`
 
@@ -764,29 +891,53 @@ git commit -m "feat: buildRemediationReport (versioned contract + totals)"
 Append to `tests/remediation-report.test.ts`:
 
 ```typescript
-import { renderRemediationMarkdown, buildRemediationReport as build2 } from "../src/standards/remediation-report.js";
+import {
+  renderRemediationMarkdown,
+  buildRemediationReport as build2,
+} from '../src/standards/remediation-report.js';
 
-describe("renderRemediationMarkdown", () => {
-  it("renders a headline, an applied section, and an escalations section with the plan", () => {
-    const r = build2({ generatedAt: "2026-06-13T07:00:00Z", sourceReport: "2026-06-13.json", applied, escalations, selfResolved: 0, runawayTripped: false });
+describe('renderRemediationMarkdown', () => {
+  it('renders a headline, an applied section, and an escalations section with the plan', () => {
+    const r = build2({
+      generatedAt: '2026-06-13T07:00:00Z',
+      sourceReport: '2026-06-13.json',
+      applied,
+      escalations,
+      selfResolved: 0,
+      runawayTripped: false,
+    });
     const md = renderRemediationMarkdown(r);
-    expect(md).toContain("# Infra Remediation");
-    expect(md).toContain("1 fixed");
-    expect(md).toContain("1 need"); // escalations needing attention
-    expect(md).toContain("app1");   // an applied target
-    expect(md).toContain("pg1");    // an escalated target
-    expect(md).toContain("coolify_create_scheduled_task".slice(0, 0) || "Plan"); // a plan section header
+    expect(md).toContain('# Infra Remediation');
+    expect(md).toContain('1 fixed');
+    expect(md).toContain('1 need'); // escalations needing attention
+    expect(md).toContain('app1'); // an applied target
+    expect(md).toContain('pg1'); // an escalated target
+    expect(md).toContain('coolify_create_scheduled_task'.slice(0, 0) || 'Plan'); // a plan section header
   });
 
-  it("renders cleanly on an empty day (nothing drifted)", () => {
-    const r = build2({ generatedAt: "t", sourceReport: "s", applied: [], escalations: [], selfResolved: 0, runawayTripped: false });
+  it('renders cleanly on an empty day (nothing drifted)', () => {
+    const r = build2({
+      generatedAt: 't',
+      sourceReport: 's',
+      applied: [],
+      escalations: [],
+      selfResolved: 0,
+      runawayTripped: false,
+    });
     const md = renderRemediationMarkdown(r);
-    expect(md).toContain("0 fixed");
+    expect(md).toContain('0 fixed');
     expect(md).toMatch(/no .* attention|nothing/i);
   });
 
-  it("surfaces a loud banner when the runaway guard tripped", () => {
-    const r = build2({ generatedAt: "t", sourceReport: "s", applied: [], escalations, selfResolved: 0, runawayTripped: true });
+  it('surfaces a loud banner when the runaway guard tripped', () => {
+    const r = build2({
+      generatedAt: 't',
+      sourceReport: 's',
+      applied: [],
+      escalations,
+      selfResolved: 0,
+      runawayTripped: true,
+    });
     const md = renderRemediationMarkdown(r);
     expect(md).toMatch(/runaway|safety guard/i);
   });
@@ -808,49 +959,51 @@ export function renderRemediationMarkdown(r: RemediationReport): string {
   const t = r.totals;
   const lines: string[] = [];
   lines.push(`# Infra Remediation — ${r.generated_at}`);
-  lines.push("");
+  lines.push('');
   lines.push(
     `**${t.applied} fixed**, ${t.escalated} need attention ` +
       `(skipped ${t.skipped}, failed ${t.failed}, self-resolved ${t.self_resolved}).`,
   );
   if (t.runaway_tripped) {
-    lines.push("");
+    lines.push('');
     lines.push(
       `> ⚠️ **Safety guard tripped:** the live safe-fix count exceeded MAX_AUTO_APPLIES, ` +
         `so NOTHING was auto-applied — every item was escalated for review.`,
     );
   }
-  lines.push("");
+  lines.push('');
 
-  lines.push("## Auto-applied");
+  lines.push('## Auto-applied');
   if (!r.applied.length) {
-    lines.push("- _none_");
+    lines.push('- _none_');
   } else {
     for (const a of r.applied) {
-      const icon = a.status === "applied" ? "✅" : a.status === "skipped" ? "⏭️" : "❌";
+      const icon = a.status === 'applied' ? '✅' : a.status === 'skipped' ? '⏭️' : '❌';
       lines.push(`- ${icon} **${a.target.name}** (${a.tool}) — ${a.status}: ${a.detail}`);
     }
   }
-  lines.push("");
+  lines.push('');
 
-  lines.push("## Escalated — needs review");
+  lines.push('## Escalated — needs review');
   if (!r.escalations.length) {
-    lines.push("- _nothing needs your attention_");
+    lines.push('- _nothing needs your attention_');
   } else {
     for (const e of r.escalations) {
-      lines.push("");
-      lines.push(`### ${e.target.resource_type} '${e.target.name}' (${e.risk}) — plan by ${e.plan.generated_by}`);
+      lines.push('');
+      lines.push(
+        `### ${e.target.resource_type} '${e.target.name}' (${e.risk}) — plan by ${e.plan.generated_by}`,
+      );
       lines.push(`- **Why:** ${e.reasoning}`);
       lines.push(`- **Root cause:** ${e.plan.root_cause}`);
       lines.push(`- **Steps:**`);
       for (const s of e.plan.steps) lines.push(`  1. ${s}`);
-      lines.push(`- **Tools:** ${e.plan.infraops_tools.join(", ") || "—"}`);
+      lines.push(`- **Tools:** ${e.plan.infraops_tools.join(', ') || '—'}`);
       lines.push(`- **Fix risk:** ${e.plan.risk} · **Rollback:** ${e.plan.rollback}`);
       lines.push(`- **Change window:** ${e.plan.cm_window_hint}`);
     }
   }
-  lines.push("");
-  return lines.join("\n");
+  lines.push('');
+  return lines.join('\n');
 }
 ```
 
@@ -871,6 +1024,7 @@ git commit -m "feat: renderRemediationMarkdown digest (applied + escalated + run
 ## Task 8: run-remediation — the dep-injected core
 
 **Files:**
+
 - Create: `src/standards/run-remediation.ts`
 - Test: `tests/run-remediation.test.ts`
 
@@ -879,27 +1033,30 @@ git commit -m "feat: renderRemediationMarkdown digest (applied + escalated + run
 Create `tests/run-remediation.test.ts`:
 
 ```typescript
-import { describe, it, expect, vi } from "vitest";
-import { runRemediation, type RemediationDeps } from "../src/standards/run-remediation.js";
-import type { AuditResult } from "../src/standards/run-audit.js";
-import type { Proposal, Risk } from "../src/standards/check-engine.js";
-import type { ApplyResult } from "../src/standards/executor.js";
-import type { RemediationPlan } from "../src/standards/remediation-plan.js";
-import type { DriftReport } from "../src/standards/report.js";
+import { describe, it, expect, vi } from 'vitest';
+import { runRemediation, type RemediationDeps } from '../src/standards/run-remediation.js';
+import type { AuditResult } from '../src/standards/run-audit.js';
+import type { Proposal, Risk } from '../src/standards/check-engine.js';
+import type { ApplyResult } from '../src/standards/executor.js';
+import type { RemediationPlan } from '../src/standards/remediation-plan.js';
+import type { DriftReport } from '../src/standards/report.js';
 
 let n = 0;
 function prop(ruleKey: string, uuid: string, opts: Partial<Proposal> = {}): Proposal {
   return {
-    id: `${ruleKey}:${(n++).toString(16).padStart(8, "0")}`,
-    kind: "remediation",
-    source: "standards-audit",
-    status: "pending",
-    target: { provider: "coolify", resource_type: "application", uuid, name: `name-${uuid}` },
+    id: `${ruleKey}:${(n++).toString(16).padStart(8, '0')}`,
+    kind: 'remediation',
+    source: 'standards-audit',
+    status: 'pending',
+    target: { provider: 'coolify', resource_type: 'application', uuid, name: `name-${uuid}` },
     description: `App '${uuid}' violates ${ruleKey}`,
     reasoning: `infra-brain rule ${ruleKey}`,
-    confidence: "high",
-    risk: "safe" as Risk,
-    planned_action: { tool: "coolify_update_application", args: { uuid, health_check_enabled: true } },
+    confidence: 'high',
+    risk: 'safe' as Risk,
+    planned_action: {
+      tool: 'coolify_update_application',
+      args: { uuid, health_check_enabled: true },
+    },
     question: null,
     ...opts,
   };
@@ -907,14 +1064,33 @@ function prop(ruleKey: string, uuid: string, opts: Partial<Proposal> = {}): Prop
 
 function auditResult(proposals: Proposal[]): AuditResult {
   return {
-    meta: { standards_source: "live", checks_evaluated: 1, not_audited: 0 },
-    summary: { total_proposals: proposals.length, by_risk: { safe: 0, caution: 0, destructive: 0 }, by_kind: { remediation: 0, question: 0 } },
+    meta: { standards_source: 'live', checks_evaluated: 1, not_audited: 0 },
+    summary: {
+      total_proposals: proposals.length,
+      by_risk: { safe: 0, caution: 0, destructive: 0 },
+      by_kind: { remediation: 0, question: 0 },
+    },
     proposals,
   };
 }
 
-const appliedOk = (p: Proposal): ApplyResult => ({ proposal_id: p.id, target: p.target, tool: "coolify_update_application", args: p.planned_action!.args, status: "applied", detail: "ok" });
-const plan = (): RemediationPlan => ({ generated_by: "sonnet", root_cause: "x", steps: ["s"], infraops_tools: [], risk: "caution", rollback: "r", cm_window_hint: "h" });
+const appliedOk = (p: Proposal): ApplyResult => ({
+  proposal_id: p.id,
+  target: p.target,
+  tool: 'coolify_update_application',
+  args: p.planned_action!.args,
+  status: 'applied',
+  detail: 'ok',
+});
+const plan = (): RemediationPlan => ({
+  generated_by: 'sonnet',
+  root_cause: 'x',
+  steps: ['s'],
+  infraops_tools: [],
+  risk: 'caution',
+  rollback: 'r',
+  cm_window_hint: 'h',
+});
 
 function deps(over: Partial<RemediationDeps> = {}): RemediationDeps {
   return {
@@ -927,12 +1103,22 @@ function deps(over: Partial<RemediationDeps> = {}): RemediationDeps {
   };
 }
 
-describe("runRemediation", () => {
-  it("applies safe proposals and escalates questions", async () => {
-    const safe = prop("570", "u1");
-    const question = prop("572", "u2", { kind: "question", planned_action: null, question: "fix?" });
+describe('runRemediation', () => {
+  it('applies safe proposals and escalates questions', async () => {
+    const safe = prop('570', 'u1');
+    const question = prop('572', 'u2', {
+      kind: 'question',
+      planned_action: null,
+      question: 'fix?',
+    });
     const d = deps({ audit: vi.fn(async () => auditResult([safe, question])) });
-    const { report, cleanlyAudited } = await runRemediation(["prod"], null, "2026-06-13T07:00:00Z", "2026-06-13.json", d);
+    const { report, cleanlyAudited } = await runRemediation(
+      ['prod'],
+      null,
+      '2026-06-13T07:00:00Z',
+      '2026-06-13.json',
+      d,
+    );
     expect(cleanlyAudited).toBe(true);
     expect(report.totals.applied).toBe(1);
     expect(report.totals.escalated).toBe(1);
@@ -940,50 +1126,72 @@ describe("runRemediation", () => {
     expect(d.plan).toHaveBeenCalledTimes(1);
   });
 
-  it("trips the runaway guard: applies nothing, escalates all safe", async () => {
-    const many = [prop("570", "u1"), prop("570", "u2"), prop("570", "u3")];
+  it('trips the runaway guard: applies nothing, escalates all safe', async () => {
+    const many = [prop('570', 'u1'), prop('570', 'u2'), prop('570', 'u3')];
     const d = deps({ audit: vi.fn(async () => auditResult(many)), maxAutoApplies: 2 });
-    const { report } = await runRemediation(["prod"], null, "t", "s", d);
+    const { report } = await runRemediation(['prod'], null, 't', 's', d);
     expect(report.totals.runaway_tripped).toBe(true);
     expect(report.totals.applied).toBe(0);
     expect(report.totals.escalated).toBe(3);
     expect(d.apply).not.toHaveBeenCalled();
   });
 
-  it("counts self-resolved: in the morning report but no longer live", async () => {
-    const stillLive = prop("570", "u1");
+  it('counts self-resolved: in the morning report but no longer live', async () => {
+    const stillLive = prop('570', 'u1');
     const morning: DriftReport = {
-      generated_at: "earlier",
-      instances: { prod: { ok: true, proposals: [stillLive, prop("571", "GONE")] } },
-      totals: { total_proposals: 2, by_risk: { safe: 2, caution: 0, destructive: 0 }, by_kind: { remediation: 2, question: 0 }, instances_ok: 1, instances_failed: 0 },
+      generated_at: 'earlier',
+      instances: { prod: { ok: true, proposals: [stillLive, prop('571', 'GONE')] } },
+      totals: {
+        total_proposals: 2,
+        by_risk: { safe: 2, caution: 0, destructive: 0 },
+        by_kind: { remediation: 2, question: 0 },
+        instances_ok: 1,
+        instances_failed: 0,
+      },
       delta: { new: [], resolved: [], unchanged: 0 },
     };
     const d = deps({ audit: vi.fn(async () => auditResult([stillLive])) });
-    const { report } = await runRemediation(["prod"], morning, "t", "s", d);
+    const { report } = await runRemediation(['prod'], morning, 't', 's', d);
     expect(report.totals.self_resolved).toBe(1);
   });
 
-  it("a thrown audit for an instance does not abort the run; cleanlyAudited reflects the others", async () => {
+  it('a thrown audit for an instance does not abort the run; cleanlyAudited reflects the others', async () => {
     const audit = vi.fn(async (inst: string) => {
-      if (inst === "dev") throw new Error("unreachable");
-      return auditResult([prop("570", "u1")]);
+      if (inst === 'dev') throw new Error('unreachable');
+      return auditResult([prop('570', 'u1')]);
     });
-    const { report, cleanlyAudited } = await runRemediation(["prod", "dev"], null, "t", "s", deps({ audit }));
+    const { report, cleanlyAudited } = await runRemediation(
+      ['prod', 'dev'],
+      null,
+      't',
+      's',
+      deps({ audit }),
+    );
     expect(cleanlyAudited).toBe(true);
     expect(report.totals.applied).toBe(1);
   });
 
-  it("cleanlyAudited is false when every instance throws", async () => {
-    const audit = vi.fn(async () => { throw new Error("down"); });
-    const { cleanlyAudited } = await runRemediation(["prod"], null, "t", "s", deps({ audit }));
+  it('cleanlyAudited is false when every instance throws', async () => {
+    const audit = vi.fn(async () => {
+      throw new Error('down');
+    });
+    const { cleanlyAudited } = await runRemediation(['prod'], null, 't', 's', deps({ audit }));
     expect(cleanlyAudited).toBe(false);
   });
 
-  it("passes dryRun through to apply", async () => {
-    const apply = vi.fn(async (p: Proposal) => ({ ...appliedOk(p), status: "skipped" as const, detail: "dry-run" }));
-    const d = deps({ audit: vi.fn(async () => auditResult([prop("570", "u1")])), apply, dryRun: true });
-    await runRemediation(["prod"], null, "t", "s", d);
-    expect(apply).toHaveBeenCalledWith(expect.anything(), "prod", { dryRun: true });
+  it('passes dryRun through to apply', async () => {
+    const apply = vi.fn(async (p: Proposal) => ({
+      ...appliedOk(p),
+      status: 'skipped' as const,
+      detail: 'dry-run',
+    }));
+    const d = deps({
+      audit: vi.fn(async () => auditResult([prop('570', 'u1')])),
+      apply,
+      dryRun: true,
+    });
+    await runRemediation(['prod'], null, 't', 's', d);
+    expect(apply).toHaveBeenCalledWith(expect.anything(), 'prod', { dryRun: true });
   });
 });
 ```
@@ -998,18 +1206,18 @@ Expected: FAIL — module not found.
 Create `src/standards/run-remediation.ts`:
 
 ```typescript
-import type { CoolifyInstance } from "../services/coolify-client.js";
-import type { AuditResult } from "./run-audit.js";
-import type { Proposal } from "./check-engine.js";
-import type { ApplyResult } from "./executor.js";
-import { isAutoApplicable } from "./executor.js";
-import type { RemediationPlan } from "./remediation-plan.js";
-import { proposalIdentity, type DriftReport } from "./report.js";
+import type { CoolifyInstance } from '../services/coolify-client.js';
+import type { AuditResult } from './run-audit.js';
+import type { Proposal } from './check-engine.js';
+import type { ApplyResult } from './executor.js';
+import { isAutoApplicable } from './executor.js';
+import type { RemediationPlan } from './remediation-plan.js';
+import { proposalIdentity, type DriftReport } from './report.js';
 import {
   buildRemediationReport,
   type Escalation,
   type RemediationReport,
-} from "./remediation-report.js";
+} from './remediation-report.js';
 
 export interface RemediationDeps {
   audit: (inst: CoolifyInstance) => Promise<AuditResult>;
@@ -1127,6 +1335,7 @@ git commit -m "feat: runRemediation core (live re-audit, partition, runaway guar
 ## Task 9: remediate-cli — arg parsing (testable unit)
 
 **Files:**
+
 - Create: `src/cli/remediate-cli.ts`
 - Test: `tests/remediate-cli.test.ts`
 
@@ -1137,19 +1346,27 @@ The CLI's `main()` does IO and is wired to real deps; keep it thin and export th
 Create `tests/remediate-cli.test.ts`:
 
 ```typescript
-import { describe, it, expect } from "vitest";
-import { parseArgs } from "../src/cli/remediate-cli.js";
+import { describe, it, expect } from 'vitest';
+import { parseArgs } from '../src/cli/remediate-cli.js';
 
-describe("remediate-cli parseArgs", () => {
-  it("parses value flags and boolean flags", () => {
-    const a = parseArgs(["--instance", "prod,dev", "--report-dir", "/r", "--now", "2026-06-13T07:00:00Z", "--dry-run"]);
-    expect(a.instance).toBe("prod,dev");
-    expect(a["report-dir"]).toBe("/r");
-    expect(a.now).toBe("2026-06-13T07:00:00Z");
-    expect(a["dry-run"]).toBe(true);
+describe('remediate-cli parseArgs', () => {
+  it('parses value flags and boolean flags', () => {
+    const a = parseArgs([
+      '--instance',
+      'prod,dev',
+      '--report-dir',
+      '/r',
+      '--now',
+      '2026-06-13T07:00:00Z',
+      '--dry-run',
+    ]);
+    expect(a.instance).toBe('prod,dev');
+    expect(a['report-dir']).toBe('/r');
+    expect(a.now).toBe('2026-06-13T07:00:00Z');
+    expect(a['dry-run']).toBe(true);
   });
-  it("treats a trailing flag with no value as boolean true", () => {
-    expect(parseArgs(["--stdout"]).stdout).toBe(true);
+  it('treats a trailing flag with no value as boolean true', () => {
+    expect(parseArgs(['--stdout']).stdout).toBe(true);
   });
 });
 ```
@@ -1165,16 +1382,16 @@ Create `src/cli/remediate-cli.ts` (the `parseArgs` is copied verbatim from `audi
 
 ```typescript
 #!/usr/bin/env node
-import fs from "fs";
-import path from "path";
-import Anthropic from "@anthropic-ai/sdk";
-import { auditInstance } from "../standards/run-audit.js";
-import { applyAction, maxAutoApplies } from "../standards/executor.js";
-import { planEscalation } from "../standards/remediation-plan.js";
-import { renderRemediationMarkdown } from "../standards/remediation-report.js";
-import { runRemediation } from "../standards/run-remediation.js";
-import type { DriftReport } from "../standards/report.js";
-import type { CoolifyInstance } from "../services/coolify-client.js";
+import fs from 'fs';
+import path from 'path';
+import Anthropic from '@anthropic-ai/sdk';
+import { auditInstance } from '../standards/run-audit.js';
+import { applyAction, maxAutoApplies } from '../standards/executor.js';
+import { planEscalation } from '../standards/remediation-plan.js';
+import { renderRemediationMarkdown } from '../standards/remediation-report.js';
+import { runRemediation } from '../standards/run-remediation.js';
+import type { DriftReport } from '../standards/report.js';
+import type { CoolifyInstance } from '../services/coolify-client.js';
 
 /**
  * Headless remediation pass. Reads the morning drift report for context, re-audits
@@ -1192,10 +1409,10 @@ export function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (!a.startsWith("--")) continue;
+    if (!a.startsWith('--')) continue;
     const key = a.slice(2);
     const next = argv[i + 1];
-    if (next !== undefined && !next.startsWith("--")) {
+    if (next !== undefined && !next.startsWith('--')) {
       args[key] = next;
       i++;
     } else {
@@ -1209,7 +1426,7 @@ function loadReport(dir: string, basename: string): DriftReport | null {
   try {
     const p = path.join(dir, basename);
     if (!fs.existsSync(p)) return null;
-    return JSON.parse(fs.readFileSync(p, "utf-8")) as DriftReport;
+    return JSON.parse(fs.readFileSync(p, 'utf-8')) as DriftReport;
   } catch {
     return null;
   }
@@ -1218,15 +1435,17 @@ function loadReport(dir: string, basename: string): DriftReport | null {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
-  const instances = String(args.instance ?? "prod")
-    .split(",")
+  const instances = String(args.instance ?? 'prod')
+    .split(',')
     .map((s) => s.trim())
     .filter(Boolean) as CoolifyInstance[];
 
-  const reportDir = typeof args["report-dir"] === "string" ? (args["report-dir"] as string) : undefined;
-  const generatedAt = typeof args.now === "string" ? (args.now as string) : new Date().toISOString();
+  const reportDir =
+    typeof args['report-dir'] === 'string' ? (args['report-dir'] as string) : undefined;
+  const generatedAt =
+    typeof args.now === 'string' ? (args.now as string) : new Date().toISOString();
   const dateStr = generatedAt.slice(0, 10);
-  const dryRun = args["dry-run"] === true;
+  const dryRun = args['dry-run'] === true;
 
   const sourceBasename = `${dateStr}.json`;
   const morning = reportDir ? loadReport(reportDir, sourceBasename) : null;
@@ -1250,17 +1469,25 @@ async function main(): Promise<void> {
 
   if (reportDir && !dryRun) {
     fs.mkdirSync(reportDir, { recursive: true });
-    fs.writeFileSync(path.join(reportDir, `${dateStr}.remediation.json`), JSON.stringify(report, null, 2), "utf-8");
-    fs.writeFileSync(path.join(reportDir, `${dateStr}.remediation.md`), renderRemediationMarkdown(report), "utf-8");
+    fs.writeFileSync(
+      path.join(reportDir, `${dateStr}.remediation.json`),
+      JSON.stringify(report, null, 2),
+      'utf-8',
+    );
+    fs.writeFileSync(
+      path.join(reportDir, `${dateStr}.remediation.md`),
+      renderRemediationMarkdown(report),
+      'utf-8',
+    );
   } else {
-    process.stdout.write(renderRemediationMarkdown(report) + "\n");
+    process.stdout.write(renderRemediationMarkdown(report) + '\n');
   }
 
   process.exit(cleanlyAudited ? 0 : 1);
 }
 
 // Only run main() when invoked as a script, not when imported by tests.
-if (process.argv[1] && process.argv[1].endsWith("remediate-cli.js")) {
+if (process.argv[1] && process.argv[1].endsWith('remediate-cli.js')) {
   main().catch((e) => {
     console.error(e instanceof Error ? e.message : String(e));
     process.exit(1);
@@ -1290,6 +1517,7 @@ git commit -m "feat: remediate-cli — wires real deps, writes remediation artif
 ## Task 10: Wire the remediate step into `drift-audit.sh`
 
 **Files:**
+
 - Modify: `scripts/drift-audit.sh`
 
 Read the current script first (it was last touched in commit `b946c60`). The changes: after `audit-cli.js` runs and writes the report, run `remediate-cli.js`; then email the **remediation** digest, falling back to the raw audit `.md` if the remediation step hard-failed; ping Healthchecks.io on the combined rc.
@@ -1366,12 +1594,14 @@ Expected: no output (valid syntax).
 Build first, then run the CLI directly in dry-run against prod (reads live state, writes nothing):
 
 Run:
+
 ```bash
 npm run build
 COOLIFY_BASE_URL=http://coolify-1.devonwatkins.com \
 COOLIFY_API_TOKEN="$(bws secret list 2>/dev/null | python3 -c "import sys,json;print(next((s['value'] for s in json.load(sys.stdin) if s['key']=='prod-coolify-api-token'),''))")" \
 node dist/cli/remediate-cli.js --instance prod --dry-run
 ```
+
 Expected: prints a remediation markdown digest to stdout; the "Auto-applied" entries all say `dry-run (would apply)`; no PATCH is performed. (If you lack a local BWS token, skip this step and rely on the launchctl smoke test in Task 12.)
 
 - [ ] **Step 7: Commit**
@@ -1386,6 +1616,7 @@ git commit -m "feat: chain remediate step into drift-audit.sh with consolidated 
 ## Task 11: Move the schedule to 03:00 and document
 
 **Files:**
+
 - Modify: `scripts/com.devon.infra-drift.plist.template`
 - Modify: `scripts/README.md`
 

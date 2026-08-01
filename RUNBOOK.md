@@ -24,15 +24,15 @@ InfraOps MCP Server is a local-only Model Context Protocol server that exposes i
 
 **195 tools across 7 providers:**
 
-| Provider   | Prefix         | Always On | Tools |
-|------------|----------------|-----------|-------|
-| Coolify    | `coolify_`     | Yes       | 67    |
-| VPS SSH    | `vps_`         | Yes       | 7     |
-| Hetzner    | `hetzner_`     | No        | 26    |
-| Namecheap  | `namecheap_`   | No        | 19    |
-| Cloudflare | `cloudflare_`  | No        | 44    |
-| Supabase   | `supabase_`    | No        | 28    |
-| GitHub     | `github_`      | No        | 4     |
+| Provider   | Prefix        | Always On | Tools |
+| ---------- | ------------- | --------- | ----- |
+| Coolify    | `coolify_`    | Yes       | 67    |
+| VPS SSH    | `vps_`        | Yes       | 7     |
+| Hetzner    | `hetzner_`    | No        | 26    |
+| Namecheap  | `namecheap_`  | No        | 19    |
+| Cloudflare | `cloudflare_` | No        | 44    |
+| Supabase   | `supabase_`   | No        | 28    |
+| GitHub     | `github_`     | No        | 4     |
 
 Coolify and VPS SSH register unconditionally. All other providers register only if their required env vars are present at startup.
 
@@ -82,14 +82,14 @@ Note: running `node dist/index.js` directly without `start.sh` will fail for Coo
 
 ### Scripts
 
-| Command              | What it does                                              |
-|----------------------|-----------------------------------------------------------|
-| `npm run dev`        | Runs `tsx watch src/index.ts` — restarts on file changes  |
-| `npm run build`      | Runs `tsc` — compiles to `dist/`                          |
-| `npm run start`      | Runs `node dist/index.js` — requires a prior build        |
-| `npm test`           | Runs `vitest run` — one-shot unit test suite              |
-| `npm run test:watch` | Runs `vitest` in watch mode for TDD                       |
-| `npm run clean`      | Removes `dist/`                                           |
+| Command              | What it does                                             |
+| -------------------- | -------------------------------------------------------- |
+| `npm run dev`        | Runs `tsx watch src/index.ts` — restarts on file changes |
+| `npm run build`      | Runs `tsc` — compiles to `dist/`                         |
+| `npm run start`      | Runs `node dist/index.js` — requires a prior build       |
+| `npm test`           | Runs `vitest run` — one-shot unit test suite             |
+| `npm run test:watch` | Runs `vitest` in watch mode for TDD                      |
+| `npm run clean`      | Removes `dist/`                                          |
 
 ### Dev workflow
 
@@ -114,7 +114,7 @@ Compiler options of note (`tsconfig.json`):
 The `.js` extension requirement is a common source of confusion: when importing within `src/`, always write the import with `.js` even though the source file is `.ts`:
 
 ```typescript
-import { registerProjectTools } from "./tools/projects.js";
+import { registerProjectTools } from './tools/projects.js';
 ```
 
 ---
@@ -124,6 +124,7 @@ import { registerProjectTools } from "./tools/projects.js";
 The workflow at `.github/workflows/build.yml` runs on every push to `main` and on pull requests targeting `main`.
 
 Steps:
+
 1. `actions/checkout@v4` — checks out the code
 2. `actions/setup-node@v4` with Node 18 and npm cache enabled
 3. `npm ci` — clean install
@@ -144,6 +145,7 @@ This pipeline does not deploy anything — the server runs locally and is never 
 `src/index.ts` calls an `isXxxConfigured()` function from each provider's client module before registering its tools. If the check returns false, the tools are skipped entirely and a message is logged to stderr.
 
 Coolify and VPS are exceptions:
+
 - Coolify tools are always registered. If no instances are configured, a warning is logged but the server still starts.
 - VPS tools are always registered with no configuration check. Connection details default at call time. Like the Coolify tools, every `vps_*` tool accepts an `instance` parameter (`"prod"` or `"dev"`) and routes to a different backend per instance (see below).
 
@@ -261,16 +263,17 @@ provisioned, so their IDs default empty). See infra-brain lesson #277.
 
 The following env vars in `.claude.json` are secret IDs (UUIDs), not the actual tokens:
 
-| Env var in .claude.json            | What it resolves to              |
-|------------------------------------|----------------------------------|
-| `BWS_COOLIFY_PROD_SECRET_ID`       | `COOLIFY_API_TOKEN`              |
-| `BWS_COOLIFY_DEV_SECRET_ID`        | `COOLIFY_DEV_API_TOKEN`          |
-| `BWS_HETZNER_SECRET_ID`            | `HETZNER_API_TOKEN`              |
-| `BWS_SSH_PASSPHRASE_SECRET_ID`     | `VPS_SSH_PASSPHRASE`             |
-| `BWS_CLOUDFLARE_SECRET_ID`         | `CLOUDFLARE_API_TOKEN`           |
-| `BWS_SUPABASE_SECRET_ID`           | `SUPABASE_ACCESS_TOKEN`          |
+| Env var in .claude.json        | What it resolves to     |
+| ------------------------------ | ----------------------- |
+| `BWS_COOLIFY_PROD_SECRET_ID`   | `COOLIFY_API_TOKEN`     |
+| `BWS_COOLIFY_DEV_SECRET_ID`    | `COOLIFY_DEV_API_TOKEN` |
+| `BWS_HETZNER_SECRET_ID`        | `HETZNER_API_TOKEN`     |
+| `BWS_SSH_PASSPHRASE_SECRET_ID` | `VPS_SSH_PASSPHRASE`    |
+| `BWS_CLOUDFLARE_SECRET_ID`     | `CLOUDFLARE_API_TOKEN`  |
+| `BWS_SUPABASE_SECRET_ID`       | `SUPABASE_ACCESS_TOKEN` |
 
 Namecheap and the Namecheap proxy token are fetched by name — no secret ID env vars are needed for them, just that the BWS vault contains keys named:
+
 - `BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID`
 - `BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID`
 - `BWS_NAMECHEAP_PROD_API_USER_SECRET_ID`
@@ -321,9 +324,7 @@ Claude Code will prompt for approval the first time each tool is used. To pre-ap
 ```json
 {
   "permissions": {
-    "allow": [
-      "mcp__infraops__*"
-    ]
+    "allow": ["mcp__infraops__*"]
   }
 }
 ```
@@ -351,7 +352,7 @@ export function isLinearConfigured(): boolean {
 
 export async function linearRequest(path: string, body: object): Promise<unknown> {
   const token = process.env.LINEAR_API_KEY;
-  if (!token) throw new Error("LINEAR_API_KEY not set");
+  if (!token) throw new Error('LINEAR_API_KEY not set');
   // ... axios call
 }
 ```
@@ -363,23 +364,23 @@ Create `src/tools/<provider>-<feature>.ts`. Export a `registerXxxTools(server: M
 ```typescript
 // src/tools/linear-issues.ts
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import { linearRequest } from "../services/linear-client.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { linearRequest } from '../services/linear-client.js';
 
 export function registerLinearIssueTools(server: McpServer): void {
   server.registerTool(
-    "linear_list_issues",
+    'linear_list_issues',
     {
-      description: "List Linear issues for a team",
+      description: 'List Linear issues for a team',
       inputSchema: z.object({
-        teamId: z.string().describe("Team ID"),
+        teamId: z.string().describe('Team ID'),
       }),
     },
     async ({ teamId }) => {
-      const result = await linearRequest("/issues", { teamId });
-      return { content: [{ type: "text", text: JSON.stringify(result) }] };
-    }
+      const result = await linearRequest('/issues', { teamId });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
   );
 }
 ```
@@ -389,16 +390,16 @@ export function registerLinearIssueTools(server: McpServer): void {
 Add the import and conditional registration to `src/index.ts`:
 
 ```typescript
-import { registerLinearIssueTools } from "./tools/linear-issues.js";
-import { isLinearConfigured } from "./services/linear-client.js";
+import { registerLinearIssueTools } from './tools/linear-issues.js';
+import { isLinearConfigured } from './services/linear-client.js';
 
 // ... after existing registrations:
 
 if (isLinearConfigured()) {
   registerLinearIssueTools(server);
-  console.error("Linear tools registered");
+  console.error('Linear tools registered');
 } else {
-  console.error("LINEAR_API_KEY not set — Linear tools disabled");
+  console.error('LINEAR_API_KEY not set — Linear tools disabled');
 }
 ```
 
@@ -441,6 +442,7 @@ npm run build
 **Cause:** The `bws` CLI is not authenticated or `BWS_ACCESS_TOKEN` is not in the environment.
 
 **Fix:**
+
 ```bash
 # Check if bws is authenticated
 bws secret list --output json | head -c 100
@@ -459,11 +461,13 @@ Note: `.zshrc` is not sourced by GUI-launched applications. Use `~/.zshenv` for 
 **Cause:** The provider's env var was empty at startup, so its tools were not registered.
 
 **Diagnosis:** Check the server's startup log in Claude Code (`/mcp` menu or session output). Look for lines like:
+
 ```
 HETZNER_API_TOKEN not set — Hetzner Cloud tools disabled
 ```
 
 **Fix:**
+
 1. Verify the BWS secret ID in `.claude.json` is correct
 2. Verify `bws secret get <id> --output json` returns the expected value
 3. Restart the Claude Code session to force a fresh server spawn
@@ -515,6 +519,7 @@ HETZNER_API_TOKEN not set — Hetzner Cloud tools disabled
 **Cause:** Namecheap's API requires IP whitelisting. Direct API calls from a local machine are rejected unless the local IP is whitelisted. The proxy at `namecheap-proxy.devonwatkins.com` routes requests through the VPS (which is whitelisted).
 
 **Diagnosis checklist:**
+
 1. Confirm `NAMECHEAP_PROXY_TOKEN` is non-empty (check start.sh output for "Namecheap proxy token loaded from BWS")
 2. Confirm `NAMECHEAP_USE_SANDBOX` matches which credentials you have in BWS (sandbox vs production)
 3. Check whether the proxy service on the VPS is running: `vps_exec` with `docker ps | grep namecheap`
@@ -529,6 +534,7 @@ HETZNER_API_TOKEN not set — Hetzner Cloud tools disabled
 **Cause:** `start.sh` is not executable, or the path in `.claude.json` is wrong.
 
 **Fix:**
+
 ```bash
 chmod +x /Users/devon/Projects/infraops-mcp-server/start.sh
 
