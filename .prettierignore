@@ -1,3 +1,4 @@
+# code-standards:managed:start — everything down to :end is replaced by `code-standards sync`.
 # code-standards vendored .prettierignore. Edit upstream and `code-standards sync`.
 #
 # Prettier must NOT format two kinds of file:
@@ -37,3 +38,4 @@ CLAUDE.md
 # the backlog skill / `portfolio add` rewrite this; formatting it just starts a
 # tug-of-war the next portfolio write undoes.
 PROJECT.md
+# code-standards:managed:end — content OUTSIDE these markers is yours and is preserved. Delete both markers to own the whole file: sync then writes nothing here and says so every run.
