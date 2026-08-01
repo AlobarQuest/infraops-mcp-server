@@ -69,9 +69,11 @@ log "change-mgr run-window exited rc=$RC"
 # ── Run the verbatim security executor (approved security items only) ───────────
 # Deterministic, no LLM; integrity-gated. Best-effort/non-fatal — never blocks the
 # Coolify window result. Reuses the same CM M2M token exported above.
-node "$REPO/dist/cli/change-mgr-cli.js" run-security-window --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
-  && log "change-mgr run-security-window ok" \
-  || log "WARN: change-mgr run-security-window failed (non-fatal)"
+if node "$REPO/dist/cli/change-mgr-cli.js" run-security-window --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1; then
+  log "change-mgr run-security-window ok"
+else
+  log "WARN: change-mgr run-security-window failed (non-fatal)"
+fi
 
 CW_MD="$REPORT_DIR/$DATE.change-window.md"
 SUBJECT="Change window $DATE"

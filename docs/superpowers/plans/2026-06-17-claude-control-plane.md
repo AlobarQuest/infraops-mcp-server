@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - **Deny-by-default `.gitignore`:** ignore `/*`, then un-ignore ONLY the explicit allow-list. Never commit the generated/sensitive bulk (`projects/`, `plugins/`, `audit/`, `history.jsonl`, caches).
-- **No secret values tracked:** only BWS secret *IDs*, tool-name allowlists, and config. Verify before every commit in `~/.claude`.
+- **No secret values tracked:** only BWS secret _IDs_, tool-name allowlists, and config. Verify before every commit in `~/.claude`.
 - **`bin/` is excluded:** `security-scan.sh` / `skills-security-scan.sh` stay owned + hash-verified by infraops; never track them in the `~/.claude` repo.
 - **`security-scan.sh` stays READ-ONLY:** Check 13 may only read (`git status`); it must never `git add`/`commit` or mutate anything.
 - **No auto-heal in v1:** detection + escalation only.
@@ -23,10 +23,12 @@
 ### Task 1: git-init `~/.claude` with deny-by-default `.gitignore` + README
 
 **Files:**
+
 - Create: `~/.claude/.gitignore`
 - Create: `~/.claude/README.md`
 
 **Interfaces:**
+
 - Produces: a git repo at `~/.claude` whose tracked set is exactly the control-plane allow-list. Task 4's Check 13 depends on `~/.claude/.git` existing.
 
 - [ ] **Step 1: Write `~/.claude/.gitignore`**
@@ -65,6 +67,7 @@ version-controls the **security-critical Claude Code control plane** — the lay
 governs whether Claude may mutate infrastructure — for **tamper-evidence + rollback**.
 
 ## Tracked set (see `.gitignore`)
+
 - `CLAUDE.md`, `RTK.md` — instruction layer (core security policy)
 - `settings.json` — deny list, hook wiring, `skipDangerousModePermissionPrompt`
 - `settings.local.json` — per-project permission allowlists (expected churn)
@@ -77,12 +80,14 @@ infraops-mcp-server repo), and all generated/sensitive content (`projects/`, `pl
 `audit/`, `history.jsonl`, caches) — excluded deny-by-default.
 
 ## Tamper-evidence
+
 Because the live files ARE the tracked files, `git -C ~/.claude status` shows any change
 since the last reviewed commit. The infraops `security-scan.sh` "Check 13" reports drift:
 critical-set changes escalate via the security-drift → change-manager pipeline;
 `settings.local.json` churn is logged but not escalated.
 
 ## Rollback
+
 `git -C ~/.claude diff` to inspect, `git -C ~/.claude checkout -- <file>` to revert a
 tampered file to the last committed state.
 
@@ -98,6 +103,7 @@ Expected: `Initialized empty Git repository in /Users/devon/.claude/.git/`
 
 Run: `git -C ~/.claude status --porcelain`
 Expected: exactly these untracked entries (order may vary), and NOTHING else (no `projects/`, `plugins/`, `audit/`, `history.jsonl`, `.DS_Store`, `*.bak*`):
+
 ```
 ?? .gitignore
 ?? .mcp.json
@@ -109,11 +115,13 @@ Expected: exactly these untracked entries (order may vary), and NOTHING else (no
 ?? settings.local.json
 ?? statusline-command.sh
 ```
+
 If any generated/sensitive path appears, STOP and fix `.gitignore` before continuing.
 
 - [ ] **Step 5: Verify no secret VALUES are about to be committed**
 
 Run:
+
 ```bash
 git -C ~/.claude diff --no-index /dev/null /dev/null >/dev/null 2>&1
 for f in settings.json settings.local.json .mcp.json statusline-command.sh; do
@@ -122,7 +130,8 @@ for f in settings.json settings.local.json .mcp.json statusline-command.sh; do
 done
 echo "value scan done"
 ```
-Expected: `value scan done` with no "SECRET-SHAPED VALUE" line. (BWS secret *IDs* like `BWS_COOLIFY_SECRET_ID` are non-secret and fine; this scan only trips on actual token/key VALUES.)
+
+Expected: `value scan done` with no "SECRET-SHAPED VALUE" line. (BWS secret _IDs_ like `BWS_COOLIFY_SECRET_ID` are non-secret and fine; this scan only trips on actual token/key VALUES.)
 
 - [ ] **Step 6: Stage and commit**
 
@@ -133,6 +142,7 @@ git -C ~/.claude commit -q -m "chore: init control-plane repo (tamper-evidence +
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
+
 Expected after add: all entries show `A` (added), none under `bin/`, no `*.bak*`.
 
 - [ ] **Step 7: Verify a clean tree**
@@ -147,6 +157,7 @@ Expected: `CLEAN` (no output before it). A subsequent change to any tracked file
 **Files:** none (remote operation)
 
 **Interfaces:**
+
 - Consumes: the local repo from Task 1.
 - Produces: offsite backup at `AlobarQuest/claude-control-plane`.
 
@@ -161,6 +172,7 @@ Expected: repo created; clone URL `git@github.com:AlobarQuest/claude-control-pla
 git -C ~/.claude remote add origin git@github.com:AlobarQuest/claude-control-plane.git
 git -C ~/.claude push -u origin main
 ```
+
 Expected: `branch 'main' set up to track 'origin/main'`; push succeeds.
 
 - [ ] **Step 3: Verify the remote has only the allow-list**
@@ -173,10 +185,12 @@ Expected: only the tracked control-plane files (no `projects/`, `bin/`, `audit/`
 ### Task 3: Route control-plane findings in `taxonomy.ts` (TDD)
 
 **Files:**
+
 - Modify: `/Users/devon/Projects/infraops-mcp-server/src/security-drift/taxonomy.ts`
 - Test: `/Users/devon/Projects/infraops-mcp-server/tests/security-drift-taxonomy.test.ts`
 
 **Interfaces:**
+
 - Consumes: `classify(f: Finding, opts: ClassifyOptions): Classification | null` (existing).
 - Produces: `controlplane.drift` + `controlplane.unmanaged` → `tier: "URGENT"`; `controlplane.local_churn` → `null` (dropped). Task 4 emits findings with these exact check keys.
 
@@ -185,30 +199,44 @@ Expected: only the tracked control-plane files (no `projects/`, `bin/`, `audit/`
 Append inside the `describe("classify", ...)` block in `tests/security-drift-taxonomy.test.ts`:
 
 ```ts
-  it("URGENTs an uncommitted control-plane critical change (deny-by-default)", () => {
-    const c = classify(
-      f({ check: "controlplane.drift", target: "settings.json", detail: "uncommitted/untracked control-plane change:  M settings.json (review + commit if intended)" }),
-      { autoFixAllowlist: [] },
-    );
-    expect(c?.tier).toBe("URGENT");
-    expect(c && "manual" in c.remediation).toBe(true);
-  });
+it('URGENTs an uncommitted control-plane critical change (deny-by-default)', () => {
+  const c = classify(
+    f({
+      check: 'controlplane.drift',
+      target: 'settings.json',
+      detail:
+        'uncommitted/untracked control-plane change:  M settings.json (review + commit if intended)',
+    }),
+    { autoFixAllowlist: [] },
+  );
+  expect(c?.tier).toBe('URGENT');
+  expect(c && 'manual' in c.remediation).toBe(true);
+});
 
-  it("URGENTs an unmanaged control plane (no git repo)", () => {
-    const c = classify(
-      f({ check: "controlplane.unmanaged", target: "/Users/x/.claude", detail: "/Users/x/.claude is not a git repo" }),
-      { autoFixAllowlist: [] },
-    );
-    expect(c?.tier).toBe("URGENT");
-  });
+it('URGENTs an unmanaged control plane (no git repo)', () => {
+  const c = classify(
+    f({
+      check: 'controlplane.unmanaged',
+      target: '/Users/x/.claude',
+      detail: '/Users/x/.claude is not a git repo',
+    }),
+    { autoFixAllowlist: [] },
+  );
+  expect(c?.tier).toBe('URGENT');
+});
 
-  it("drops settings.local.json churn (logged in scan, never escalated)", () => {
-    const c = classify(
-      f({ severity: "WARN", check: "controlplane.local_churn", target: "settings.local.json", detail: "settings.local.json changed since last commit (expected churn)" }),
-      { autoFixAllowlist: [] },
-    );
-    expect(c).toBeNull();
-  });
+it('drops settings.local.json churn (logged in scan, never escalated)', () => {
+  const c = classify(
+    f({
+      severity: 'WARN',
+      check: 'controlplane.local_churn',
+      target: 'settings.local.json',
+      detail: 'settings.local.json changed since last commit (expected churn)',
+    }),
+    { autoFixAllowlist: [] },
+  );
+  expect(c).toBeNull();
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -219,6 +247,7 @@ Expected: the `local_churn` test FAILS (deny-by-default currently returns URGENT
 - [ ] **Step 3: Add the explicit mappings in `taxonomy.ts`**
 
 In `URGENT_KEYS`, add these two entries (after the `mcp.server_added` line, inside the `Set`):
+
 ```ts
   // control-plane tamper-evidence (~/.claude git repo):
   "controlplane.drift",
@@ -226,20 +255,23 @@ In `URGENT_KEYS`, add these two entries (after the `mcp.server_added` line, insi
 ```
 
 Immediately AFTER the `URGENT_KEYS` set definition, add the ignore set:
+
 ```ts
 // Findings surfaced in the scan log but intentionally NOT escalated (expected churn).
-const IGNORE_KEYS = new Set<string>(["controlplane.local_churn"]);
+const IGNORE_KEYS = new Set<string>(['controlplane.local_churn']);
 ```
 
 In `SHORT_TITLES`, add:
+
 ```ts
   "controlplane.drift": "Control-plane file changed without review",
   "controlplane.unmanaged": "Control plane not under version control",
 ```
 
 In `classify`, add the ignore short-circuit immediately after the existing `if (isFalsePositive(f, opts)) return null;` line:
+
 ```ts
-  if (IGNORE_KEYS.has(f.check)) return null;
+if (IGNORE_KEYS.has(f.check)) return null;
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -265,9 +297,11 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ### Task 4: Add Check 13 (control-plane git drift) to `security-scan.sh`
 
 **Files:**
+
 - Modify: `/Users/devon/Projects/security-standards/scripts/security-scan.sh` (insert before the summary block at the end)
 
 **Interfaces:**
+
 - Consumes: the `~/.claude` git repo (Task 1), the `emit` function, the `have` helper.
 - Produces: findings with check keys `controlplane.drift` (FAIL), `controlplane.local_churn` (WARN), `controlplane.clean` (PASS), `controlplane.unmanaged` (FAIL) — routed by Task 3.
 
@@ -310,6 +344,7 @@ Expected (with `~/.claude` committed clean from Task 1): `PASS controlplane.clea
 - [ ] **Step 3: Negative check — dirtying a critical file reports FAIL (scratch, non-destructive)**
 
 Run (uses a throwaway tracked file path, then reverts — does NOT leave drift):
+
 ```bash
 cd /Users/devon/Projects/infraops-mcp-server
 # simulate a critical-set change
@@ -319,6 +354,7 @@ bash /Users/devon/Projects/security-standards/scripts/security-scan.sh 2>&1 | gr
 git -C "$HOME/.claude" checkout -- CLAUDE.md
 bash /Users/devon/Projects/security-standards/scripts/security-scan.sh 2>&1 | grep -q 'controlplane.clean' && echo "REVERTED-CLEAN"
 ```
+
 Expected: a `FAIL controlplane.drift ... CLAUDE.md ...` line then `DETECTED`, and after revert `REVERTED-CLEAN`.
 
 - [ ] **Step 4: Update infraops docs**
@@ -347,6 +383,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 **Files:** none (deploy + verification); uses `security-standards/scripts/install-security-scan-launchd.sh`.
 
 **Interfaces:**
+
 - Consumes: the committed `security-scan.sh` (Task 4) and taxonomy (Task 3).
 - Produces: the updated detector deployed to `~/.claude/bin/`; a verified-green build.
 
@@ -384,6 +421,7 @@ Expected: `CLEAN` (Task 4's negative check reverted its change; the deploy touch
 ## Self-Review
 
 **Spec coverage:**
+
 - git-init `~/.claude` + deny-by-default `.gitignore` → Task 1 ✓
 - Tracked allow-list (incl. `bin/` exclusion, `*.bak*` exclusion) → Task 1 (`.gitignore`) ✓
 - Private remote `AlobarQuest/claude-control-plane` → Task 2 ✓

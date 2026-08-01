@@ -23,5 +23,9 @@ if [ -z "${BWS_ACCESS_TOKEN:-}" ]; then
          "(service=Claude, account=BWS_ACCESS_TOKEN_INFRA_DRIFT)." \
          "Add it with: security add-generic-password -U -s Claude" \
          "-a BWS_ACCESS_TOKEN_INFRA_DRIFT -T /usr/bin/security -w" >&2
+    # shellcheck disable=SC2317  # deliberate dual-mode idiom: `return` succeeds when this
+    # file is sourced (every caller sources it) and fails when it is executed directly,
+    # in which case `exit` runs. Exactly one of the two is reachable per invocation mode,
+    # which is what shellcheck cannot model.
     return 1 2>/dev/null || exit 1
 fi

@@ -42,7 +42,7 @@ Postgres directly).
 4. **Executor: an in-repo (mini-side) Anthropic SDK tool-use agent with a curated,
    narrow allowlist of real infraops operations** — not headless Claude Code (too
    broad a tool surface) and not a hosted/Managed agent (can't reach the local
-   stdio infraops MCP). The agent uses the Sonnet plan as *guidance* but acts only
+   stdio infraops MCP). The agent uses the Sonnet plan as _guidance_ but acts only
    through vetted tools, because the plans' `infraops_tools` are unreliable (Sonnet
    invents tool names like `coolify_redeploy_application`, `coolify_create_s3_storage`
    that don't exist).
@@ -57,7 +57,7 @@ Postgres directly).
 ## Why this is two sub-projects
 
 - **Sub-project A — `change-manager` web app** (new repo, Flavor B): Postgres schema
-  + Alembic migrations + FastAPI API + HTMX GUI + SSO + deploy. Owns the data.
+  - Alembic migrations + FastAPI API + HTMX GUI + SSO + deploy. Owns the data.
 - **Sub-project B — mini-side sync + window executor** (existing `infraops-mcp-server`
   repo): the contract fix, the `sync` push, and the 04:00 agent that implements
   approved items via infraops and reports outcomes.
@@ -151,12 +151,13 @@ window_runs (
 
 Every transition writes a `change_events` row (no silent status changes). Nothing
 is hard-deleted: `done`/`wontfix`/`resolved` are display states; the row + its full
-event trail persist forever, and a reappearing identity reopens the *same* row
+event trail persist forever, and a reappearing identity reopens the _same_ row
 (accumulating multi-cycle history) rather than creating a new one.
 
 ### Reconciliation (web-app-owned, on `POST /api/sync`)
 
 The mini posts today's full escalation set; the app reconciles by `identity`:
+
 - new identity → insert `pending` (+ `ingested` event)
 - existing + drift persists → refresh `plan`/`note`/`last_seen_at`/`source_report`; keep status
 - `done`/`resolved` reappears → reopen to `pending` (`regression_reopened`)
@@ -175,6 +176,7 @@ FastAPI (port 8000) + SQLAlchemy + Alembic + Jinja/HTMX + Postgres (Coolify DB
 resource). GUI behind Alobar ID forward-auth; API behind an M2M bearer token.
 
 ### GUI pages (server-rendered + HTMX)
+
 - `GET /` — Dashboard: the `pending` queue front and center, grouped by change-type
   (HTTPS / backups / health-check) with counts; filter tabs (pending / approved /
   blocked / done / wontfix / resolved / all).
@@ -186,6 +188,7 @@ resource). GUI behind Alobar ID forward-auth; API behind an M2M bearer token.
 - `GET /windows` — window-run history with counts + per-item outcomes.
 
 ### API (mini-facing, M2M)
+
 - `POST /api/sync` — `{generated_at, source_report, escalations[]}` → reconcile → `{new, refreshed, resolved, reopened}`.
 - `GET /api/items?status=approved&instance=…` — the window's work.
 - `POST /api/items/{id}/claim` — atomic `approved→in_progress`; 409 if not approved.
@@ -195,11 +198,13 @@ resource). GUI behind Alobar ID forward-auth; API behind an M2M bearer token.
 - `GET /api/health` — liveness (conforms to its own standard).
 
 ### Auth
+
 - GUI: Alobar ID forward-auth; `decided_by` = authenticated email.
 - API: Alobar ID **service-account M2M token** the mini holds (BWS, by-UUID),
   validated distinctly from the SSO cookie. Covered by the `sso-integration` pattern.
 
 ### Deploy
+
 Standard Flavor B: GHCR image, GitHub Actions CI/CD, Coolify app + Postgres DB
 resource, `change-mgr.devonwatkins.com` (FQDN field, HTTPS), health check
 `/api/health`. New deployed app → follows the **app-brain → infra-brain → infraops**
@@ -208,11 +213,13 @@ workflow (onboarded after planning).
 ## Sub-project B — mini-side sync + window executor (`infraops-mcp-server`)
 
 ### Contract fix (prerequisite)
+
 Add `instance` to the `Escalation` interface (`src/standards/remediation-report.ts`),
 thread `t.instance` when building escalations (`src/standards/run-remediation.ts`),
 bump the remediation report `schema_version → 2`. Update the remediation tests.
 
 ### `change-mgr sync`
+
 Appended to the existing 03:00 job (audit → remediate → **sync**). Reads the day's
 `<date>.remediation.json`, `POST /api/sync` with the M2M token. Thin client; the
 web app does the reconciliation. **Best-effort:** a change-mgr API outage logs a
@@ -220,6 +227,7 @@ warning but does not fail the audit/remediate heartbeat (the escalations are sti
 on disk to sync on the next run).
 
 ### `change-mgr run-window` (04:00 launchd)
+
 1. `GET /api/items?status=approved`.
 2. Per item, up to `MAX_CHANGES_PER_WINDOW` (default 5):
    - `POST /claim` (skip on 409).
@@ -230,12 +238,14 @@ on disk to sync on the next run).
 3. `POST/PATCH /api/window-runs`; write `<date>.change-window.json/.md`; email; ping a new Healthchecks.io check.
 
 ### Curated tool surface (`src/change-manager/tools.ts`) — the blast-radius boundary
+
 The ONLY writes the agent can make; hallucinated tool names cannot fire. Each =
 JSON-schema def + handler wrapping `coolify-client` with validation, idempotency
 re-check, rollback capture. The surface is deliberately scoped to the remediation
 types that are both **API-automatable** (verified against Coolify 4.0.0-beta.473)
 **and** genuinely a Coolify change — which, after investigation, is HTTPS and
 health-checks. **DB backups are out of scope** (see below). Initial set:
+
 - `get_application(uuid, instance)` — read current state.
 - `set_application_domains(uuid, instance, domains)` — `PATCH /applications/{uuid}`
   fqdn http→https (captures original for rollback; uses `force_domain_override` to
@@ -246,17 +256,18 @@ health-checks. **DB backups are out of scope** (see below). Initial set:
   health-check fields; the agent must supply a verified path, else `report_blocked`.
 - `report_blocked(reason)` / `report_done(summary)` — end the loop with the outcome.
 
-**Why no backup tool.** Coolify's API *does* expose a backup sub-resource
+**Why no backup tool.** Coolify's API _does_ expose a backup sub-resource
 (`POST /databases/{uuid}/backups`), so backups are technically automatable — but
 the right remediation for the flagged DBs is **not** a Coolify change at all: they
 should be added to the existing **vps-backup** (Restic/NAS) pipeline like every
-other database, and rule #572 should be re-pointed to verify *that* real coverage
+other database, and rule #572 should be re-pointed to verify _that_ real coverage
 (not Coolify's native `backup_configs`). Both are filed as **BACKLOG.md #3 (add the
 DBs to vps-backup) and #4 (re-point rule #572)** and revisited after the change
 manager ships. Until then, DB-backup escalations have no executor path and are
 resolved by human decision in the GUI (`defer`/`wontfix`).
 
 ### Agent safety model
+
 - Agent can call **only** the curated tools — `plan.infraops_tools` are guidance, never executed by name.
 - Rollback captured before each write; executor **post-verifies** after (re-fetch →
   still drifted / unhealthy? → revert via captured rollback + mark `failed`).
@@ -268,17 +279,19 @@ resolved by human decision in the GUI (`defer`/`wontfix`).
 - Every tool call + result recorded in `change_attempts.tool_calls`.
 
 ### Scheduling
+
 `scripts/change-window.sh` (launchd ~04:00) fetches Coolify + Anthropic + the
 change-mgr M2M token from BWS **by UUID** (`get_secret_by_id`), runs
 `node dist/cli/change-mgr-cli.js run-window`, emails the digest, pings a new
 Healthchecks.io check. New plist template + install script mirror the drift-audit
-ones. *Operational prereq: create the Alobar ID service account + store its token in BWS.*
+ones. _Operational prereq: create the Alobar ID service account + store its token in BWS._
 
 ## Realistic expectations
 
-Of the daily escalations, the executor only ever *acts* on the two
+Of the daily escalations, the executor only ever _acts_ on the two
 genuinely-Coolify, API-automatable change-types; the rest are first-class
 human-decision or `blocked` outcomes, not failures:
+
 - **HTTPS (rule #571):** the agent does these (set domains https → redeploy →
   post-verify cert), with rollback on failure. The real, common automatable case.
 - **Health-check held (verify-gate):** apps like Watchtower/mirror may have no
@@ -305,6 +318,7 @@ subset (HTTPS), with everything else cleanly surfaced for a human decision + why
   `instance` + `schema_version: 2`.
 
 ## Future consumers / out of scope
+
 - A richer tool surface (more remediation types) added to `tools.ts` over time.
 - Opus for hard items; multi-window scheduling; provisioning tools for S3/secrets
   (deliberately excluded now — too high-blast-radius for autonomous setup).

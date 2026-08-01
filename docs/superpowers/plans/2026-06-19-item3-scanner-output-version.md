@@ -32,10 +32,12 @@
 ### Task 1: `scanner-version.ts` — the marker reader + gate
 
 **Files:**
+
 - Create: `src/security-drift/scanner-version.ts`
 - Test: `tests/security-drift-scanner-version.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Finding` from `./scan-parser.js`.
 - Produces: `EXPECTED_SCANNER_OUTPUT_VERSION: number` (= 1); `readScannerOutputVersion(scanPath: string): number | null`; `scannerVersionGate(scanPath: string, expected: number): Finding | null`. Task 3 (the CLI) imports `scannerVersionGate` + `EXPECTED_SCANNER_OUTPUT_VERSION`. Task 2 routes the `scanner.output_version_skew` check key this produces.
 
@@ -44,52 +46,68 @@
 Create `tests/security-drift-scanner-version.test.ts`:
 
 ```ts
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import { readScannerOutputVersion, scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION } from "../src/security-drift/scanner-version.js";
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import {
+  readScannerOutputVersion,
+  scannerVersionGate,
+  EXPECTED_SCANNER_OUTPUT_VERSION,
+} from '../src/security-drift/scanner-version.js';
 
 let dir: string;
-beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), "sd-scanver-")); });
-afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sd-scanver-'));
+});
+afterEach(() => {
+  fs.rmSync(dir, { recursive: true, force: true });
+});
 
 function writeScanner(body: string): string {
-  const p = path.join(dir, "security-scan.sh");
+  const p = path.join(dir, 'security-scan.sh');
   fs.writeFileSync(p, body);
   return p;
 }
 
-describe("readScannerOutputVersion", () => {
-  it("extracts the version from the marker amid other lines", () => {
-    const p = writeScanner("#!/bin/bash\n# OUTPUT CONTRACT ...\n# SCANNER_OUTPUT_VERSION=1\necho hi\n");
+describe('readScannerOutputVersion', () => {
+  it('extracts the version from the marker amid other lines', () => {
+    const p = writeScanner(
+      '#!/bin/bash\n# OUTPUT CONTRACT ...\n# SCANNER_OUTPUT_VERSION=1\necho hi\n',
+    );
     expect(readScannerOutputVersion(p)).toBe(1);
   });
-  it("returns null when the marker is absent", () => {
-    expect(readScannerOutputVersion(writeScanner("#!/bin/bash\necho hi\n"))).toBeNull();
+  it('returns null when the marker is absent', () => {
+    expect(readScannerOutputVersion(writeScanner('#!/bin/bash\necho hi\n'))).toBeNull();
   });
-  it("returns null when the file does not exist", () => {
-    expect(readScannerOutputVersion(path.join(dir, "nope.sh"))).toBeNull();
+  it('returns null when the file does not exist', () => {
+    expect(readScannerOutputVersion(path.join(dir, 'nope.sh'))).toBeNull();
   });
-  it("picks the first marker when duplicated", () => {
-    expect(readScannerOutputVersion(writeScanner("# SCANNER_OUTPUT_VERSION=2\n# SCANNER_OUTPUT_VERSION=3\n"))).toBe(2);
+  it('picks the first marker when duplicated', () => {
+    expect(
+      readScannerOutputVersion(
+        writeScanner('# SCANNER_OUTPUT_VERSION=2\n# SCANNER_OUTPUT_VERSION=3\n'),
+      ),
+    ).toBe(2);
   });
 });
 
-describe("scannerVersionGate", () => {
-  it("returns null when deployed version == expected", () => {
-    expect(scannerVersionGate(writeScanner("# SCANNER_OUTPUT_VERSION=1\n"), 1)).toBeNull();
+describe('scannerVersionGate', () => {
+  it('returns null when deployed version == expected', () => {
+    expect(scannerVersionGate(writeScanner('# SCANNER_OUTPUT_VERSION=1\n'), 1)).toBeNull();
   });
-  it("returns a skew Finding when deployed != expected", () => {
-    const f = scannerVersionGate(writeScanner("# SCANNER_OUTPUT_VERSION=2\n"), 1);
-    expect(f?.check).toBe("scanner.output_version_skew");
-    expect(f?.severity).toBe("FAIL");
-    expect(f?.target).toContain("security-scan.sh");
+  it('returns a skew Finding when deployed != expected', () => {
+    const f = scannerVersionGate(writeScanner('# SCANNER_OUTPUT_VERSION=2\n'), 1);
+    expect(f?.check).toBe('scanner.output_version_skew');
+    expect(f?.severity).toBe('FAIL');
+    expect(f?.target).toContain('security-scan.sh');
   });
-  it("returns a skew Finding when the marker is missing (fail loud)", () => {
-    expect(scannerVersionGate(writeScanner("#!/bin/bash\necho hi\n"), 1)?.check).toBe("scanner.output_version_skew");
+  it('returns a skew Finding when the marker is missing (fail loud)', () => {
+    expect(scannerVersionGate(writeScanner('#!/bin/bash\necho hi\n'), 1)?.check).toBe(
+      'scanner.output_version_skew',
+    );
   });
-  it("pins EXPECTED_SCANNER_OUTPUT_VERSION to the current contract (1)", () => {
+  it('pins EXPECTED_SCANNER_OUTPUT_VERSION to the current contract (1)', () => {
     expect(EXPECTED_SCANNER_OUTPUT_VERSION).toBe(1);
   });
 });
@@ -108,8 +126,8 @@ Expected: FAIL — module `../src/security-drift/scanner-version.js` does not ex
 // scanner (NOT emitted to stdout); we read it from the deployed file and refuse to parse
 // a contract we weren't written for. See scan-parser.ts for what version 1 means.
 
-import * as fs from "node:fs";
-import type { Finding } from "./scan-parser.js";
+import * as fs from 'node:fs';
+import type { Finding } from './scan-parser.js';
 
 /** The scanner output-contract version scan-parser.ts was written against. Bump in the
  *  SAME PR that changes the LINE shape or a detail form in scan-parser.ts. */
@@ -122,7 +140,7 @@ const MARKER = /^#\s*SCANNER_OUTPUT_VERSION=(\d+)\s*$/m;
 export function readScannerOutputVersion(scanPath: string): number | null {
   let text: string;
   try {
-    text = fs.readFileSync(scanPath, "utf8");
+    text = fs.readFileSync(scanPath, 'utf8');
   } catch {
     return null;
   }
@@ -139,11 +157,11 @@ export function scannerVersionGate(scanPath: string, expected: number): Finding 
   const v = readScannerOutputVersion(scanPath);
   if (v === expected) return null;
   return {
-    severity: "FAIL",
-    check: "scanner.output_version_skew",
+    severity: 'FAIL',
+    check: 'scanner.output_version_skew',
     target: scanPath,
     detail:
-      `deployed scanner output version ${v ?? "missing/unreadable"} != parser-expected ${expected} — ` +
+      `deployed scanner output version ${v ?? 'missing/unreadable'} != parser-expected ${expected} — ` +
       `parser cannot be trusted; run aborted. Reconcile with: cd ~/Projects/security-standards && make install`,
   };
 }
@@ -175,10 +193,12 @@ Expected: build exit 0; `git status` clean after commit.
 ### Task 2: Taxonomy — route `scanner.output_version_skew` as URGENT
 
 **Files:**
+
 - Modify: `src/security-drift/taxonomy.ts:44-69` (the `URGENT_KEYS` set)
 - Test: `tests/security-drift-taxonomy.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing `classify(f, opts)` + the `f()` test factory.
 - Produces: `URGENT_KEYS` now contains `"scanner.output_version_skew"`. Task 3 classifies the skew finding and relies on this routing (URGENT + FP-filter-immune).
 
@@ -187,18 +207,19 @@ Expected: build exit 0; `git status` clean after commit.
 Add inside `describe("classify", …)` in `tests/security-drift-taxonomy.test.ts`. The `fpExtra: ["security-scan"]` substring matches the target path, so without `URGENT_KEYS` membership taxonomy.ts:109 would drop it to `null` — a true red→green for the FP-bypass (deny-by-default).
 
 ```ts
-  it("URGENTs a scanner output-version skew and bypasses the FP filter (deny-by-default)", () => {
-    const c = classify(
-      f({
-        check: "scanner.output_version_skew",
-        target: "/Users/x/.claude/bin/security-scan.sh",
-        detail: "deployed scanner output version 2 != parser-expected 1 — run aborted. Reconcile with: ... make install",
-      }),
-      { autoFixAllowlist: [], fpExtra: ["security-scan"] },
-    );
-    expect(c?.tier).toBe("URGENT");
-    expect(c && "manual" in c.remediation).toBe(true);
-  });
+it('URGENTs a scanner output-version skew and bypasses the FP filter (deny-by-default)', () => {
+  const c = classify(
+    f({
+      check: 'scanner.output_version_skew',
+      target: '/Users/x/.claude/bin/security-scan.sh',
+      detail:
+        'deployed scanner output version 2 != parser-expected 1 — run aborted. Reconcile with: ... make install',
+    }),
+    { autoFixAllowlist: [], fpExtra: ['security-scan'] },
+  );
+  expect(c?.tier).toBe('URGENT');
+  expect(c && 'manual' in c.remediation).toBe(true);
+});
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -240,10 +261,12 @@ Expected: build exit 0; `git status` clean after commit.
 ### Task 3: CLI preflight gate — abort-with-alert on skew
 
 **Files:**
+
 - Modify: `src/cli/security-drift-cli.ts` — imports (lines 12-16 region) + insert the gate between the `runSelfCheck(...)` call (ends line 71) and the `runSecurityDrift(...)` call (begins line 73)
 - Test: full suite (`npx vitest run`) + `npm run build` (the repo does not unit-test `main()`; the behavior-bearing gate logic is unit-tested in Task 1)
 
 **Interfaces:**
+
 - Consumes: `scannerVersionGate` + `EXPECTED_SCANNER_OUTPUT_VERSION` (Task 1); `classify` (taxonomy); `buildEscalations` + `ClassifiedFinding` (emit); the existing `sendUrgentEmail`, `readList`, `securityPaths`, `runSelfCheck` already imported/defined in this file; `p.autoFixAllowlistFile` / `p.fpAllowlistFile` from `securityPaths()`.
 - Produces: on skew, an aborted run (no `runSecurityDrift`, no `postSync`), a direct urgent email, an abort digest, and a non-zero exit.
 
@@ -252,9 +275,12 @@ Expected: build exit 0; `git status` clean after commit.
 In `src/cli/security-drift-cli.ts`, add to the existing import block (alongside the other `../security-drift/*` imports near lines 13-16):
 
 ```ts
-import { classify } from "../security-drift/taxonomy.js";
-import { buildEscalations, type ClassifiedFinding } from "../security-drift/emit.js";
-import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION } from "../security-drift/scanner-version.js";
+import { classify } from '../security-drift/taxonomy.js';
+import { buildEscalations, type ClassifiedFinding } from '../security-drift/emit.js';
+import {
+  scannerVersionGate,
+  EXPECTED_SCANNER_OUTPUT_VERSION,
+} from '../security-drift/scanner-version.js';
 ```
 
 - [ ] **Step 2: Insert the preflight gate**
@@ -262,38 +288,42 @@ import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION } from "../security
 In `main()`, immediately AFTER the `const selfCheckFindings = runSelfCheck({ … });` block (ends at line 71) and BEFORE `const result = await runSecurityDrift(` (line 73), insert:
 
 ```ts
-  // --- Preflight: refuse to run on a scanner whose output contract this parser was not
-  // written for. On skew we MUST NOT reach runSecurityDrift's postSync — it posts the full
-  // current set and CM reconcile would false-resolve every open item against a garbage parse.
-  // Abort with a direct urgent email carrying the skew + this run's trustworthy self-check urgents.
-  const skew = scannerVersionGate(p.scanPath, EXPECTED_SCANNER_OUTPUT_VERSION);
-  if (skew) {
-    const classified: ClassifiedFinding[] = [];
-    for (const finding of [skew, ...selfCheckFindings]) {
-      const classification = classify(finding, { autoFixAllowlist: readList(p.autoFixAllowlistFile), fpExtra: readList(p.fpAllowlistFile) });
-      if (classification) classified.push({ finding, classification });
-    }
-    const { escalations } = buildEscalations(classified, now);
-    const urgent = escalations.filter((e) => e.urgent);
-    const emailed = await sendUrgentEmail(urgent, {
-      resendApiKey: process.env.RESEND_API_KEY,
-      from: process.env.INFRADRIFT_EMAIL_FROM ?? "infra@devonwatkins.com",
-      to: process.env.INFRADRIFT_EMAIL_TO ?? "devon.watkins@gmail.com",
+// --- Preflight: refuse to run on a scanner whose output contract this parser was not
+// written for. On skew we MUST NOT reach runSecurityDrift's postSync — it posts the full
+// current set and CM reconcile would false-resolve every open item against a garbage parse.
+// Abort with a direct urgent email carrying the skew + this run's trustworthy self-check urgents.
+const skew = scannerVersionGate(p.scanPath, EXPECTED_SCANNER_OUTPUT_VERSION);
+if (skew) {
+  const classified: ClassifiedFinding[] = [];
+  for (const finding of [skew, ...selfCheckFindings]) {
+    const classification = classify(finding, {
+      autoFixAllowlist: readList(p.autoFixAllowlistFile),
+      fpExtra: readList(p.fpAllowlistFile),
     });
-    const digest =
-      `# Security drift ${now.slice(0, 10)} — ABORTED (scanner output-version skew)\n\n` +
-      `🚨 ${skew.detail}\n\n` +
-      `Run aborted before parse/sync (reconcile-safe: open items untouched). ` +
-      `${urgent.length} urgent item(s), emailed=${emailed}.\n`;
-    if (reportDir) {
-      fs.mkdirSync(reportDir, { recursive: true });
-      fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security.md`), digest, "utf8");
-    }
-    process.stdout.write(digest + "\n");
-    process.stdout.write(`\nsecurity-drift: ABORTED scanner_version_skew urgent=${urgent.length} emailed=${emailed}\n`);
-    process.exit(1);
+    if (classification) classified.push({ finding, classification });
   }
-
+  const { escalations } = buildEscalations(classified, now);
+  const urgent = escalations.filter((e) => e.urgent);
+  const emailed = await sendUrgentEmail(urgent, {
+    resendApiKey: process.env.RESEND_API_KEY,
+    from: process.env.INFRADRIFT_EMAIL_FROM ?? 'infra@devonwatkins.com',
+    to: process.env.INFRADRIFT_EMAIL_TO ?? 'devon.watkins@gmail.com',
+  });
+  const digest =
+    `# Security drift ${now.slice(0, 10)} — ABORTED (scanner output-version skew)\n\n` +
+    `🚨 ${skew.detail}\n\n` +
+    `Run aborted before parse/sync (reconcile-safe: open items untouched). ` +
+    `${urgent.length} urgent item(s), emailed=${emailed}.\n`;
+  if (reportDir) {
+    fs.mkdirSync(reportDir, { recursive: true });
+    fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security.md`), digest, 'utf8');
+  }
+  process.stdout.write(digest + '\n');
+  process.stdout.write(
+    `\nsecurity-drift: ABORTED scanner_version_skew urgent=${urgent.length} emailed=${emailed}\n`,
+  );
+  process.exit(1);
+}
 ```
 
 (Leave the existing `runSecurityDrift(...)` call and everything after it unchanged — that is the version-OK path.)
@@ -335,6 +365,7 @@ Expected: build exit 0; `git status` clean after commit.
 3. Unit-tested in the infraops suite (wrong/absent marker). → Task 1 tests + Task 2 routing test. ✅
 
 ## Out of scope (do not build)
+
 - Any change to `runSecurityDrift` internals (stays the trusted-parse path).
 - The `make install` deploy of the marker (operator action) + item #4's source header.
 - The handoff's optional in-stream `PASS`-line alternative (we use the file-comment marker).

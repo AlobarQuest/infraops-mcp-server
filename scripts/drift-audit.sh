@@ -75,8 +75,11 @@ mkdir -p "$REPORT_DIR"
 # brain-app-db container (reuses the existing Hetzner key — no new exposure). Dry-run
 # by default; set APPBRAIN_SYNC_APPLY=1 in $CONFIG to write. BWS_ACCESS_TOKEN (exported
 # above) is inherited for the script's Coolify-token fetch.
-bash "$REPO/scripts/appbrain-sync.sh" >>"$LOG_FILE" 2>&1 \
-  && log "app-brain sync ok" || log "WARN: app-brain sync failed (non-fatal)"
+if bash "$REPO/scripts/appbrain-sync.sh" >>"$LOG_FILE" 2>&1; then
+  log "app-brain sync ok"
+else
+  log "WARN: app-brain sync failed (non-fatal)"
+fi
 
 # ── Run the audit (exit 1 only if EVERY instance hard-failed) ──────────────────
 node "$REPO/dist/cli/audit-cli.js" --instance prod,dev --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1
@@ -94,8 +97,11 @@ log "remediate CLI exited rc=$RC_REMEDIATE"
 # ── Best-effort: push the day's escalations to the change manager (non-fatal) ────
 export CHANGE_MGR_API_BASE="${CHANGE_MGR_API_BASE:-https://change-mgr.alobar.net}"
 export CHANGE_MGR_M2M_TOKEN="$(get_secret_by_id "${BWS_CHANGE_MGR_M2M_SECRET_ID:-af0e4192-edc6-46ae-9e4f-b469011dbb8d}")"
-node "$REPO/dist/cli/change-mgr-cli.js" sync --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
-  && log "change-mgr sync ok" || log "WARN: change-mgr sync failed (non-fatal)"
+if node "$REPO/dist/cli/change-mgr-cli.js" sync --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1; then
+  log "change-mgr sync ok"
+else
+  log "WARN: change-mgr sync failed (non-fatal)"
+fi
 
 # ── Best-effort: the day's digest → orchestrator observations (non-fatal) ───────
 # WS-P3.0. Posts one observation per audited Coolify instance to the orchestrator's
@@ -105,8 +111,11 @@ node "$REPO/dist/cli/change-mgr-cli.js" sync --report-dir "$REPORT_DIR" --now "$
 export ORCHESTRATOR_API_BASE="${ORCHESTRATOR_API_BASE:-https://sds.alobar.net}"
 export ORCHESTRATOR_M2M_TOKEN="$(get_secret_by_id "${BWS_ORCHESTRATOR_OBS_SECRET_ID:-8998c4ea-453c-4ae1-9b5c-b49500b8dacc}")"
 export ORCHESTRATOR_CREDENTIAL_KEY_ID="${ORCHESTRATOR_CREDENTIAL_KEY_ID:-orchestrator-drift-reporter}"
-node "$REPO/dist/cli/orchestrator-cli.js" observe --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
-  && log "orchestrator observation ok" || log "WARN: orchestrator observation failed (non-fatal)"
+if node "$REPO/dist/cli/orchestrator-cli.js" observe --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1; then
+  log "orchestrator observation ok"
+else
+  log "WARN: orchestrator observation failed (non-fatal)"
+fi
 
 # ── Best-effort: run one follow-up minting pass (non-fatal) ────────────────────
 # WS-P2.8. Mints the work units whose package-declared follow-up reviews have come due. Uses the
@@ -132,16 +141,22 @@ export ORCHESTRATOR_MINT_TOKEN="$(
   get_secret_by_id "${BWS_ORCHESTRATOR_SYSTEM_SECRET_ID:-221a48d5-3f29-4898-b300-b4820140c880}"
 )"
 export ORCHESTRATOR_MINT_CREDENTIAL_KEY_ID="${ORCHESTRATOR_MINT_CREDENTIAL_KEY_ID:-orchestrator-system}"
-node "$REPO/dist/cli/orchestrator-cli.js" mint-follow-ups >>"$LOG_FILE" 2>&1 \
-  && log "follow-up mint ok" || log "WARN: follow-up mint failed (non-fatal)"
+if node "$REPO/dist/cli/orchestrator-cli.js" mint-follow-ups >>"$LOG_FILE" 2>&1; then
+  log "follow-up mint ok"
+else
+  log "WARN: follow-up mint failed (non-fatal)"
+fi
 
 # ── Best-effort: machine security-posture drift → change manager (non-fatal) ─────
 # Runs security-scan.sh, auto-fixes the narrow set (guarded chmod), posts the rest
 # to the CM (source=security), and emails NEW urgent items immediately. Reuses the
 # CM token exported above; passes the Resend creds for the urgent-email path.
-RESEND_API_KEY="$RESEND_API_KEY" INFRADRIFT_EMAIL_TO="$EMAIL_TO" INFRADRIFT_EMAIL_FROM="$EMAIL_FROM" \
-  node "$REPO/dist/cli/security-drift-cli.js" run --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1 \
-  && log "security-drift run ok" || log "WARN: security-drift run failed (non-fatal)"
+if RESEND_API_KEY="$RESEND_API_KEY" INFRADRIFT_EMAIL_TO="$EMAIL_TO" INFRADRIFT_EMAIL_FROM="$EMAIL_FROM" \
+  node "$REPO/dist/cli/security-drift-cli.js" run --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1; then
+  log "security-drift run ok"
+else
+  log "WARN: security-drift run failed (non-fatal)"
+fi
 
 # Prefer the consolidated remediation digest; fall back to the raw audit digest.
 if [ -f "$REMEDIATE_MD" ]; then

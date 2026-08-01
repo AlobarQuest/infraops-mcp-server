@@ -26,14 +26,15 @@ The integration defaults to **sandbox mode** for safe testing, with a single env
 
 Store **both** sandbox and production credentials in BWS with these exact names. `start.sh` looks them up by name automatically — no env vars needed for the secrets themselves.
 
-| BWS Secret Name | Value |
-|---|---|
-| `BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID` | Your sandbox API username |
-| `BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID` | Your sandbox API key |
-| `BWS_NAMECHEAP_PROD_API_USER_SECRET_ID` | Your production API username |
-| `BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID` | Your production API key |
+| BWS Secret Name                            | Value                        |
+| ------------------------------------------ | ---------------------------- |
+| `BWS_NAMECHEAP_SANDBOX_API_USER_SECRET_ID` | Your sandbox API username    |
+| `BWS_NAMECHEAP_SANDBOX_API_KEY_SECRET_ID`  | Your sandbox API key         |
+| `BWS_NAMECHEAP_PROD_API_USER_SECRET_ID`    | Your production API username |
+| `BWS_NAMECHEAP_PROD_API_KEY_SECRET_ID`     | Your production API key      |
 
 Only two env vars needed in your MCP config:
+
 - `NAMECHEAP_CLIENT_IP` — Your machine's public IP (must be whitelisted in Namecheap API settings)
 - `NAMECHEAP_USE_SANDBOX` — `"true"` (default) or `"false"` — controls which credential pair is loaded
 
@@ -61,6 +62,7 @@ Only two env vars — credentials are fetched from BWS by name at startup.
 ### 3. Restart InfraOps MCP server
 
 You should see in stderr:
+
 ```
 Namecheap API user loaded from BWS (sandbox)
 Namecheap API key loaded from BWS (sandbox)
@@ -106,32 +108,32 @@ Run `namecheap_domains_list` to see your real domains.
 
 ### Domain Management (11 tools)
 
-| Tool | Description | Destructive? |
-|---|---|---|
-| `namecheap_domains_get_env` | Show API environment (sandbox/prod) | No |
-| `namecheap_domains_list` | List all domains | No |
-| `namecheap_domains_get_info` | Full domain details | No |
-| `namecheap_domains_check` | Check availability | No |
-| `namecheap_domains_register` | Register domain (💰 paid) | No |
-| `namecheap_domains_renew` | Renew domain (💰 paid) | No |
-| `namecheap_domains_reactivate` | Reactivate expired domain (💰 paid) | No |
-| `namecheap_domains_get_lock` | Check registrar lock | No |
-| `namecheap_domains_set_lock` | Enable/disable lock | No |
-| `namecheap_domains_get_contacts` | WHOIS contact info | No |
-| `namecheap_domains_get_tld_list` | Available TLDs + pricing | No |
+| Tool                             | Description                         | Destructive? |
+| -------------------------------- | ----------------------------------- | ------------ |
+| `namecheap_domains_get_env`      | Show API environment (sandbox/prod) | No           |
+| `namecheap_domains_list`         | List all domains                    | No           |
+| `namecheap_domains_get_info`     | Full domain details                 | No           |
+| `namecheap_domains_check`        | Check availability                  | No           |
+| `namecheap_domains_register`     | Register domain (💰 paid)           | No           |
+| `namecheap_domains_renew`        | Renew domain (💰 paid)              | No           |
+| `namecheap_domains_reactivate`   | Reactivate expired domain (💰 paid) | No           |
+| `namecheap_domains_get_lock`     | Check registrar lock                | No           |
+| `namecheap_domains_set_lock`     | Enable/disable lock                 | No           |
+| `namecheap_domains_get_contacts` | WHOIS contact info                  | No           |
+| `namecheap_domains_get_tld_list` | Available TLDs + pricing            | No           |
 
 ### DNS Management (8 tools)
 
-| Tool | Description | Destructive? |
-|---|---|---|
-| `namecheap_dns_get_hosts` | List all DNS records | No |
-| `namecheap_dns_get_servers` | Get nameservers | No |
-| `namecheap_dns_add_record` | Add record (preserves existing) | No |
-| `namecheap_dns_update_record` | Update record by name+type | No |
-| `namecheap_dns_delete_record` | Delete record by name+type+address | ⚠️ Yes |
-| `namecheap_dns_set_hosts` | Full replace all records | ⚠️ Yes |
-| `namecheap_dns_set_nameservers` | Set custom nameservers | ⚠️ Yes |
-| `namecheap_dns_set_default` | Reset to Namecheap DNS | ⚠️ Yes |
+| Tool                            | Description                        | Destructive? |
+| ------------------------------- | ---------------------------------- | ------------ |
+| `namecheap_dns_get_hosts`       | List all DNS records               | No           |
+| `namecheap_dns_get_servers`     | Get nameservers                    | No           |
+| `namecheap_dns_add_record`      | Add record (preserves existing)    | No           |
+| `namecheap_dns_update_record`   | Update record by name+type         | No           |
+| `namecheap_dns_delete_record`   | Delete record by name+type+address | ⚠️ Yes       |
+| `namecheap_dns_set_hosts`       | Full replace all records           | ⚠️ Yes       |
+| `namecheap_dns_set_nameservers` | Set custom nameservers             | ⚠️ Yes       |
+| `namecheap_dns_set_default`     | Reset to Namecheap DNS             | ⚠️ Yes       |
 
 ---
 

@@ -4,7 +4,7 @@
 
 **Goal:** Make a legitimate scanner deploy silent to the security-drift self-check by asserting the deployed `~/.claude/bin/security-scan.sh` byte-matches its blessed source, while an out-of-band edit, a stale/forgotten deploy, or an unverifiable source still raise an URGENT.
 
-**Architecture:** Split the self-check's check #3 into two per-file policies: a new *source-verified* policy (deployed artifact must byte-equal its blessed source — stateless) for the scanner, and the existing *change-tracked* policy (sha256 vs recorded hash) for the two allowlist files. A new distinct finding key `selfcheck.runner_source_unresolved` signals "can't verify" and is added to the taxonomy's `URGENT_KEYS` so it bypasses the false-positive filter (deny-by-default).
+**Architecture:** Split the self-check's check #3 into two per-file policies: a new _source-verified_ policy (deployed artifact must byte-equal its blessed source — stateless) for the scanner, and the existing _change-tracked_ policy (sha256 vs recorded hash) for the two allowlist files. A new distinct finding key `selfcheck.runner_source_unresolved` signals "can't verify" and is added to the taxonomy's `URGENT_KEYS` so it bypasses the false-positive filter (deny-by-default).
 
 **Tech Stack:** TypeScript (Node 18+), vitest, MCP server compiled to tracked `dist/`.
 
@@ -33,10 +33,12 @@
 ### Task 1: Taxonomy — route the new "can't verify" key as URGENT
 
 **Files:**
+
 - Modify: `src/security-drift/taxonomy.ts:44-69` (the `URGENT_KEYS` set)
 - Test: `tests/security-drift-taxonomy.test.ts`
 
 **Interfaces:**
+
 - Consumes: existing `classify(f: Finding, opts: ClassifyOptions): Classification | null` and the `f()` test factory in the test file.
 - Produces: `URGENT_KEYS` now contains `"selfcheck.runner_source_unresolved"`. Task 2 emits findings with that `check` value and relies on this routing.
 
@@ -45,18 +47,19 @@
 Add this case inside the `describe("classify", …)` block in `tests/security-drift-taxonomy.test.ts` (e.g. after the `controlplane.unmanaged` case near line 68). The `fpExtra: ["security-standards"]` is essential: the detail contains that substring, so if the key were NOT in `URGENT_KEYS`, line 109's FP filter would drop it to `null`. This makes the test a true red→green for criterion #4 (without it, deny-by-default would return URGENT anyway and the test would pass vacuously).
 
 ```ts
-  it("URGENTs an unverifiable deployed scanner and bypasses the FP filter (deny-by-default)", () => {
-    const c = classify(
-      f({
-        check: "selfcheck.runner_source_unresolved",
-        target: "/Users/x/.claude/bin/security-scan.sh",
-        detail: "blessed source unreadable at /Users/x/Projects/security-standards/scripts/security-scan.sh — cannot verify deployed artifact",
-      }),
-      { autoFixAllowlist: [], fpExtra: ["security-standards"] },
-    );
-    expect(c?.tier).toBe("URGENT");
-    expect(c && "manual" in c.remediation).toBe(true);
-  });
+it('URGENTs an unverifiable deployed scanner and bypasses the FP filter (deny-by-default)', () => {
+  const c = classify(
+    f({
+      check: 'selfcheck.runner_source_unresolved',
+      target: '/Users/x/.claude/bin/security-scan.sh',
+      detail:
+        'blessed source unreadable at /Users/x/Projects/security-standards/scripts/security-scan.sh — cannot verify deployed artifact',
+    }),
+    { autoFixAllowlist: [], fpExtra: ['security-standards'] },
+  );
+  expect(c?.tier).toBe('URGENT');
+  expect(c && 'manual' in c.remediation).toBe(true);
+});
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -98,10 +101,12 @@ Expected: `npm run build` exits 0; commit succeeds.
 ### Task 2: Self-check — source-verified integrity policy
 
 **Files:**
+
 - Modify: `src/security-drift/self-check.ts` — `SelfCheckConfig` interface (lines 15-23) and `runSelfCheck` (add a block before the existing check #3 at lines 79-95)
 - Test: `tests/security-drift-self-check.test.ts` — `cfg()` helper (lines 11-21), new `describe` block, and relabel of the existing scanner test (lines 56-63)
 
 **Interfaces:**
+
 - Consumes: `URGENT_KEYS` membership of `selfcheck.runner_source_unresolved` from Task 1; the existing `fail(check, target, detail): Finding` helper (self-check.ts:47); `Finding` from `scan-parser.js`.
 - Produces: `SelfCheckConfig` gains a required field `sourceVerifiedFiles: { deployed: string; source: string }[]`. Task 3 (the CLI) populates it. The source-verify block emits `selfcheck.runner_integrity` (deployed≠source) or `selfcheck.runner_source_unresolved` (source unreadable), targeting the deployed path.
 
@@ -115,67 +120,67 @@ In `tests/security-drift-self-check.test.ts`:
 function cfg(over: Partial<SelfCheckConfig> = {}): SelfCheckConfig {
   return {
     stateFiles: [],
-    auditLog: path.join(dir, "audit.jsonl"),
-    hwmFile: path.join(dir, "hwm.json"),
+    auditLog: path.join(dir, 'audit.jsonl'),
+    hwmFile: path.join(dir, 'hwm.json'),
     sourceVerifiedFiles: [],
     integrityFiles: [],
-    hashFile: path.join(dir, "hashes.json"),
-    now: "2026-06-15T03:00:00Z",
+    hashFile: path.join(dir, 'hashes.json'),
+    now: '2026-06-15T03:00:00Z',
     ...over,
   };
 }
 ```
 
-(b) Relabel the existing scanner test (currently lines 56-63) so it documents the *change-tracked* (allowlist) policy it now exercises — the scanner has moved to the source-verified policy. Replace it with:
+(b) Relabel the existing scanner test (currently lines 56-63) so it documents the _change-tracked_ (allowlist) policy it now exercises — the scanner has moved to the source-verified policy. Replace it with:
 
 ```ts
-  it("change-tracked config (allowlist) seeds on first sight then flags on change", () => {
-    const conf = path.join(dir, "security-fp-allowlist.txt");
-    fs.writeFileSync(conf, "#original");
-    expect(runSelfCheck(cfg({ integrityFiles: [conf] }))).toHaveLength(0); // seed
-    fs.writeFileSync(conf, "#CHANGED");
-    const findings = runSelfCheck(cfg({ integrityFiles: [conf] }));
-    expect(findings.map((x) => x.check)).toContain("selfcheck.runner_integrity");
-  });
+it('change-tracked config (allowlist) seeds on first sight then flags on change', () => {
+  const conf = path.join(dir, 'security-fp-allowlist.txt');
+  fs.writeFileSync(conf, '#original');
+  expect(runSelfCheck(cfg({ integrityFiles: [conf] }))).toHaveLength(0); // seed
+  fs.writeFileSync(conf, '#CHANGED');
+  const findings = runSelfCheck(cfg({ integrityFiles: [conf] }));
+  expect(findings.map((x) => x.check)).toContain('selfcheck.runner_integrity');
+});
 ```
 
 (c) Add a new `describe` block (e.g. after the existing `describe("runSelfCheck", …)` closes, or nested before its closing brace) with the four source-verified cases:
 
 ```ts
-describe("runSelfCheck — source-verified integrity", () => {
+describe('runSelfCheck — source-verified integrity', () => {
   function pair() {
     return {
-      deployed: path.join(dir, "bin-security-scan.sh"),
-      source: path.join(dir, "src-security-scan.sh"),
+      deployed: path.join(dir, 'bin-security-scan.sh'),
+      source: path.join(dir, 'src-security-scan.sh'),
     };
   }
 
-  it("is silent when the deployed scanner byte-matches its blessed source", () => {
+  it('is silent when the deployed scanner byte-matches its blessed source', () => {
     const { deployed, source } = pair();
-    fs.writeFileSync(deployed, "#!/bin/bash\necho blessed\n");
-    fs.writeFileSync(source, "#!/bin/bash\necho blessed\n");
+    fs.writeFileSync(deployed, '#!/bin/bash\necho blessed\n');
+    fs.writeFileSync(source, '#!/bin/bash\necho blessed\n');
     expect(runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }))).toHaveLength(0);
   });
 
-  it("flags runner_integrity when the deployed scanner differs from blessed source", () => {
+  it('flags runner_integrity when the deployed scanner differs from blessed source', () => {
     const { deployed, source } = pair();
-    fs.writeFileSync(deployed, "#!/bin/bash\necho TAMPERED\n");
-    fs.writeFileSync(source, "#!/bin/bash\necho blessed\n");
+    fs.writeFileSync(deployed, '#!/bin/bash\necho TAMPERED\n');
+    fs.writeFileSync(source, '#!/bin/bash\necho blessed\n');
     const findings = runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }));
-    expect(findings.map((x) => x.check)).toContain("selfcheck.runner_integrity");
+    expect(findings.map((x) => x.check)).toContain('selfcheck.runner_integrity');
   });
 
-  it("flags runner_source_unresolved when the blessed source is unreadable (fail loud, not open)", () => {
+  it('flags runner_source_unresolved when the blessed source is unreadable (fail loud, not open)', () => {
     const { deployed, source } = pair();
-    fs.writeFileSync(deployed, "#!/bin/bash\necho blessed\n");
+    fs.writeFileSync(deployed, '#!/bin/bash\necho blessed\n');
     // source intentionally not written → unreadable
     const findings = runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }));
-    expect(findings.map((x) => x.check)).toContain("selfcheck.runner_source_unresolved");
+    expect(findings.map((x) => x.check)).toContain('selfcheck.runner_source_unresolved');
   });
 
-  it("is silent when the deployed scanner does not exist yet (nothing to verify)", () => {
+  it('is silent when the deployed scanner does not exist yet (nothing to verify)', () => {
     const { deployed, source } = pair();
-    fs.writeFileSync(source, "#!/bin/bash\necho blessed\n");
+    fs.writeFileSync(source, '#!/bin/bash\necho blessed\n');
     // deployed intentionally not written
     expect(runSelfCheck(cfg({ sourceVerifiedFiles: [{ deployed, source }] }))).toHaveLength(0);
   });
@@ -207,30 +212,41 @@ export interface SelfCheckConfig {
 (b) Insert this block in `runSelfCheck` immediately BEFORE the existing `// 3. runner / config integrity` comment (currently line 79). Renumber the existing one to `3b` in its comment for clarity.
 
 ```ts
-  // 3a. source-verified integrity — a deployed artifact must byte-match its blessed
-  // source-of-truth. Stateless (no hash store): the steady state right after a legit
-  // `make install` (shutil.copyfile) is deployed == source. A mismatch means tamper or a
-  // stale/forgotten deploy; an unreadable source means we cannot verify — emit, never
-  // silently pass (deny-by-default).
-  for (const { deployed, source } of cfg.sourceVerifiedFiles) {
-    let deployedBuf: Buffer;
-    try {
-      deployedBuf = fs.readFileSync(deployed);
-    } catch {
-      continue; // not deployed yet — nothing to verify
-    }
-    let sourceBuf: Buffer;
-    try {
-      sourceBuf = fs.readFileSync(source);
-    } catch {
-      findings.push(fail("selfcheck.runner_source_unresolved", deployed, `blessed source unreadable at ${source} — cannot verify deployed artifact`));
-      continue;
-    }
-    if (!deployedBuf.equals(sourceBuf)) {
-      findings.push(fail("selfcheck.runner_integrity", deployed, `deployed scanner does not match blessed source ${source} — investigate tamper or stale deploy`));
-    }
+// 3a. source-verified integrity — a deployed artifact must byte-match its blessed
+// source-of-truth. Stateless (no hash store): the steady state right after a legit
+// `make install` (shutil.copyfile) is deployed == source. A mismatch means tamper or a
+// stale/forgotten deploy; an unreadable source means we cannot verify — emit, never
+// silently pass (deny-by-default).
+for (const { deployed, source } of cfg.sourceVerifiedFiles) {
+  let deployedBuf: Buffer;
+  try {
+    deployedBuf = fs.readFileSync(deployed);
+  } catch {
+    continue; // not deployed yet — nothing to verify
   }
-
+  let sourceBuf: Buffer;
+  try {
+    sourceBuf = fs.readFileSync(source);
+  } catch {
+    findings.push(
+      fail(
+        'selfcheck.runner_source_unresolved',
+        deployed,
+        `blessed source unreadable at ${source} — cannot verify deployed artifact`,
+      ),
+    );
+    continue;
+  }
+  if (!deployedBuf.equals(sourceBuf)) {
+    findings.push(
+      fail(
+        'selfcheck.runner_integrity',
+        deployed,
+        `deployed scanner does not match blessed source ${source} — investigate tamper or stale deploy`,
+      ),
+    );
+  }
+}
 ```
 
 Update the existing comment `// 3. runner / config integrity` to `// 3b. change-tracked integrity (config files with no source-of-truth repo)`. Leave the loop body (lines 80-95) unchanged.
@@ -268,11 +284,13 @@ Expected: `npm run build` exits 0; commit succeeds.
 ### Task 3: Wiring — resolve the source path and route it into the self-check
 
 **Files:**
+
 - Modify: `src/security-drift/paths.ts` — add `scanSourcePath` to `SecurityPaths` (lines 8-20) and `securityPaths()` (lines 28-40)
 - Modify: `src/cli/security-drift-cli.ts:64-71` — the `runSelfCheck({...})` call
 - Test: full suite (`npx vitest run`) + `npm run build` (type-check is the wiring's gate; the repo does not unit-test the CLI entrypoint or `paths.ts`, consistent with existing patterns)
 
 **Interfaces:**
+
 - Consumes: `SelfCheckConfig.sourceVerifiedFiles` from Task 2; `securityPaths()` returning a `SecurityPaths`.
 - Produces: `SecurityPaths.scanSourcePath: string`. The CLI passes `sourceVerifiedFiles: [{ deployed: p.scanPath, source: p.scanSourcePath }]` and the trimmed `integrityFiles: [p.autoFixAllowlistFile, p.fpAllowlistFile]`.
 
@@ -281,8 +299,8 @@ Expected: `npm run build` exits 0; commit succeeds.
 In the `SecurityPaths` interface (after `scanPath: string;`):
 
 ```ts
-  scanPath: string;
-  scanSourcePath: string;
+scanPath: string;
+scanSourcePath: string;
 ```
 
 In the returned object of `securityPaths()` (after the `scanPath:` line):
@@ -297,15 +315,15 @@ In the returned object of `securityPaths()` (after the `scanPath:` line):
 In `src/cli/security-drift-cli.ts`, replace the existing call (lines 64-71). The scanner moves out of `integrityFiles` into `sourceVerifiedFiles`; the two allowlist files remain in `integrityFiles`:
 
 ```ts
-  const selfCheckFindings = runSelfCheck({
-    stateFiles: [p.baselineFile, p.emitStateFile, p.rollbackLog],
-    auditLog: p.auditLog,
-    hwmFile: p.hwmFile,
-    sourceVerifiedFiles: [{ deployed: p.scanPath, source: p.scanSourcePath }],
-    integrityFiles: [p.autoFixAllowlistFile, p.fpAllowlistFile],
-    hashFile: p.hashFile,
-    now,
-  });
+const selfCheckFindings = runSelfCheck({
+  stateFiles: [p.baselineFile, p.emitStateFile, p.rollbackLog],
+  auditLog: p.auditLog,
+  hwmFile: p.hwmFile,
+  sourceVerifiedFiles: [{ deployed: p.scanPath, source: p.scanSourcePath }],
+  integrityFiles: [p.autoFixAllowlistFile, p.fpAllowlistFile],
+  hashFile: p.hashFile,
+  now,
+});
 ```
 
 (Note: any stale `scanPath` entry left in the existing `hashFile` from prior runs is harmless — the change-tracked loop only iterates the current `integrityFiles`, which no longer includes it.)

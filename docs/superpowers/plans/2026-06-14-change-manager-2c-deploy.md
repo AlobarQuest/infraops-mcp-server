@@ -11,7 +11,8 @@
 **Specs/standards:** `docs/superpowers/specs/2026-06-14-change-manager-design.md`; infra-brain BLOCK rules #1/#2/#3/#5/#6/#211/#212 + WARN #12/#13/#237; the `sso-integration` skill (forward-auth recipe, §7).
 
 **Decisions baked in (from infra-brain + the SSO skill):**
-- **Domain: `change-mgr.alobar.net`** (the SSO skill's forward-auth convention is `<app>.alobar.net`, not `devonwatkins.com` — corrects the spec's placeholder). *Confirm with Devon before DNS.*
+
+- **Domain: `change-mgr.alobar.net`** (the SSO skill's forward-auth convention is `<app>.alobar.net`, not `devonwatkins.com` — corrects the spec's placeholder). _Confirm with Devon before DNS._
 - **M2M auth stays the simple shared bearer token** built in 2a (random secret in BWS → `M2M_TOKEN` env; the mini sends it). Not Authentik client-credentials JWT — that's a future upgrade; one internal caller doesn't need it.
 - **Forward-auth protects GUI paths only; `/api/*` is M2M-only** — otherwise the mini can't sync (forward-auth expects a browser session, not a bearer token).
 - No `SECRET_KEY`/OIDC session needed — forward-auth means the app only reads a trusted header.
@@ -125,7 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
+        with: { python-version: '3.12' }
       - run: pip install -e ".[dev]"
       - run: pytest -q
 
@@ -186,7 +187,7 @@ git commit -q -m "ci: GitHub Actions test → GHCR build/push → Coolify redepl
 ## Task 4: Create + configure the Coolify app (GHCR image)
 
 - [ ] **Create the app** pointing at the private GHCR image `ghcr.io/alobarquest/change-manager:main`. Use `coolify_create_application_dockerimage` (single-container image app). If infraops can't create a private-image app cleanly, fall back to the Coolify UI with a **Deploy Key** git source (rule #237) — do NOT use `coolify_create_application_public` for the private repo (rule #238).
-- [ ] **GHCR pull credentials:** the image is private — add a GHCR registry credential in Coolify (a GitHub PAT with `read:packages`, stored in BWS) so Coolify can pull. (Alternative: make only the GHCR *package* public — but prefer private + creds.)
+- [ ] **GHCR pull credentials:** the image is private — add a GHCR registry credential in Coolify (a GitHub PAT with `read:packages`, stored in BWS) so Coolify can pull. (Alternative: make only the GHCR _package_ public — but prefer private + creds.)
 - [ ] **Set env vars** (single-container → `coolify_create_app_env` works, rule #239):
   - `DATABASE_URL` (from BWS) · `M2M_TOKEN` (from BWS)
   - (defaults are fine: `sso_user_header=x-authentik-email`, `dev_user=""` — leave unset)
@@ -212,14 +213,14 @@ http:
     cm-strip-authentik-headers:
       headers:
         customRequestHeaders:
-          X-authentik-username: ""
-          X-authentik-email: ""
-          X-authentik-groups: ""
-          X-authentik-uid: ""
-          X-authentik-jwt: ""
+          X-authentik-username: ''
+          X-authentik-email: ''
+          X-authentik-groups: ''
+          X-authentik-uid: ''
+          X-authentik-jwt: ''
     cm-forward-auth:
       forwardAuth:
-        address: "http://ak-outpost-<outpost-uuid>:9000/outpost.goauthentik.io/auth/traefik"
+        address: 'http://ak-outpost-<outpost-uuid>:9000/outpost.goauthentik.io/auth/traefik'
         trustForwardHeader: true
         authResponseHeaders:
           - X-authentik-username
@@ -228,7 +229,7 @@ http:
   routers:
     # GUI paths: strip spoofed headers, THEN forward-auth (browser SSO)
     change-manager-gui:
-      rule: "Host(`change-mgr.alobar.net`)"
+      rule: 'Host(`change-mgr.alobar.net`)'
       priority: 10
       entryPoints: [https]
       service: <coolify-service-name>
@@ -236,15 +237,16 @@ http:
       tls: { certResolver: letsencrypt }
     # API paths: strip spoofed headers only — app's M2M token guards these (no forward-auth)
     change-manager-api:
-      rule: "Host(`change-mgr.alobar.net`) && PathPrefix(`/api`)"
-      priority: 20      # higher priority than the GUI router so /api matches here first
+      rule: 'Host(`change-mgr.alobar.net`) && PathPrefix(`/api`)'
+      priority: 20 # higher priority than the GUI router so /api matches here first
       entryPoints: [https]
       service: <coolify-service-name>
       middlewares: [cm-strip-authentik-headers]
       tls: { certResolver: letsencrypt }
 ```
 
-  Fill `<outpost-uuid>` and `<coolify-service-name>` from Authentik + Coolify. If Coolify auto-generates a conflicting router for the FQDN, reconcile (you may set the domain via these labels and clear the Coolify FQDN routing, or disable Coolify's auto-router for this app — confirm which during execution).
+Fill `<outpost-uuid>` and `<coolify-service-name>` from Authentik + Coolify. If Coolify auto-generates a conflicting router for the FQDN, reconcile (you may set the domain via these labels and clear the Coolify FQDN routing, or disable Coolify's auto-router for this app — confirm which during execution).
+
 - [ ] **Lock down direct access (rule §7-1):** ensure the app container does NOT publish a host port — it must be reachable only via Traefik on the internal Docker network. Verify no `ports:` host mapping.
 
 ## Task 7: End-to-end verification (the SSO checklist + the mini path)

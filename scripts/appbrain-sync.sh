@@ -69,6 +69,9 @@ SSH_OPTS=(-i "$VPS_SSH_KEY_PATH" -o BatchMode=yes -o ConnectTimeout=10 -o Strict
 
 # ── Resolve the DB container's coolify-network IP (re-queried each run; survives a
 #    container recreate that changes the IP) ────────────────────────────────────
+# shellcheck disable=SC2029  # $APPBRAIN_DB_CONTAINER MUST expand client-side: it is
+# local config the VPS has no knowledge of. The Go template braces are escaped so they
+# reach the remote docker verbatim; only the container name is interpolated here.
 DB_IP="$(ssh "${SSH_OPTS[@]}" "$VPS_USER@$VPS_HOST" \
   "docker inspect -f '{{range \$k,\$v := .NetworkSettings.Networks}}{{if eq \$k \"coolify\"}}{{\$v.IPAddress}}{{end}}{{end}}' $APPBRAIN_DB_CONTAINER" 2>/dev/null)"
 DB_IP="$(echo "$DB_IP" | tr -d '[:space:]')"
@@ -76,6 +79,8 @@ DB_IP="$(echo "$DB_IP" | tr -d '[:space:]')"
 log "brain-app-db at ${DB_IP}:5432 on coolify network (via $VPS_HOST)"
 
 # ── Fetch the DB password over the same SSH (never logged/persisted) ───────────────
+# shellcheck disable=SC2029  # same as above: the container name is local config and
+# must expand here, not on the VPS.
 DB_PW="$(ssh "${SSH_OPTS[@]}" "$VPS_USER@$VPS_HOST" \
   "docker exec $APPBRAIN_DB_CONTAINER printenv POSTGRES_PASSWORD" 2>/dev/null)"
 [ -n "$DB_PW" ] || fail "could not read brain-app-db POSTGRES_PASSWORD"
@@ -86,6 +91,9 @@ DB_PW_ENC="$(P="$DB_PW" python3 -c 'import os,urllib.parse;print(urllib.parse.qu
 ssh "${SSH_OPTS[@]}" -o ExitOnForwardFailure=yes -N \
   -L "127.0.0.1:${APPBRAIN_SYNC_LOCAL_PORT}:${DB_IP}:5432" "$VPS_USER@$VPS_HOST" &
 SSH_PID=$!
+# shellcheck disable=SC2329  # false positive: `trap cleanup EXIT` on the next line is
+# the invocation. Verified against shellcheck 0.11 — a minimal repro of these two lines
+# alone is NOT flagged, so the analysis loses the trap only in this file's context.
 cleanup() { kill "$SSH_PID" 2>/dev/null; wait "$SSH_PID" 2>/dev/null; }
 trap cleanup EXIT
 

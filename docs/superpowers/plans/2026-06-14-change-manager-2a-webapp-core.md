@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-06-14-change-manager-design.md` → "Data model", "Sub-project A — the web app" (API section).
 
 **Conventions:**
+
 - New repo lives at `~/Projects/change-manager` (GitHub `alobarquest/change-manager`). This plan doc stays in the infraops repo with the other change-manager planning docs.
 - Python 3.12+; verify with `python --version` after creating the venv.
 - Test: `pytest -q`. Single test: `pytest tests/test_x.py::test_name -q`.
@@ -21,22 +22,22 @@
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `pyproject.toml`, `.gitignore`, `README.md` | Project metadata + deps. |
-| `app/config.py` | `Settings` (DATABASE_URL, M2M_TOKEN) via pydantic-settings. |
-| `app/db.py` | Engine, `SessionLocal`, declarative `Base`, `get_db` dependency. |
-| `app/models.py` | ORM: `ChangeItem`, `ChangeAttempt`, `ChangeEvent`, `WindowRun`. |
-| `app/identity.py` | `stable_identity()`, `rule_key_of()`. |
-| `app/events.py` | `record_event()` — append a `ChangeEvent` on every transition. |
-| `app/schemas.py` | Pydantic request/response models. |
-| `app/reconcile.py` | The sync reconciliation state machine. |
-| `app/auth.py` | `require_m2m` dependency (bearer token). |
-| `app/api.py` | The `/api/*` router. |
-| `app/main.py` | FastAPI app; mounts the router; `/api/health`. |
-| `tests/conftest.py` | SQLite engine + session + TestClient fixtures. |
-| `tests/test_*.py` | Per-unit tests. |
-| `alembic/`, `alembic.ini` | Prod Postgres migrations. |
+| File                                        | Responsibility                                                   |
+| ------------------------------------------- | ---------------------------------------------------------------- |
+| `pyproject.toml`, `.gitignore`, `README.md` | Project metadata + deps.                                         |
+| `app/config.py`                             | `Settings` (DATABASE_URL, M2M_TOKEN) via pydantic-settings.      |
+| `app/db.py`                                 | Engine, `SessionLocal`, declarative `Base`, `get_db` dependency. |
+| `app/models.py`                             | ORM: `ChangeItem`, `ChangeAttempt`, `ChangeEvent`, `WindowRun`.  |
+| `app/identity.py`                           | `stable_identity()`, `rule_key_of()`.                            |
+| `app/events.py`                             | `record_event()` — append a `ChangeEvent` on every transition.   |
+| `app/schemas.py`                            | Pydantic request/response models.                                |
+| `app/reconcile.py`                          | The sync reconciliation state machine.                           |
+| `app/auth.py`                               | `require_m2m` dependency (bearer token).                         |
+| `app/api.py`                                | The `/api/*` router.                                             |
+| `app/main.py`                               | FastAPI app; mounts the router; `/api/health`.                   |
+| `tests/conftest.py`                         | SQLite engine + session + TestClient fixtures.                   |
+| `tests/test_*.py`                           | Per-unit tests.                                                  |
+| `alembic/`, `alembic.ini`                   | Prod Postgres migrations.                                        |
 
 ---
 
@@ -96,6 +97,7 @@ __pycache__/
 ```bash
 pip install -e ".[dev]"
 ```
+
 Expected: installs cleanly.
 
 - [ ] **Step 5: Write `app/config.py`**
@@ -1320,6 +1322,7 @@ pytest
 git add app/api.py tests/test_api_windows.py README.md
 git commit -q -m "feat: window-runs endpoints; README"
 ```
+
 Expected: all tests pass (health, identity, models, migration, events, schemas, reconcile, auth, sync, lifecycle, decisions, windows).
 
 - [ ] **Step 7: Create the GitHub repo + push** (only when the user confirms)

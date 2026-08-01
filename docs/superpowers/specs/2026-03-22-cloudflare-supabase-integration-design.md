@@ -69,79 +69,79 @@ Both providers use bearer token auth fetched from BWS at startup. No new npm dep
 
 ### `src/tools/cloudflare-dns.ts` — Zone & DNS Record Management
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `cloudflare_list_zones` | List all zones (domains) on the account | readOnly |
-| `cloudflare_get_zone` | Get zone details by ID | readOnly |
-| `cloudflare_list_dns_records` | List records for a zone (filterable by type, name) | readOnly |
-| `cloudflare_create_dns_record` | Create A/AAAA/CNAME/MX/TXT/SRV/etc record | — |
-| `cloudflare_update_dns_record` | Update an existing record | — |
-| `cloudflare_delete_dns_record` | Delete a record | destructive |
+| Tool                           | Description                                        | Annotations |
+| ------------------------------ | -------------------------------------------------- | ----------- |
+| `cloudflare_list_zones`        | List all zones (domains) on the account            | readOnly    |
+| `cloudflare_get_zone`          | Get zone details by ID                             | readOnly    |
+| `cloudflare_list_dns_records`  | List records for a zone (filterable by type, name) | readOnly    |
+| `cloudflare_create_dns_record` | Create A/AAAA/CNAME/MX/TXT/SRV/etc record          | —           |
+| `cloudflare_update_dns_record` | Update an existing record                          | —           |
+| `cloudflare_delete_dns_record` | Delete a record                                    | destructive |
 
 ### `src/tools/cloudflare-pages.ts` — Pages Projects & Deployments
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `cloudflare_list_pages_projects` | List all Pages projects | readOnly |
-| `cloudflare_get_pages_project` | Get project details (domains, build config, env vars) | readOnly |
-| `cloudflare_create_pages_project` | Create a new project | — |
-| `cloudflare_update_pages_project` | Update project build config, env vars, deployment settings | — |
-| `cloudflare_delete_pages_project` | Delete a project | destructive |
-| `cloudflare_list_pages_deployments` | List deployments for a project | readOnly |
-| `cloudflare_get_pages_deployment` | Get deployment details/status | readOnly |
-| `cloudflare_create_pages_deployment` | Trigger a new deployment for a project | — |
+| Tool                                 | Description                                                | Annotations |
+| ------------------------------------ | ---------------------------------------------------------- | ----------- |
+| `cloudflare_list_pages_projects`     | List all Pages projects                                    | readOnly    |
+| `cloudflare_get_pages_project`       | Get project details (domains, build config, env vars)      | readOnly    |
+| `cloudflare_create_pages_project`    | Create a new project                                       | —           |
+| `cloudflare_update_pages_project`    | Update project build config, env vars, deployment settings | —           |
+| `cloudflare_delete_pages_project`    | Delete a project                                           | destructive |
+| `cloudflare_list_pages_deployments`  | List deployments for a project                             | readOnly    |
+| `cloudflare_get_pages_deployment`    | Get deployment details/status                              | readOnly    |
+| `cloudflare_create_pages_deployment` | Trigger a new deployment for a project                     | —           |
 
 ### `src/tools/cloudflare-workers.ts` — Worker Scripts, KV & D1
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `cloudflare_list_workers` | List worker scripts | readOnly |
-| `cloudflare_get_worker` | Get worker details (routes, bindings) | readOnly |
-| `cloudflare_delete_worker` | Delete a worker script | destructive |
-| `cloudflare_list_kv_namespaces` | List KV namespaces | readOnly |
-| `cloudflare_create_kv_namespace` | Create a KV namespace | — |
-| `cloudflare_delete_kv_namespace` | Delete a KV namespace | destructive |
-| `cloudflare_list_kv_keys` | List keys in a namespace | readOnly |
-| `cloudflare_get_kv_value` | Read a KV value | readOnly |
-| `cloudflare_put_kv_value` | Write a KV value | — |
-| `cloudflare_delete_kv_value` | Delete a KV key | destructive |
-| `cloudflare_list_d1_databases` | List D1 databases | readOnly |
-| `cloudflare_query_d1` | Execute SQL against a D1 database | destructive |
+| Tool                             | Description                           | Annotations |
+| -------------------------------- | ------------------------------------- | ----------- |
+| `cloudflare_list_workers`        | List worker scripts                   | readOnly    |
+| `cloudflare_get_worker`          | Get worker details (routes, bindings) | readOnly    |
+| `cloudflare_delete_worker`       | Delete a worker script                | destructive |
+| `cloudflare_list_kv_namespaces`  | List KV namespaces                    | readOnly    |
+| `cloudflare_create_kv_namespace` | Create a KV namespace                 | —           |
+| `cloudflare_delete_kv_namespace` | Delete a KV namespace                 | destructive |
+| `cloudflare_list_kv_keys`        | List keys in a namespace              | readOnly    |
+| `cloudflare_get_kv_value`        | Read a KV value                       | readOnly    |
+| `cloudflare_put_kv_value`        | Write a KV value                      | —           |
+| `cloudflare_delete_kv_value`     | Delete a KV key                       | destructive |
+| `cloudflare_list_d1_databases`   | List D1 databases                     | readOnly    |
+| `cloudflare_query_d1`            | Execute SQL against a D1 database     | destructive |
 
 ### `src/tools/cloudflare-r2.ts` — R2 Storage Buckets
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `cloudflare_list_r2_buckets` | List R2 buckets | readOnly |
-| `cloudflare_create_r2_bucket` | Create a bucket | — |
-| `cloudflare_get_r2_bucket` | Get bucket details | readOnly |
-| `cloudflare_delete_r2_bucket` | Delete a bucket | destructive |
+| Tool                          | Description        | Annotations |
+| ----------------------------- | ------------------ | ----------- |
+| `cloudflare_list_r2_buckets`  | List R2 buckets    | readOnly    |
+| `cloudflare_create_r2_bucket` | Create a bucket    | —           |
+| `cloudflare_get_r2_bucket`    | Get bucket details | readOnly    |
+| `cloudflare_delete_r2_bucket` | Delete a bucket    | destructive |
 
 ### `src/tools/cloudflare-tunnels.ts` — Cloudflare Tunnel Management
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `cloudflare_list_tunnels` | List tunnels | readOnly |
-| `cloudflare_get_tunnel` | Get tunnel details and connections | readOnly |
-| `cloudflare_create_tunnel` | Create a new tunnel | — |
-| `cloudflare_delete_tunnel` | Delete a tunnel | destructive |
-| `cloudflare_get_tunnel_config` | Get tunnel ingress configuration | readOnly |
-| `cloudflare_update_tunnel_config` | Update tunnel ingress rules | — |
+| Tool                              | Description                        | Annotations |
+| --------------------------------- | ---------------------------------- | ----------- |
+| `cloudflare_list_tunnels`         | List tunnels                       | readOnly    |
+| `cloudflare_get_tunnel`           | Get tunnel details and connections | readOnly    |
+| `cloudflare_create_tunnel`        | Create a new tunnel                | —           |
+| `cloudflare_delete_tunnel`        | Delete a tunnel                    | destructive |
+| `cloudflare_get_tunnel_config`    | Get tunnel ingress configuration   | readOnly    |
+| `cloudflare_update_tunnel_config` | Update tunnel ingress rules        | —           |
 
 ### `src/tools/cloudflare-security.ts` — WAF Rulesets, Cache & SSL/TLS
 
 Uses the Rulesets API (not the deprecated Firewall Rules API).
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `cloudflare_get_ssl_setting` | Get zone SSL mode (off/flexible/full/strict) | readOnly |
-| `cloudflare_update_ssl_setting` | Change SSL mode | — |
-| `cloudflare_list_rulesets` | List rulesets for a zone (WAF, custom rules, rate limiting) | readOnly |
-| `cloudflare_get_ruleset` | Get ruleset details and rules | readOnly |
-| `cloudflare_create_ruleset_rule` | Add a custom rule to a zone ruleset | — |
-| `cloudflare_update_ruleset_rule` | Update a custom rule | — |
-| `cloudflare_delete_ruleset_rule` | Delete a custom rule | destructive |
-| `cloudflare_purge_cache` | Purge zone cache (all, by URL, or by tag) | — |
+| Tool                             | Description                                                 | Annotations |
+| -------------------------------- | ----------------------------------------------------------- | ----------- |
+| `cloudflare_get_ssl_setting`     | Get zone SSL mode (off/flexible/full/strict)                | readOnly    |
+| `cloudflare_update_ssl_setting`  | Change SSL mode                                             | —           |
+| `cloudflare_list_rulesets`       | List rulesets for a zone (WAF, custom rules, rate limiting) | readOnly    |
+| `cloudflare_get_ruleset`         | Get ruleset details and rules                               | readOnly    |
+| `cloudflare_create_ruleset_rule` | Add a custom rule to a zone ruleset                         | —           |
+| `cloudflare_update_ruleset_rule` | Update a custom rule                                        | —           |
+| `cloudflare_delete_ruleset_rule` | Delete a custom rule                                        | destructive |
+| `cloudflare_purge_cache`         | Purge zone cache (all, by URL, or by tag)                   | —           |
 
 **Cloudflare total: 44 tools across 6 files.**
 
@@ -149,51 +149,51 @@ Uses the Rulesets API (not the deprecated Firewall Rules API).
 
 ### `src/tools/supabase-projects.ts` — Project Lifecycle
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `supabase_list_projects` | List all projects | readOnly |
-| `supabase_get_project` | Get project details (status, region, database info) | readOnly |
-| `supabase_create_project` | Create a new project (name, org, region, db password, plan) | — |
-| `supabase_delete_project` | Delete a project | destructive |
-| `supabase_pause_project` | Pause a project | — |
-| `supabase_restore_project` | Resume a paused project | — |
-| `supabase_list_organizations` | List organizations (needed for project creation) | readOnly |
-| `supabase_get_api_keys` | Get a project's API keys (anon, service_role) | readOnly |
-| `supabase_get_project_health` | Get project service health status | readOnly |
+| Tool                          | Description                                                 | Annotations |
+| ----------------------------- | ----------------------------------------------------------- | ----------- |
+| `supabase_list_projects`      | List all projects                                           | readOnly    |
+| `supabase_get_project`        | Get project details (status, region, database info)         | readOnly    |
+| `supabase_create_project`     | Create a new project (name, org, region, db password, plan) | —           |
+| `supabase_delete_project`     | Delete a project                                            | destructive |
+| `supabase_pause_project`      | Pause a project                                             | —           |
+| `supabase_restore_project`    | Resume a paused project                                     | —           |
+| `supabase_list_organizations` | List organizations (needed for project creation)            | readOnly    |
+| `supabase_get_api_keys`       | Get a project's API keys (anon, service_role)               | readOnly    |
+| `supabase_get_project_health` | Get project service health status                           | readOnly    |
 
 ### `src/tools/supabase-database.ts` — SQL & Postgres Config
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `supabase_run_sql` | Execute arbitrary SQL against a project's database | destructive |
-| `supabase_list_extensions` | List available/enabled Postgres extensions | readOnly |
-| `supabase_get_postgres_config` | Get Postgres configuration | readOnly |
-| `supabase_update_postgres_config` | Update Postgres settings | — |
+| Tool                              | Description                                        | Annotations |
+| --------------------------------- | -------------------------------------------------- | ----------- |
+| `supabase_run_sql`                | Execute arbitrary SQL against a project's database | destructive |
+| `supabase_list_extensions`        | List available/enabled Postgres extensions         | readOnly    |
+| `supabase_get_postgres_config`    | Get Postgres configuration                         | readOnly    |
+| `supabase_update_postgres_config` | Update Postgres settings                           | —           |
 
 ### `src/tools/supabase-functions.ts` — Edge Functions
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `supabase_list_functions` | List Edge Functions for a project | readOnly |
-| `supabase_get_function` | Get function details (status, version, route) | readOnly |
-| `supabase_create_function` | Create/deploy an Edge Function | — |
-| `supabase_update_function` | Update an Edge Function | — |
-| `supabase_delete_function` | Delete an Edge Function | destructive |
+| Tool                       | Description                                   | Annotations |
+| -------------------------- | --------------------------------------------- | ----------- |
+| `supabase_list_functions`  | List Edge Functions for a project             | readOnly    |
+| `supabase_get_function`    | Get function details (status, version, route) | readOnly    |
+| `supabase_create_function` | Create/deploy an Edge Function                | —           |
+| `supabase_update_function` | Update an Edge Function                       | —           |
+| `supabase_delete_function` | Delete an Edge Function                       | destructive |
 
 ### `src/tools/supabase-config.ts` — Auth, Secrets & Storage Buckets
 
-| Tool | Description | Annotations |
-|------|-------------|-------------|
-| `supabase_get_auth_config` | Get auth settings (providers, JWT expiry, etc.) | readOnly |
-| `supabase_update_auth_config` | Update auth configuration | — |
-| `supabase_list_secrets` | List project secrets | readOnly |
-| `supabase_create_secrets` | Create/update secrets | — |
-| `supabase_delete_secrets` | Delete secrets | destructive |
-| `supabase_list_storage_buckets` | List storage buckets | readOnly |
-| `supabase_get_storage_bucket` | Get bucket details/policies | readOnly |
-| `supabase_create_storage_bucket` | Create a storage bucket | — |
-| `supabase_update_storage_bucket` | Update bucket settings (public/private, file size limits) | — |
-| `supabase_delete_storage_bucket` | Delete a storage bucket | destructive |
+| Tool                             | Description                                               | Annotations |
+| -------------------------------- | --------------------------------------------------------- | ----------- |
+| `supabase_get_auth_config`       | Get auth settings (providers, JWT expiry, etc.)           | readOnly    |
+| `supabase_update_auth_config`    | Update auth configuration                                 | —           |
+| `supabase_list_secrets`          | List project secrets                                      | readOnly    |
+| `supabase_create_secrets`        | Create/update secrets                                     | —           |
+| `supabase_delete_secrets`        | Delete secrets                                            | destructive |
+| `supabase_list_storage_buckets`  | List storage buckets                                      | readOnly    |
+| `supabase_get_storage_bucket`    | Get bucket details/policies                               | readOnly    |
+| `supabase_create_storage_bucket` | Create a storage bucket                                   | —           |
+| `supabase_update_storage_bucket` | Update bucket settings (public/private, file size limits) | —           |
+| `supabase_delete_storage_bucket` | Delete a storage bucket                                   | destructive |
 
 **Supabase total: 28 tools across 4 files.**
 
@@ -210,9 +210,9 @@ if (isCloudflareConfigured()) {
   registerCloudflareR2Tools(server);
   registerCloudflareTunnelTools(server);
   registerCloudflareSecurityTools(server);
-  console.error("Cloudflare tools registered");
+  console.error('Cloudflare tools registered');
 } else {
-  console.error("CLOUDFLARE_API_TOKEN/ACCOUNT_ID not set — Cloudflare tools disabled");
+  console.error('CLOUDFLARE_API_TOKEN/ACCOUNT_ID not set — Cloudflare tools disabled');
 }
 
 // Supabase tools
@@ -221,9 +221,9 @@ if (isSupabaseConfigured()) {
   registerSupabaseDatabaseTools(server);
   registerSupabaseFunctionTools(server);
   registerSupabaseConfigTools(server);
-  console.error("Supabase tools registered");
+  console.error('Supabase tools registered');
 } else {
-  console.error("SUPABASE_ACCESS_TOKEN not set — Supabase tools disabled");
+  console.error('SUPABASE_ACCESS_TOKEN not set — Supabase tools disabled');
 }
 ```
 
@@ -269,13 +269,13 @@ Add to the `env` block:
 
 ## File Summary
 
-| Type | Files | Count |
-|------|-------|-------|
-| **New client services** | `cloudflare-client.ts`, `supabase-client.ts` | 2 |
-| **New tool files** | `cloudflare-dns.ts`, `cloudflare-pages.ts`, `cloudflare-workers.ts`, `cloudflare-r2.ts`, `cloudflare-tunnels.ts`, `cloudflare-security.ts`, `supabase-projects.ts`, `supabase-database.ts`, `supabase-functions.ts`, `supabase-config.ts` | 10 |
-| **Modified** | `index.ts` (registration, version string, provider list in header), `start.sh`, `package.json` | 3 |
-| **Total new tools** | 44 Cloudflare + 28 Supabase | 72 |
-| **New dependencies** | None | 0 |
+| Type                    | Files                                                                                                                                                                                                                                     | Count |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| **New client services** | `cloudflare-client.ts`, `supabase-client.ts`                                                                                                                                                                                              | 2     |
+| **New tool files**      | `cloudflare-dns.ts`, `cloudflare-pages.ts`, `cloudflare-workers.ts`, `cloudflare-r2.ts`, `cloudflare-tunnels.ts`, `cloudflare-security.ts`, `supabase-projects.ts`, `supabase-database.ts`, `supabase-functions.ts`, `supabase-config.ts` | 10    |
+| **Modified**            | `index.ts` (registration, version string, provider list in header), `start.sh`, `package.json`                                                                                                                                            | 3     |
+| **Total new tools**     | 44 Cloudflare + 28 Supabase                                                                                                                                                                                                               | 72    |
+| **New dependencies**    | None                                                                                                                                                                                                                                      | 0     |
 
 ## Out of Scope
 

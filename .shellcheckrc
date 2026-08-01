@@ -1,7 +1,17 @@
 # code-standards shellcheck config (vendored). Edit upstream and `code-standards sync`.
 # Only warning-and-above findings gate; info/style are advisory.
 severity=warning
-external-sources=false
+# NOTE: `severity=` above is NOT a supported .shellcheckrc directive — shellcheck reads
+# this file (external-sources below demonstrably takes effect) but silently ignores it.
+# Only the `--severity` CLI flag works. The line is inherited from the upstream template
+# and left in place pending an upstream fix; do not rely on it. Nothing here filters by
+# severity, so info-level findings DO gate. (WS-P2.24)
+#
+# Sources ARE followed: these scripts source a sibling helper in this same directory, and
+# following it lets shellcheck verify the variables it defines instead of reporting that
+# it declined to look (SC1091). Strictly more checking than external-sources=false.
+external-sources=true
+source-path=SCRIPTDIR
 # Secret bootstrap scripts intentionally export command-substitution results;
 # failures are handled by fetch_bws_secret itself. Runtime config paths are
 # dynamic by design, and JSON is consumed by the following command pipeline.

@@ -11,6 +11,7 @@
 **Spec:** `docs/superpowers/specs/2026-06-14-change-manager-design.md` → "Contract fix (prerequisite)".
 
 **Conventions (follow exactly):**
+
 - Source imports use `.js` specifiers; tests live in `tests/`, import from `../src/...js`.
 - Build: `npm run build`. Test: `npx vitest run`. Single file: `npx vitest run tests/NAME.test.ts`.
 - `dist/` is **tracked** and run directly by launchd — a final task rebuilds and commits it.
@@ -20,19 +21,20 @@
 
 ## File Structure
 
-| File | Change |
-|---|---|
+| File                                  | Change                                                                                                         |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `src/standards/remediation-report.ts` | Add `instance: string` to the `Escalation` interface; bump `schema_version` 1 → 2 in `buildRemediationReport`. |
-| `src/standards/run-remediation.ts` | Add `instance: t.instance` to each pushed `Escalation`. |
-| `tests/run-remediation.test.ts` | Assert escalations carry the correct `instance`. |
-| `tests/remediation-report.test.ts` | Add `instance` to `Escalation` fixtures; assert `schema_version === 2`. |
-| `dist/**` | Rebuilt + committed (final task). |
+| `src/standards/run-remediation.ts`    | Add `instance: t.instance` to each pushed `Escalation`.                                                        |
+| `tests/run-remediation.test.ts`       | Assert escalations carry the correct `instance`.                                                               |
+| `tests/remediation-report.test.ts`    | Add `instance` to `Escalation` fixtures; assert `schema_version === 2`.                                        |
+| `dist/**`                             | Rebuilt + committed (final task).                                                                              |
 
 ---
 
 ## Task 1: Thread `instance` into `Escalation`
 
 **Files:**
+
 - Modify: `src/standards/remediation-report.ts` (the `Escalation` interface)
 - Modify: `src/standards/run-remediation.ts` (the escalation builder)
 - Test: `tests/run-remediation.test.ts`
@@ -42,8 +44,8 @@
 In `tests/run-remediation.test.ts`, find the test `"applies safe proposals and escalates questions"` and add, after the existing `expect(report.totals.escalated).toBe(1);` line:
 
 ```typescript
-    // contract v2: escalations carry their instance
-    expect(report.escalations[0].instance).toBe("prod");
+// contract v2: escalations carry their instance
+expect(report.escalations[0].instance).toBe('prod');
 ```
 
 (The `prop(...)` helper builds proposals audited under the `["prod"]` instance in that test, so the single escalation's `instance` must be `"prod"`.)
@@ -60,8 +62,8 @@ In `src/standards/remediation-report.ts`, change the `Escalation` interface to i
 ```typescript
 export interface Escalation {
   proposal_id: string;
-  instance: string;            // 'prod' | 'dev' — which Coolify instance this came from (contract v2)
-  target: Proposal["target"];
+  instance: string; // 'prod' | 'dev' — which Coolify instance this came from (contract v2)
+  target: Proposal['target'];
   risk: string;
   kind: string;
   reasoning: string;
@@ -76,16 +78,16 @@ export interface Escalation {
 In `src/standards/run-remediation.ts`, find the `escalations.push({ ... })` block (inside the `for (const t of toEscalate)` loop) and add `instance: t.instance,` right after `proposal_id: t.proposal.id,`:
 
 ```typescript
-    escalations.push({
-      proposal_id: t.proposal.id,
-      instance: t.instance,
-      target: t.proposal.target,
-      risk: t.proposal.risk,
-      kind: t.proposal.kind,
-      reasoning: t.proposal.reasoning,
-      plan,
-      ...(t.note ? { note: t.note } : {}),
-    });
+escalations.push({
+  proposal_id: t.proposal.id,
+  instance: t.instance,
+  target: t.proposal.target,
+  risk: t.proposal.risk,
+  kind: t.proposal.kind,
+  reasoning: t.proposal.reasoning,
+  plan,
+  ...(t.note ? { note: t.note } : {}),
+});
 ```
 
 - [ ] **Step 5: Run the run-remediation test to verify it passes**
@@ -99,7 +101,23 @@ Adding a required `instance` field makes the `Escalation` fixtures in `tests/rem
 
 ```typescript
 const escalations: Escalation[] = [
-  { proposal_id: "q1", instance: "prod", target: { provider: "coolify", resource_type: "database", uuid: "db1", name: "pg1" }, risk: "safe", kind: "question", reasoning: "rule #572", plan: { generated_by: "sonnet", root_cause: "x", steps: ["s"], infraops_tools: [], risk: "caution", rollback: "r", cm_window_hint: "h" } },
+  {
+    proposal_id: 'q1',
+    instance: 'prod',
+    target: { provider: 'coolify', resource_type: 'database', uuid: 'db1', name: 'pg1' },
+    risk: 'safe',
+    kind: 'question',
+    reasoning: 'rule #572',
+    plan: {
+      generated_by: 'sonnet',
+      root_cause: 'x',
+      steps: ['s'],
+      infraops_tools: [],
+      risk: 'caution',
+      rollback: 'r',
+      cm_window_hint: 'h',
+    },
+  },
 ];
 ```
 
@@ -122,6 +140,7 @@ git commit -m "feat: add instance to the Escalation contract (carries prod/dev t
 ## Task 2: Bump the report `schema_version` to 2
 
 **Files:**
+
 - Modify: `src/standards/remediation-report.ts` (`buildRemediationReport`)
 - Test: `tests/remediation-report.test.ts`
 
@@ -130,7 +149,7 @@ git commit -m "feat: add instance to the Escalation contract (carries prod/dev t
 In `tests/remediation-report.test.ts`, find the `buildRemediationReport` test that asserts `expect(r.schema_version).toBe(1);` and change it to:
 
 ```typescript
-    expect(r.schema_version).toBe(2);
+expect(r.schema_version).toBe(2);
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -163,6 +182,7 @@ git commit -m "feat: bump remediation report schema_version to 2 (escalations no
 ## Task 3: Rebuild and commit `dist/`
 
 **Files:**
+
 - Modify: `dist/**` (compiled output — tracked, run directly by launchd)
 
 - [ ] **Step 1: Clean rebuild**

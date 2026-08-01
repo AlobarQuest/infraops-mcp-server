@@ -14,20 +14,20 @@
 
 ### New repo: `namecheap-proxy` (at `/Users/devon/Projects/namecheap-proxy`)
 
-| File | Responsibility |
-|------|---------------|
-| `Dockerfile` | Nginx container with custom config |
-| `nginx.conf` | Main Nginx config: bearer token auth, reverse proxy to sandbox/prod, health check |
-| `docker-compose.test.yml` | Local testing only |
-| `.gitignore` | Standard |
+| File                      | Responsibility                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `Dockerfile`              | Nginx container with custom config                                                |
+| `nginx.conf`              | Main Nginx config: bearer token auth, reverse proxy to sandbox/prod, health check |
+| `docker-compose.test.yml` | Local testing only                                                                |
+| `.gitignore`              | Standard                                                                          |
 
 ### Modified files in `infraops-mcp-server` (at `/Users/devon/Projects/infraops-mcp-server`)
 
-| File | Change |
-|------|--------|
+| File                               | Change                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------- |
 | `src/services/namecheap-client.ts` | Base URLs → proxy URLs, hardcode clientIp, remove clientIp from config/env |
-| `src/index.ts` | Update env var docs, remove NAMECHEAP_CLIENT_IP from configured check |
-| `start.sh` | Remove NAMECHEAP_CLIENT_IP handling, add BWS fetch for proxy bearer token |
+| `src/index.ts`                     | Update env var docs, remove NAMECHEAP_CLIENT_IP from configured check      |
+| `start.sh`                         | Remove NAMECHEAP_CLIENT_IP handling, add BWS fetch for proxy bearer token  |
 
 ---
 
@@ -36,6 +36,7 @@
 ### Task 1: Initialize the repo
 
 **Files:**
+
 - Create: `/Users/devon/Projects/namecheap-proxy/.gitignore`
 
 - [ ] **Step 1: Create repo directory and init git**
@@ -49,6 +50,7 @@ git init
 - [ ] **Step 2: Create .gitignore**
 
 Create `/Users/devon/Projects/namecheap-proxy/.gitignore`:
+
 ```
 .env
 docker-compose.test.yml
@@ -66,9 +68,11 @@ git commit -m "Initial commit"
 ### Task 2: Write the Nginx config
 
 **Files:**
+
 - Create: `/Users/devon/Projects/namecheap-proxy/nginx.conf`
 
 The Nginx config must:
+
 1. Listen on port 8080 (standard for Coolify non-privileged containers)
 2. Validate a `Bearer <token>` in the `Authorization` header on `/sandbox/` and `/prod/` paths
 3. The token value comes from the `PROXY_BEARER_TOKEN` env var (injected at container start)
@@ -81,6 +85,7 @@ The Nginx config must:
 - [ ] **Step 1: Create nginx.conf**
 
 Create `/Users/devon/Projects/namecheap-proxy/nginx.conf`:
+
 ```nginx
 worker_processes 1;
 error_log /var/log/nginx/error.log warn;
@@ -145,6 +150,7 @@ http {
 ```
 
 **Key details:**
+
 - `$is_args$args` passes the full query string (including `ClientIp`) untouched
 - `proxy_ssl_server_name on` enables SNI for the upstream HTTPS connection
 - `Host` header set to the real upstream so Namecheap sees the correct hostname
@@ -171,11 +177,13 @@ git commit -m "Add Nginx config with bearer token auth and proxy routes"
 ### Task 3: Write the Dockerfile
 
 **Files:**
+
 - Create: `/Users/devon/Projects/namecheap-proxy/Dockerfile`
 
 - [ ] **Step 1: Create Dockerfile**
 
 Create `/Users/devon/Projects/namecheap-proxy/Dockerfile`:
+
 ```dockerfile
 FROM nginx:1.27-alpine
 
@@ -202,6 +210,7 @@ HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=5s \
 ```
 
 **Key details:**
+
 - The official `nginx:alpine` image has built-in `envsubst` support via its entrypoint — files in `/etc/nginx/templates/` are processed at startup
 - `NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx` tells it to write the processed template to `/etc/nginx/nginx.conf` (not the default `/etc/nginx/conf.d/`)
 - `NGINX_ENVSUBST_FILTER=PROXY_BEARER_TOKEN` restricts `envsubst` to only that variable — without it, Nginx variables like `$http_authorization`, `$is_args`, `$args` get clobbered with empty strings
@@ -283,6 +292,7 @@ Use `coolify_create_project` with name `namecheap-proxy`.
 - [ ] **Step 2: Create application**
 
 Use `coolify_create_application_dockerfile` with:
+
 - Project: the newly created project UUID
 - Git repo: `https://github.com/alobarquest/namecheap-proxy`
 - Branch: `main`
@@ -293,12 +303,14 @@ Use `coolify_create_application_dockerfile` with:
 - [ ] **Step 3: Set environment variable**
 
 Use `coolify_create_app_env` to set:
+
 - `PROXY_BEARER_TOKEN` = (the token from BWS)
 - Mark as secret/sensitive
 
 - [ ] **Step 4: Configure health check**
 
 Use `coolify_update_application` to set:
+
 - Health check enabled: true
 - Health check path: `/health`
 - Health check host: `127.0.0.1`
@@ -331,20 +343,23 @@ curl -s -o /dev/null -w "%{http_code}" https://namecheap-proxy.devonwatkins.com/
 ### Task 7: Update namecheap-client.ts — base URLs and hardcoded IP
 
 **Files:**
+
 - Modify: `/Users/devon/Projects/infraops-mcp-server/src/services/namecheap-client.ts`
 
 - [ ] **Step 1: Update base URLs (lines 20-21)**
 
 Replace:
+
 ```typescript
-const NAMECHEAP_SANDBOX_URL = "https://api.sandbox.namecheap.com/xml.response";
-const NAMECHEAP_PRODUCTION_URL = "https://api.namecheap.com/xml.response";
+const NAMECHEAP_SANDBOX_URL = 'https://api.sandbox.namecheap.com/xml.response';
+const NAMECHEAP_PRODUCTION_URL = 'https://api.namecheap.com/xml.response';
 ```
 
 With:
+
 ```typescript
-const NAMECHEAP_SANDBOX_URL = "https://namecheap-proxy.devonwatkins.com/sandbox/xml.response";
-const NAMECHEAP_PRODUCTION_URL = "https://namecheap-proxy.devonwatkins.com/prod/xml.response";
+const NAMECHEAP_SANDBOX_URL = 'https://namecheap-proxy.devonwatkins.com/sandbox/xml.response';
+const NAMECHEAP_PRODUCTION_URL = 'https://namecheap-proxy.devonwatkins.com/prod/xml.response';
 ```
 
 - [ ] **Step 2: Hardcode clientIp and add proxy auth**
@@ -352,6 +367,7 @@ const NAMECHEAP_PRODUCTION_URL = "https://namecheap-proxy.devonwatkins.com/prod/
 In the `NamecheapConfig` interface, remove `clientIp` and add `proxyToken`:
 
 Replace:
+
 ```typescript
 interface NamecheapConfig {
   apiUser: string;
@@ -363,6 +379,7 @@ interface NamecheapConfig {
 ```
 
 With:
+
 ```typescript
 interface NamecheapConfig {
   apiUser: string;
@@ -376,6 +393,7 @@ interface NamecheapConfig {
 - [ ] **Step 3: Update getConfig()**
 
 Replace:
+
 ```typescript
 function getConfig(): NamecheapConfig {
   const apiUser = process.env.NAMECHEAP_API_USER;
@@ -384,13 +402,13 @@ function getConfig(): NamecheapConfig {
 
   if (!apiUser || !apiKey || !clientIp) {
     throw new Error(
-      "Namecheap API requires NAMECHEAP_API_USER, NAMECHEAP_API_KEY, and NAMECHEAP_CLIENT_IP. " +
-        "Store credentials in BWS and set BWS_NAMECHEAP_API_USER_SECRET_ID, " +
-        "BWS_NAMECHEAP_API_KEY_SECRET_ID in your MCP config."
+      'Namecheap API requires NAMECHEAP_API_USER, NAMECHEAP_API_KEY, and NAMECHEAP_CLIENT_IP. ' +
+        'Store credentials in BWS and set BWS_NAMECHEAP_API_USER_SECRET_ID, ' +
+        'BWS_NAMECHEAP_API_KEY_SECRET_ID in your MCP config.',
     );
   }
 
-  const useSandbox = (process.env.NAMECHEAP_USE_SANDBOX ?? "true").toLowerCase() === "true";
+  const useSandbox = (process.env.NAMECHEAP_USE_SANDBOX ?? 'true').toLowerCase() === 'true';
 
   return {
     apiUser,
@@ -403,8 +421,9 @@ function getConfig(): NamecheapConfig {
 ```
 
 With:
+
 ```typescript
-const VPS_IP = "178.156.247.239";
+const VPS_IP = '178.156.247.239';
 
 function getConfig(): NamecheapConfig {
   const apiUser = process.env.NAMECHEAP_API_USER;
@@ -413,12 +432,12 @@ function getConfig(): NamecheapConfig {
 
   if (!apiUser || !apiKey || !proxyToken) {
     throw new Error(
-      "Namecheap API requires NAMECHEAP_API_USER, NAMECHEAP_API_KEY, and NAMECHEAP_PROXY_TOKEN. " +
-        "Store credentials in BWS."
+      'Namecheap API requires NAMECHEAP_API_USER, NAMECHEAP_API_KEY, and NAMECHEAP_PROXY_TOKEN. ' +
+        'Store credentials in BWS.',
     );
   }
 
-  const useSandbox = (process.env.NAMECHEAP_USE_SANDBOX ?? "true").toLowerCase() === "true";
+  const useSandbox = (process.env.NAMECHEAP_USE_SANDBOX ?? 'true').toLowerCase() === 'true';
 
   return {
     apiUser,
@@ -433,39 +452,43 @@ function getConfig(): NamecheapConfig {
 - [ ] **Step 4: Add Authorization header to axios client**
 
 Replace:
+
 ```typescript
-  _client = axios.create({
-    baseURL,
-    timeout: REQUEST_TIMEOUT,
-    // Namecheap returns XML, not JSON
-    headers: { Accept: "application/xml" },
-    // Don't throw on non-2xx — we parse errors from XML
-    validateStatus: () => true,
-  });
+_client = axios.create({
+  baseURL,
+  timeout: REQUEST_TIMEOUT,
+  // Namecheap returns XML, not JSON
+  headers: { Accept: 'application/xml' },
+  // Don't throw on non-2xx — we parse errors from XML
+  validateStatus: () => true,
+});
 ```
 
 With:
+
 ```typescript
-  _client = axios.create({
-    baseURL,
-    timeout: REQUEST_TIMEOUT,
-    headers: {
-      Accept: "application/xml",
-      Authorization: `Bearer ${_config.proxyToken}`,
-    },
-    // Don't throw on non-2xx — we parse errors from XML
-    validateStatus: () => true,
-  });
+_client = axios.create({
+  baseURL,
+  timeout: REQUEST_TIMEOUT,
+  headers: {
+    Accept: 'application/xml',
+    Authorization: `Bearer ${_config.proxyToken}`,
+  },
+  // Don't throw on non-2xx — we parse errors from XML
+  validateStatus: () => true,
+});
 ```
 
 - [ ] **Step 5: Update namecheapCommand to use hardcoded VPS_IP**
 
 In the `namecheapCommand` function, replace:
+
 ```typescript
     ClientIp: config.clientIp,
 ```
 
 With:
+
 ```typescript
     ClientIp: VPS_IP,
 ```
@@ -473,6 +496,7 @@ With:
 - [ ] **Step 6: Update isNamecheapConfigured()**
 
 Replace:
+
 ```typescript
 export function isNamecheapConfigured(): boolean {
   return !!(
@@ -484,6 +508,7 @@ export function isNamecheapConfigured(): boolean {
 ```
 
 With:
+
 ```typescript
 export function isNamecheapConfigured(): boolean {
   return !!(
@@ -497,13 +522,17 @@ export function isNamecheapConfigured(): boolean {
 - [ ] **Step 7: Update handleNamecheapError IP reference**
 
 Replace:
+
 ```typescript
-    if (code === 2011170) return `Error: Namecheap IP not whitelisted. Add ${process.env.NAMECHEAP_CLIENT_IP} to your API access list.`;
+if (code === 2011170)
+  return `Error: Namecheap IP not whitelisted. Add ${process.env.NAMECHEAP_CLIENT_IP} to your API access list.`;
 ```
 
 With:
+
 ```typescript
-    if (code === 2011170) return `Error: Namecheap IP not whitelisted. Add ${VPS_IP} to your API access list.`;
+if (code === 2011170)
+  return `Error: Namecheap IP not whitelisted. Add ${VPS_IP} to your API access list.`;
 ```
 
 - [ ] **Step 8: Commit**
@@ -519,6 +548,7 @@ git commit -m "Route Namecheap API calls through VPS proxy, hardcode client IP"
 ### Task 8: Update start.sh
 
 **Files:**
+
 - Modify: `/Users/devon/Projects/infraops-mcp-server/start.sh`
 
 - [ ] **Step 1: Replace NAMECHEAP_CLIENT_IP handling with proxy token fetch**
@@ -526,6 +556,7 @@ git commit -m "Route Namecheap API calls through VPS proxy, hardcode client IP"
 In the Namecheap section of `start.sh`, remove the `NAMECHEAP_CLIENT_IP` warning block and add proxy token fetch.
 
 Remove these lines (after the API key fetch block):
+
 ```bash
 # NAMECHEAP_CLIENT_IP must be set explicitly — it's the IP whitelisted in your
 # Namecheap API settings, which is your local machine's public IP (not the VPS).
@@ -538,6 +569,7 @@ fi
 ```
 
 Replace with:
+
 ```bash
 # Proxy bearer token for namecheap-proxy.devonwatkins.com
 export NAMECHEAP_PROXY_TOKEN=$(fetch_bws_secret_by_name "NAMECHEAP_PROXY_BEARER_TOKEN")
@@ -553,6 +585,7 @@ fi
 - [ ] **Step 2: Remove NAMECHEAP_CLIENT_IP from header comments**
 
 Remove the line:
+
 ```bash
 #   NAMECHEAP_CLIENT_IP         - Your machine's public IP (must be whitelisted in Namecheap)
 ```
@@ -570,11 +603,13 @@ git commit -m "Replace NAMECHEAP_CLIENT_IP with proxy token from BWS"
 ### Task 9: Update index.ts env var docs
 
 **Files:**
+
 - Modify: `/Users/devon/Projects/infraops-mcp-server/src/index.ts`
 
 - [ ] **Step 1: Update the env var comment block**
 
 Replace:
+
 ```typescript
  *   NAMECHEAP_API_USER          - Namecheap API username (optional, from BWS via start.sh)
  *   NAMECHEAP_API_KEY           - Namecheap API key (optional, from BWS via start.sh)
@@ -583,6 +618,7 @@ Replace:
 ```
 
 With:
+
 ```typescript
  *   NAMECHEAP_API_USER          - Namecheap API username (optional, from BWS via start.sh)
  *   NAMECHEAP_API_KEY           - Namecheap API key (optional, from BWS via start.sh)
@@ -593,13 +629,15 @@ With:
 - [ ] **Step 2: Update the "not configured" log message**
 
 Replace:
+
 ```typescript
-  console.error("NAMECHEAP_API_USER/KEY/IP not set — Namecheap tools disabled");
+console.error('NAMECHEAP_API_USER/KEY/IP not set — Namecheap tools disabled');
 ```
 
 With:
+
 ```typescript
-  console.error("NAMECHEAP_API_USER/KEY/PROXY_TOKEN not set — Namecheap tools disabled");
+console.error('NAMECHEAP_API_USER/KEY/PROXY_TOKEN not set — Namecheap tools disabled');
 ```
 
 - [ ] **Step 3: Commit**
@@ -615,11 +653,13 @@ git commit -m "Update env var docs for proxy-based Namecheap access"
 ### Task 10: Update test-namecheap.sh
 
 **Files:**
+
 - Modify: `/Users/devon/Projects/infraops-mcp-server/test-namecheap.sh`
 
 - [ ] **Step 1: Replace IP detection block with proxy token fetch**
 
 Replace lines 42-53 (the entire IP detection section):
+
 ```bash
 # ── Detect public IP ─────────────────────────────────────────────────
 
@@ -636,6 +676,7 @@ echo ""
 ```
 
 With:
+
 ```bash
 # ── Proxy token ──────────────────────────────────────────────────────
 
