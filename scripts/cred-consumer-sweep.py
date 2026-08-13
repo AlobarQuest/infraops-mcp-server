@@ -40,7 +40,7 @@ TOKEN_RE = re.compile(
     r"|sk-[A-Za-z0-9_\-]{30,}[A-Za-z0-9])"
 )
 
-matches = {}   # sha8 -> list of locations
+matches = {}  # sha8 -> list of locations
 candidates = 0  # total token-shaped values inspected
 
 
@@ -62,8 +62,9 @@ def inspect_text(location: str, text: str) -> None:
 
 def run(cmd, timeout=15, env=None, input_=None):
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                           env=env, input=input_)
+        r = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, env=env, input=input_
+        )
         return r.stdout
     except Exception:
         return ""
@@ -95,7 +96,11 @@ for p in glob.glob(os.path.join(HOME, ".config", "**", "*"), recursive=True):
     if not os.path.isfile(p) or os.path.getsize(p) > 200_000:
         continue
     base = os.path.basename(p).lower()
-    if base.startswith("env") or base.endswith((".env", ".toml", ".yml", ".yaml", ".json", ".sh")) or "env" in base:
+    if (
+        base.startswith("env")
+        or base.endswith((".env", ".toml", ".yml", ".yaml", ".json", ".sh"))
+        or "env" in base
+    ):
         try:
             inspect_text(p.replace(HOME, "~"), open(p, errors="ignore").read())
         except Exception:
@@ -131,7 +136,9 @@ for block in meta.split("keychain: ")[1:]:
     if svc and acct:
         items.append((svc.group(1), acct.group(1)))
 seen = set()
-KEY_HINT = re.compile(r"github|openai|openrouter|token|pat\b|api|key|secret|claude|bws", re.I)
+KEY_HINT = re.compile(
+    r"github|openai|openrouter|token|pat\b|api|key|secret|claude|bws", re.I
+)
 fetch_failures = []
 for svc, acct in items:
     if (svc, acct) in seen:
@@ -139,28 +146,42 @@ for svc, acct in items:
     seen.add((svc, acct))
     if not (KEY_HINT.search(svc) or KEY_HINT.search(acct)):
         continue
-    val = run(["security", "find-generic-password", "-s", svc, "-a", acct, "-w"], timeout=6).strip()
+    val = run(
+        ["security", "find-generic-password", "-s", svc, "-a", acct, "-w"], timeout=6
+    ).strip()
     if val:
         inspect(f"keychain:{svc}/{acct}", val)
         inspect_text(f"keychain:{svc}/{acct}", val)
     else:
         fetch_failures.append(f"{svc}/{acct}")
-print(f"    keychain items scanned={len(seen)}, candidate-fetched-empty-or-denied={len(fetch_failures)}")
+print(
+    f"    keychain items scanned={len(seen)}, candidate-fetched-empty-or-denied={len(fetch_failures)}"
+)
 for f in fetch_failures:
     print(f"    UNFETCHED: {f}")
 
 # 7. BWS: every secret value (hashed in-process)
 section("BWS secrets")
-bws_token = run(["security", "find-generic-password", "-s", "Claude",
-                 "-a", "BWS_ACCESS_TOKEN_INFRA_DRIFT", "-w"], timeout=6).strip()
+bws_token = run(
+    [
+        "security",
+        "find-generic-password",
+        "-s",
+        "Claude",
+        "-a",
+        "BWS_ACCESS_TOKEN_INFRA_DRIFT",
+        "-w",
+    ],
+    timeout=6,
+).strip()
 if bws_token:
     env = dict(os.environ, BWS_ACCESS_TOKEN=bws_token)
     out = run(["bws", "secret", "list", "--output", "json"], timeout=60, env=env)
     try:
         secrets = json.loads(out)
         for s in secrets:
-            inspect(f"bws:{s['id']} ({s.get('key','?')})", s.get("value", ""))
-            inspect_text(f"bws:{s['id']} ({s.get('key','?')})", s.get("value", ""))
+            inspect(f"bws:{s['id']} ({s.get('key', '?')})", s.get("value", ""))
+            inspect_text(f"bws:{s['id']} ({s.get('key', '?')})", s.get("value", ""))
         print(f"    bws secrets scanned={len(secrets)}")
     except Exception as e:
         print(f"    BWS list parse failed: {e}")
@@ -175,14 +196,17 @@ def coolify_scan(label, base, token):
     if not token:
         print(f"    {label}: no token")
         return
+
     def get(path):
-        req = urllib.request.Request(base + "/api/v1" + path,
-                                     headers={"Authorization": f"Bearer {token}"})
+        req = urllib.request.Request(
+            base + "/api/v1" + path, headers={"Authorization": f"Bearer {token}"}
+        )
         try:
             with urllib.request.urlopen(req, timeout=20) as r:
                 return json.loads(r.read().decode())
         except Exception:
             return None
+
     n_envs = 0
     for kind in ("applications", "services"):
         resources = get(f"/{kind}") or []
@@ -196,7 +220,10 @@ def coolify_scan(label, base, token):
                     v = e.get(field)
                     if isinstance(v, str) and v:
                         n_envs += 1
-                        inspect(f"coolify[{label}]:{res.get('name',uuid)}/{e.get('key','?')}", v)
+                        inspect(
+                            f"coolify[{label}]:{res.get('name', uuid)}/{e.get('key', '?')}",
+                            v,
+                        )
     print(f"    {label}: env values scanned={n_envs}")
 
 
@@ -210,10 +237,16 @@ def bws_get(uuid, env):
 
 if bws_token:
     env = dict(os.environ, BWS_ACCESS_TOKEN=bws_token)
-    coolify_scan("prod", "http://coolify-1.devonwatkins.com",
-                 bws_get("bbd71f41-b7df-4ae9-8fdb-b41501447308", env))
-    coolify_scan("dev", "http://192.168.139.217:8000",
-                 bws_get("8a2e1e10-d67b-4382-bbf3-b4150178e2a8", env))
+    coolify_scan(
+        "prod",
+        "http://coolify-1.devonwatkins.com",
+        bws_get("bbd71f41-b7df-4ae9-8fdb-b41501447308", env),
+    )
+    coolify_scan(
+        "dev",
+        "http://192.168.139.217:8000",
+        bws_get("8a2e1e10-d67b-4382-bbf3-b4150178e2a8", env),
+    )
 
 # 9. Current process env
 section("process env")
