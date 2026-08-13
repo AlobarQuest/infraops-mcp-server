@@ -1,0 +1,16 @@
+# Ruff configuration for this repository's handful of Python scripts.
+#
+# This repo is declared `languages = ["ts", "shell"]` in .code-standards.toml and has no
+# pyproject.toml, so `make check` skips ruff entirely (every ruff line in the Makefile is
+# gated on `[ -f pyproject.toml ]`). This file exists so that a bare `ruff` invocation —
+# a pre-commit hook, a portfolio-wide sweep, an operator running it by hand — behaves the
+# same way here as in the Python repos.
+#
+# NOTE: ruff.toml SUPERSEDES a pyproject.toml `[tool.ruff]` table entirely rather than
+# merging with it. If this repo ever gains a pyproject.toml with ruff settings, fold them
+# into this file or delete this file — otherwise they will be silently ignored.
+
+# ruff 0.16 formats Python code blocks inside Markdown; 0.15 did not. The affected files
+# here are historical plan documents — the record, not code — so the formatter is excluded
+# from them rather than allowed to rewrite them.
+extend-exclude = ["*.md"]
