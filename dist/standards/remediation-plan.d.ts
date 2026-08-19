@@ -11,20 +11,20 @@ export declare const RemediationPlanSchema: z.ZodObject<{
     rollback: z.ZodString;
     cm_window_hint: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    generated_by: "sonnet" | "raw";
+    generated_by: "raw" | "sonnet";
     root_cause: string;
     steps: string[];
     infraops_tools: string[];
+    risk: "caution" | "destructive" | "safe";
+    rollback: string;
     cm_window_hint: string;
 }, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    generated_by: "sonnet" | "raw";
+    generated_by: "raw" | "sonnet";
     root_cause: string;
     steps: string[];
     infraops_tools: string[];
+    risk: "caution" | "destructive" | "safe";
+    rollback: string;
     cm_window_hint: string;
 }>;
 export type RemediationPlan = z.infer<typeof RemediationPlanSchema>;
@@ -38,18 +38,18 @@ export declare const PlanModelSchema: z.ZodObject<Omit<{
     rollback: z.ZodString;
     cm_window_hint: z.ZodString;
 }, "generated_by">, "strip", z.ZodTypeAny, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
     root_cause: string;
     steps: string[];
     infraops_tools: string[];
+    risk: "caution" | "destructive" | "safe";
+    rollback: string;
     cm_window_hint: string;
 }, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
     root_cause: string;
     steps: string[];
     infraops_tools: string[];
+    risk: "caution" | "destructive" | "safe";
+    rollback: string;
     cm_window_hint: string;
 }>;
 /** Deterministic prompt for one escalated proposal. No timestamps/randomness (keeps tests + caching stable). */
@@ -74,18 +74,18 @@ export declare function buildPlanPrompt(p: Proposal): string;
  * Exported so it can be unit-tested directly (the format is the real network path).
  */
 export declare function planOutputFormat(): {
-    parse: (content: string) => {
-        risk: "safe" | "caution" | "destructive";
-        rollback: string;
-        root_cause: string;
-        steps: string[];
-        infraops_tools: string[];
-        cm_window_hint: string;
-    };
     schema: {
         [key: string]: unknown;
     };
-    type: "json_schema";
+    type: 'json_schema';
+    parse: (content: string) => {
+        root_cause: string;
+        steps: string[];
+        infraops_tools: string[];
+        risk: "caution" | "destructive" | "safe";
+        rollback: string;
+        cm_window_hint: string;
+    };
 };
 export declare function planEscalation(p: Proposal, client?: Anthropic): Promise<RemediationPlan>;
 /** Deterministic fallback when Sonnet is unreachable — keeps the pipeline flowing. */

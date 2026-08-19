@@ -23,86 +23,86 @@ export declare function httpsLive(domain: string, timeoutMs?: number): Promise<b
 export declare function firstDomain(app: Record<string, unknown>): string;
 /** JSON-schema tool definitions handed to the model. Read tools + the two write tools + control tools. */
 export declare const TOOLS: readonly [{
-    readonly name: "get_application";
+    readonly name: 'get_application';
     readonly description: "Read a Coolify application's current config.";
     readonly input_schema: {
-        readonly type: "object";
+        readonly type: 'object';
         readonly properties: {
             readonly uuid: {
-                readonly type: "string";
+                readonly type: 'string';
             };
         };
-        readonly required: readonly ["uuid"];
+        readonly required: readonly ['uuid'];
     };
 }, {
-    readonly name: "set_application_domains";
+    readonly name: 'set_application_domains';
     readonly description: "Set an application's domains (e.g. change http:// to https://). Captures the original for rollback.";
     readonly input_schema: {
-        readonly type: "object";
+        readonly type: 'object';
         readonly properties: {
             readonly uuid: {
-                readonly type: "string";
+                readonly type: 'string';
             };
             readonly domains: {
-                readonly type: "string";
-                readonly description: "comma-separated https URLs";
+                readonly type: 'string';
+                readonly description: 'comma-separated https URLs';
             };
         };
-        readonly required: readonly ["uuid", "domains"];
+        readonly required: readonly ['uuid', 'domains'];
     };
 }, {
-    readonly name: "set_application_healthcheck";
+    readonly name: 'set_application_healthcheck';
     readonly description: "Enable an application's health check at a verified path/port.";
     readonly input_schema: {
-        readonly type: "object";
+        readonly type: 'object';
         readonly properties: {
             readonly uuid: {
-                readonly type: "string";
+                readonly type: 'string';
             };
             readonly path: {
-                readonly type: "string";
+                readonly type: 'string';
             };
             readonly port: {
-                readonly type: "number";
+                readonly type: 'number';
             };
         };
-        readonly required: readonly ["uuid", "path", "port"];
+        readonly required: readonly ['uuid', 'path', 'port'];
     };
 }, {
-    readonly name: "redeploy_application";
-    readonly description: "Restart/redeploy an application so routing/cert changes take effect.";
+    readonly name: 'redeploy_application';
+    readonly description: 'Restart/redeploy an application so routing/cert changes take effect.';
     readonly input_schema: {
-        readonly type: "object";
+        readonly type: 'object';
         readonly properties: {
             readonly uuid: {
-                readonly type: "string";
+                readonly type: 'string';
             };
         };
-        readonly required: readonly ["uuid"];
+        readonly required: readonly ['uuid'];
     };
 }, {
-    readonly name: "report_done";
-    readonly description: "Call when the remediation is complete and verified.";
+    readonly name: 'report_done';
+    readonly description: 'Call when the remediation is complete and verified.';
     readonly input_schema: {
-        readonly type: "object";
+        readonly type: 'object';
         readonly properties: {
             readonly summary: {
-                readonly type: "string";
+                readonly type: 'string';
             };
         };
-        readonly required: readonly ["summary"];
+        readonly required: readonly ['summary'];
     };
 }, {
-    readonly name: "report_blocked";
-    readonly description: "Call when the change cannot be completed (missing prerequisite or needs human judgment).";
+    readonly name: 'report_blocked';
+    readonly description: 'Call when the change cannot be completed (missing prerequisite or needs human judgment).';
     readonly input_schema: {
-        readonly type: "object";
+        readonly type: 'object';
         readonly properties: {
             readonly reason: {
-                readonly type: "string";
+                readonly type: 'string';
             };
         };
-        readonly required: readonly ["reason"];
+        readonly required: readonly ['reason'];
     };
 }];
 /** Execute one tool call. Write tools capture rollback + validate. Throws on unknown tool (defense in depth). */
