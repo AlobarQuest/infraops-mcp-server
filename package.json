@@ -20,10 +20,10 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.116.0",
+    "@anthropic-ai/sdk": "^0.120.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "axios": "^1.19.0",
-    "fast-xml-parser": "^5.10.1",
+    "fast-xml-parser": "^5.11.0",
     "minisearch": "^7.2.0",
     "ssh2": "^1.16.0",
     "zod": "^3.23.8",
@@ -37,6 +37,6 @@
     "tsx": "^4.23.12",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.67.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }
