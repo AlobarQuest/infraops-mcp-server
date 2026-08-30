@@ -20,23 +20,23 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.120.0",
+    "@anthropic-ai/sdk": "^0.121.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "axios": "^1.19.0",
-    "fast-xml-parser": "^5.11.0",
+    "axios": "^1.20.0",
+    "fast-xml-parser": "^5.11.1",
     "minisearch": "^7.2.0",
     "ssh2": "^1.16.0",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.4.0",
     "@types/ssh2": "^1.15.0",
-    "eslint": "10.8.1",
+    "eslint": "10.9.1",
     "prettier": "^3.9.6",
     "tsx": "^4.23.12",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.67.0",
+    "typescript-eslint": "^8.68.0",
     "vitest": "4.1.11"
   }
 }
