@@ -56,7 +56,9 @@ export function buildPlanPrompt(p) {
  * Exported so it can be unit-tested directly (the format is the real network path).
  */
 export function planOutputFormat() {
-    const rawSchema = zodToJsonSchema(PlanModelSchema, { $refStrategy: 'none' });
+    const rawSchema = zodToJsonSchema(PlanModelSchema, {
+        $refStrategy: 'none',
+    });
     const base = jsonSchemaOutputFormat(rawSchema);
     return {
         ...base,

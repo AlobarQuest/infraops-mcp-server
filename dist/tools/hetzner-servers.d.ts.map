@@ -1,1 +1,1 @@
-{"version":3,"file":"hetzner-servers.d.ts","sourceRoot":"","sources":["../../src/tools/hetzner-servers.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AAEH,OAAO,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AASpE,wBAAgB,0BAA0B,CAAC,MAAM,EAAE,SAAS,GAAG,IAAI,CAyRlE"}
+{"version":3,"file":"hetzner-servers.d.ts","sourceRoot":"","sources":["../../src/tools/hetzner-servers.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AAEH,OAAO,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AASpE,wBAAgB,0BAA0B,CAAC,MAAM,EAAE,SAAS,GAAG,IAAI,CA4RlE"}

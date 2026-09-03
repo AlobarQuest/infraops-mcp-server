@@ -96,7 +96,7 @@ export function registerHetznerNetworkingTools(server: McpServer): void {
           )
           .optional()
           .describe('Resources to apply the firewall to'),
-        labels: z.record(z.string()).optional().describe('Labels'),
+        labels: z.record(z.string(), z.string()).optional().describe('Labels'),
       },
       annotations: {
         readOnlyHint: false,
@@ -219,7 +219,7 @@ export function registerHetznerNetworkingTools(server: McpServer): void {
       inputSchema: {
         name: z.string().min(1).describe('Key name'),
         public_key: z.string().min(1).describe('SSH public key content (e.g. ssh-ed25519 AAAA...)'),
-        labels: z.record(z.string()).optional().describe('Labels'),
+        labels: z.record(z.string(), z.string()).optional().describe('Labels'),
       },
       annotations: {
         readOnlyHint: false,
@@ -304,7 +304,7 @@ export function registerHetznerNetworkingTools(server: McpServer): void {
           .describe('Location (e.g. fsn1). Required if not attaching to server.'),
         server: z.number().int().optional().describe('Server ID to attach to'),
         format: z.enum(['ext4', 'xfs']).optional().describe('Filesystem format'),
-        labels: z.record(z.string()).optional().describe('Labels'),
+        labels: z.record(z.string(), z.string()).optional().describe('Labels'),
       },
       annotations: {
         readOnlyHint: false,
@@ -419,7 +419,7 @@ export function registerHetznerNetworkingTools(server: McpServer): void {
       inputSchema: {
         id: z.number().int().describe('Server ID to snapshot'),
         description: z.string().optional().describe('Snapshot description'),
-        labels: z.record(z.string()).optional().describe('Labels'),
+        labels: z.record(z.string(), z.string()).optional().describe('Labels'),
       },
       annotations: {
         readOnlyHint: false,

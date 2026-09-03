@@ -3,55 +3,35 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Proposal } from './check-engine.js';
 /** The structured remediation plan Sonnet returns for one escalated proposal. */
 export declare const RemediationPlanSchema: z.ZodObject<{
-    generated_by: z.ZodEnum<["sonnet", "raw"]>;
+    generated_by: z.ZodEnum<{
+        sonnet: "sonnet";
+        raw: "raw";
+    }>;
     root_cause: z.ZodString;
-    steps: z.ZodArray<z.ZodString, "many">;
-    infraops_tools: z.ZodArray<z.ZodString, "many">;
-    risk: z.ZodEnum<["safe", "caution", "destructive"]>;
+    steps: z.ZodArray<z.ZodString>;
+    infraops_tools: z.ZodArray<z.ZodString>;
+    risk: z.ZodEnum<{
+        safe: "safe";
+        caution: "caution";
+        destructive: "destructive";
+    }>;
     rollback: z.ZodString;
     cm_window_hint: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    generated_by: "sonnet" | "raw";
-    root_cause: string;
-    steps: string[];
-    infraops_tools: string[];
-    cm_window_hint: string;
-}, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    generated_by: "sonnet" | "raw";
-    root_cause: string;
-    steps: string[];
-    infraops_tools: string[];
-    cm_window_hint: string;
-}>;
+}, z.core.$strip>;
 export type RemediationPlan = z.infer<typeof RemediationPlanSchema>;
 /** Schema sent to the model — same shape minus generated_by, which we stamp ourselves. */
-export declare const PlanModelSchema: z.ZodObject<Omit<{
-    generated_by: z.ZodEnum<["sonnet", "raw"]>;
-    root_cause: z.ZodString;
-    steps: z.ZodArray<z.ZodString, "many">;
-    infraops_tools: z.ZodArray<z.ZodString, "many">;
-    risk: z.ZodEnum<["safe", "caution", "destructive"]>;
+export declare const PlanModelSchema: z.ZodObject<{
+    risk: z.ZodEnum<{
+        safe: "safe";
+        caution: "caution";
+        destructive: "destructive";
+    }>;
     rollback: z.ZodString;
+    root_cause: z.ZodString;
+    steps: z.ZodArray<z.ZodString>;
+    infraops_tools: z.ZodArray<z.ZodString>;
     cm_window_hint: z.ZodString;
-}, "generated_by">, "strip", z.ZodTypeAny, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    root_cause: string;
-    steps: string[];
-    infraops_tools: string[];
-    cm_window_hint: string;
-}, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    root_cause: string;
-    steps: string[];
-    infraops_tools: string[];
-    cm_window_hint: string;
-}>;
+}, z.core.$strip>;
 /** Deterministic prompt for one escalated proposal. No timestamps/randomness (keeps tests + caching stable). */
 export declare function buildPlanPrompt(p: Proposal): string;
 /**

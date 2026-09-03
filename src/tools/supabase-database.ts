@@ -134,7 +134,7 @@ export function registerSupabaseDatabaseTools(server: McpServer): void {
       inputSchema: {
         ref: z.string().describe("Supabase project reference (e.g. 'abcdefghijklmnop')"),
         config: z
-          .record(z.string())
+          .record(z.string(), z.string())
           .describe(
             "Postgres configuration key-value pairs to update (e.g. { max_connections: '100', statement_timeout: '30000' })",
           ),
