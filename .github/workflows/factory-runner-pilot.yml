@@ -22,7 +22,7 @@ jobs:
     # orchestrator's `Runner brief compatibility` job checks the served brief against.
     # A mutable @main ref makes that check meaningless: the pin it reads would not
     # describe the code that runs. Advance this only alongside that check (WS-P2.23).
-    uses: AlobarQuest/factory-runner/.github/workflows/factory-runner.yml@faf9c4278c11235cc429a0e1089c707a45ed80d0
+    uses: AlobarQuest/factory-runner/.github/workflows/factory-runner.yml@abd72dbe9741484bcbc352c37aded6607d69b7cd
     with:
       work_unit_id: ${{ inputs.work_unit_id }}
       orchestrator_url: https://sds.alobar.net
