@@ -3,7 +3,10 @@
  */
 import { z } from 'zod';
 import { ResponseFormat } from '../constants.js';
-export declare const CoolifyInstanceSchema: z.ZodDefault<z.ZodEnum<["prod", "dev"]>>;
+export declare const CoolifyInstanceSchema: z.ZodDefault<z.ZodEnum<{
+    prod: "prod";
+    dev: "dev";
+}>>;
 /**
  * Required (no-default) instance selector for *mutating* Coolify tools.
  *
@@ -13,17 +16,14 @@ export declare const CoolifyInstanceSchema: z.ZodDefault<z.ZodEnum<["prod", "dev
  * the tool boundary before it can silently land a write on prod. See the
  * "Mutating coolify_* tools require an explicit instance" invariant in CLAUDE.md.
  */
-export declare const CoolifyInstanceRequiredSchema: z.ZodEnum<["prod", "dev"]>;
-export declare const ResponseFormatSchema: z.ZodDefault<z.ZodNativeEnum<typeof ResponseFormat>>;
+export declare const CoolifyInstanceRequiredSchema: z.ZodEnum<{
+    prod: "prod";
+    dev: "dev";
+}>;
+export declare const ResponseFormatSchema: z.ZodDefault<z.ZodEnum<typeof ResponseFormat>>;
 export declare const UuidSchema: z.ZodString;
 export declare const PaginationSchema: z.ZodObject<{
     limit: z.ZodDefault<z.ZodNumber>;
     offset: z.ZodDefault<z.ZodNumber>;
-}, "strip", z.ZodTypeAny, {
-    limit: number;
-    offset: number;
-}, {
-    limit?: number | undefined;
-    offset?: number | undefined;
-}>;
+}, z.core.$strip>;
 //# sourceMappingURL=common.d.ts.map

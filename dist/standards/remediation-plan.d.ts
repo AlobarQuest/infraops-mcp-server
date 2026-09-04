@@ -3,55 +3,35 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Proposal } from './check-engine.js';
 /** The structured remediation plan Sonnet returns for one escalated proposal. */
 export declare const RemediationPlanSchema: z.ZodObject<{
-    generated_by: z.ZodEnum<["sonnet", "raw"]>;
+    generated_by: z.ZodEnum<{
+        sonnet: "sonnet";
+        raw: "raw";
+    }>;
     root_cause: z.ZodString;
-    steps: z.ZodArray<z.ZodString, "many">;
-    infraops_tools: z.ZodArray<z.ZodString, "many">;
-    risk: z.ZodEnum<["safe", "caution", "destructive"]>;
+    steps: z.ZodArray<z.ZodString>;
+    infraops_tools: z.ZodArray<z.ZodString>;
+    risk: z.ZodEnum<{
+        safe: "safe";
+        caution: "caution";
+        destructive: "destructive";
+    }>;
     rollback: z.ZodString;
     cm_window_hint: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    generated_by: "sonnet" | "raw";
-    root_cause: string;
-    steps: string[];
-    infraops_tools: string[];
-    cm_window_hint: string;
-}, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    generated_by: "sonnet" | "raw";
-    root_cause: string;
-    steps: string[];
-    infraops_tools: string[];
-    cm_window_hint: string;
-}>;
+}, z.core.$strip>;
 export type RemediationPlan = z.infer<typeof RemediationPlanSchema>;
 /** Schema sent to the model — same shape minus generated_by, which we stamp ourselves. */
-export declare const PlanModelSchema: z.ZodObject<Omit<{
-    generated_by: z.ZodEnum<["sonnet", "raw"]>;
-    root_cause: z.ZodString;
-    steps: z.ZodArray<z.ZodString, "many">;
-    infraops_tools: z.ZodArray<z.ZodString, "many">;
-    risk: z.ZodEnum<["safe", "caution", "destructive"]>;
+export declare const PlanModelSchema: z.ZodObject<{
+    risk: z.ZodEnum<{
+        safe: "safe";
+        caution: "caution";
+        destructive: "destructive";
+    }>;
     rollback: z.ZodString;
+    root_cause: z.ZodString;
+    steps: z.ZodArray<z.ZodString>;
+    infraops_tools: z.ZodArray<z.ZodString>;
     cm_window_hint: z.ZodString;
-}, "generated_by">, "strip", z.ZodTypeAny, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    root_cause: string;
-    steps: string[];
-    infraops_tools: string[];
-    cm_window_hint: string;
-}, {
-    risk: "safe" | "caution" | "destructive";
-    rollback: string;
-    root_cause: string;
-    steps: string[];
-    infraops_tools: string[];
-    cm_window_hint: string;
-}>;
+}, z.core.$strip>;
 /** Deterministic prompt for one escalated proposal. No timestamps/randomness (keeps tests + caching stable). */
 export declare function buildPlanPrompt(p: Proposal): string;
 /**
@@ -63,9 +43,10 @@ export declare function buildPlanPrompt(p: Proposal): string;
  * Model is claude-sonnet-4-6 by explicit choice (plan quality over executor cost).
  */
 /**
- * AutoParseableOutputFormat built from a zod v3 schema via zod-to-json-schema.
- * The SDK's zodOutputFormat() helper uses zod/v4 internally and is incompatible
- * with zod v3 schemas at runtime, so we route through jsonSchemaOutputFormat instead —
+ * AutoParseableOutputFormat built from the zod schema via zod's own JSON Schema export.
+ * The SDK's zodOutputFormat() helper would now also work, this package having moved to
+ * zod 4; we keep jsonSchemaOutputFormat because it is the SDK's own strict-transform
+ * helper and preserves the zod-validated parse below —
  * the SDK's own strict-transform helper that strips unsupported keys (like $schema)
  * and forces additionalProperties:false recursively, producing an API-valid schema.
  * We override the base parse with a zod-validated parse so the model output is

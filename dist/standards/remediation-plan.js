@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import Anthropic from '@anthropic-ai/sdk';
 import { jsonSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/json-schema';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 /** The structured remediation plan Sonnet returns for one escalated proposal. */
 export const RemediationPlanSchema = z.object({
     generated_by: z.enum(['sonnet', 'raw']),
@@ -45,9 +44,10 @@ export function buildPlanPrompt(p) {
  * Model is claude-sonnet-4-6 by explicit choice (plan quality over executor cost).
  */
 /**
- * AutoParseableOutputFormat built from a zod v3 schema via zod-to-json-schema.
- * The SDK's zodOutputFormat() helper uses zod/v4 internally and is incompatible
- * with zod v3 schemas at runtime, so we route through jsonSchemaOutputFormat instead —
+ * AutoParseableOutputFormat built from the zod schema via zod's own JSON Schema export.
+ * The SDK's zodOutputFormat() helper would now also work, this package having moved to
+ * zod 4; we keep jsonSchemaOutputFormat because it is the SDK's own strict-transform
+ * helper and preserves the zod-validated parse below —
  * the SDK's own strict-transform helper that strips unsupported keys (like $schema)
  * and forces additionalProperties:false recursively, producing an API-valid schema.
  * We override the base parse with a zod-validated parse so the model output is
@@ -56,7 +56,7 @@ export function buildPlanPrompt(p) {
  * Exported so it can be unit-tested directly (the format is the real network path).
  */
 export function planOutputFormat() {
-    const rawSchema = zodToJsonSchema(PlanModelSchema, { $refStrategy: 'none' });
+    const rawSchema = z.toJSONSchema(PlanModelSchema);
     const base = jsonSchemaOutputFormat(rawSchema);
     return {
         ...base,
