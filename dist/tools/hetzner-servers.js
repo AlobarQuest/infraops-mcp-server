@@ -175,7 +175,7 @@ export function registerHetznerServerTools(server) {
                 .array(z.string())
                 .optional()
                 .describe('Array of SSH key names or IDs to install'),
-            labels: z.record(z.string()).optional().describe('Key-value labels for the server'),
+            labels: z.record(z.string(), z.string()).optional().describe('Key-value labels for the server'),
             firewalls: z
                 .array(z.object({ firewall: z.number().int() }))
                 .optional()

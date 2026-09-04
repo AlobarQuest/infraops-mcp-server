@@ -43,7 +43,7 @@ export function registerSupabaseConfigTools(server) {
         inputSchema: {
             ref: z.string().describe('Supabase project reference'),
             config: z
-                .record(z.unknown())
+                .record(z.string(), z.unknown())
                 .describe('Auth configuration settings to update. Keys include site_url, jwt_expiry, external_email_enabled, disable_signup, and provider-specific settings.'),
         },
         annotations: {
