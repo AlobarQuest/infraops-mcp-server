@@ -11,10 +11,11 @@ import {
   CLASS_POLICY,
   credTarget,
   STAGING_SERVICE,
+  SUPPORTED_CONSUMER_KINDS,
   type RotationState,
 } from '../src/security-drift/cred-rotation.js';
 import { classify } from '../src/security-drift/taxonomy.js';
-import type { CredentialSpec } from '../src/security-drift/cred-consumers.js';
+import { parseCredConsumers, type CredentialSpec } from '../src/security-drift/cred-consumers.js';
 
 const NOW = '2026-07-02T00:00:00.000Z';
 
@@ -303,5 +304,84 @@ describe('M2M bearer classes (SDS 1.1 L1b)', () => {
       expect(c.remediation).toHaveProperty('manual');
       expect(c.remediation).not.toHaveProperty('rotation');
     }
+  });
+});
+
+describe('unknown credential class', () => {
+  const doc = `
+version = 1
+
+[[credential]]
+id = "typo-class"
+class = "orchestrator-m2m-baerer"
+created = "2020-01-01"
+
+[[credential]]
+id = "real-class"
+class = "openrouter-key"
+created = "2020-01-01"
+`;
+
+  it('loads without a registry error and emits one cred.unknown-class WARN for that credential only', () => {
+    const specs = parseCredConsumers(doc); // would throw (=> cred.registry-error) if refused
+    const state = { resolvedExposures: {}, lastRotated: {} };
+    const findings = credFindings(specs, state, NOW);
+    expect(findings.map((f) => [f.severity, f.check, f.target])).toEqual([
+      ['WARN', 'cred.unknown-class', 'cred:typo-class'],
+      ['WARN', 'cred.rotation-age', 'cred:real-class'],
+    ]);
+    expect(findings[0].detail).toContain("'orchestrator-m2m-baerer'");
+  });
+
+  it('routes the finding to its registry-built classification, not the unplanned fallback', () => {
+    const specs = parseCredConsumers(doc);
+    const state = { resolvedExposures: {}, lastRotated: {} };
+    const [f] = credFindings(specs, state, NOW);
+    const c = classify(f, {
+      autoFixAllowlist: [],
+      credClassifications: buildCredClassifications(specs, state),
+    });
+    expect(c!.title).toBe('Unknown credential class: typo-class (orchestrator-m2m-baerer)');
+    expect(c!.tier).toBe('NORMAL');
+    expect(c!.remediation).toHaveProperty('manual');
+  });
+
+  it('still lets an open exposure win over the unknown class (rotate-now first)', () => {
+    const [spec] = parseCredConsumers(doc);
+    spec.exposures.push({ id: 'e1', date: '2026-07-01' });
+    const findings = credFindings([spec], { resolvedExposures: {}, lastRotated: {} }, NOW);
+    expect(findings.map((f) => f.check)).toEqual(['cred.exposure-rotate']);
+  });
+});
+
+describe('coolify-env-hash consumer kind', () => {
+  it('is not executor-deployable, so it forces an otherwise executor-eligible credential manual', () => {
+    expect(SUPPORTED_CONSUMER_KINDS.has('coolify-env-hash')).toBe(false);
+    const spec: CredentialSpec = {
+      id: 'or-hash',
+      class: 'openrouter-key',
+      bws_uuid: 'keeper-uuid',
+      consumers_verified: '2026-10-06',
+      disposition: 'reissue',
+      rotation_preconditions: [],
+      consumers: [
+        { kind: 'bws-secret', uuid: 'keeper-uuid' },
+        {
+          kind: 'coolify-env-hash',
+          instance: 'prod',
+          resource_type: 'application',
+          uuid: 'app',
+          key: 'K',
+        },
+      ],
+      exposures: [],
+    };
+    const c = buildCredClassifications([spec], { resolvedExposures: {}, lastRotated: {} })[
+      'cred.exposure-rotate|cred:or-hash'
+    ];
+    expect(c.remediation).not.toHaveProperty('rotation');
+    expect((c.remediation as { manual: string[] }).manual).toContain(
+      "NOT executor-eligible: consumer kind 'coolify-env-hash' not supported by the executor",
+    );
   });
 });

@@ -20,7 +20,12 @@
 
 import { execFileSync } from 'node:child_process';
 import type { ConsumerSpec } from './cred-consumers.js';
-import { CLASS_POLICY, type ProviderProbe, type RotationPlanSpec } from './cred-rotation.js';
+import {
+  CLASS_POLICY,
+  SUPPORTED_CONSUMER_KINDS,
+  type ProviderProbe,
+  type RotationPlanSpec,
+} from './cred-rotation.js';
 
 export interface RotationOutcome {
   outcome: 'done' | 'failed' | 'blocked';
@@ -108,6 +113,12 @@ export async function runRotationPlan(
       return finish('blocked', `class ${plan.credClass} is not executor-runnable`);
     if (!plan.consumersVerified)
       return finish('blocked', 'consumer set not attested — refusing (fail-safe)');
+    const unsupported = plan.consumers.filter((c) => !SUPPORTED_CONSUMER_KINDS.has(c.kind));
+    if (unsupported.length)
+      return finish(
+        'blocked',
+        `consumer kind(s) ${unsupported.map((c) => `'${c.kind}'`).join(', ')} not executor-deployable — refusing before any write`,
+      );
 
     let newValue: string | null = null;
     let oldValue: string | null = null;
@@ -319,8 +330,8 @@ async function deployConsumer(
       return `deploy: gh secret ${consumer.repo}/${consumer.name} set`;
     }
     default:
-      // Plan building already refuses unsupported kinds; hitting this means the plan
-      // and executor disagree — fail loudly rather than skip silently.
+      // Unreachable: the run-time guards refuse unsupported kinds before any write.
+      // Kept so a kind added to SUPPORTED_CONSUMER_KINDS without a deployer fails loudly.
       throw new Error(`unsupported consumer kind '${consumer.kind}'`);
   }
 }

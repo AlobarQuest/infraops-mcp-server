@@ -81,8 +81,9 @@ export const CLASS_POLICY = {
         ],
     },
 };
-// Consumer kinds the executor knows how to deploy to. Anything else forces manual.
-const SUPPORTED_CONSUMER_KINDS = new Set([
+// Consumer kinds the executor knows how to deploy to. Anything else forces manual —
+// at plan-build time here, and again in the executor's run-time guards before any write.
+export const SUPPORTED_CONSUMER_KINDS = new Set([
     'bws-secret',
     'keychain',
     'coolify-env',
@@ -129,8 +130,19 @@ export function credFindings(specs, state, now) {
             continue; // exposure supersedes age for the same credential
         }
         const policy = CLASS_POLICY[spec.class];
+        if (!policy) {
+            // A class outside CLASS_POLICY has no max age, so it would never age and nothing
+            // would say so. Report it per credential; the rest of the registry still loads.
+            findings.push({
+                severity: 'WARN',
+                check: 'cred.unknown-class',
+                target: credTarget(spec.id),
+                detail: `${credTarget(spec.id)} declares class '${spec.class}', which has no rotation policy — it is never aged; fix the class in its .cred-consumers.toml`,
+            });
+            continue;
+        }
         const anchor = state.lastRotated[spec.id] ?? spec.last_rotated ?? spec.created;
-        if (!policy || !anchor || !Number.isFinite(policy.maxAgeDays))
+        if (!anchor || !Number.isFinite(policy.maxAgeDays))
             continue;
         const ageDays = (nowMs - new Date(anchor).getTime()) / 86400_000;
         if (ageDays > policy.maxAgeDays) {
@@ -189,6 +201,17 @@ export function buildCredClassifications(specs, state) {
             ...rotate,
             tier: 'NORMAL',
             title: `Rotation due: ${spec.id} (${spec.class})`,
+        };
+        out[`cred.unknown-class|${target}`] = {
+            tier: 'NORMAL',
+            kind: 'question',
+            risk: 'caution',
+            remediation: {
+                manual: [
+                    `Set ${spec.id}'s class to one defined in CLASS_POLICY (src/security-drift/cred-rotation.ts), or add the class there with executor:false.`,
+                ],
+            },
+            title: `Unknown credential class: ${spec.id} (${spec.class})`,
         };
     }
     return out;
