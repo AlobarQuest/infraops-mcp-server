@@ -17,6 +17,13 @@
 # presence keeps the credential manual-lane by design):
 #   shell-export      { file, var }                         — literal export line in a shell file
 #   runtime-fetch     { repo, ref }                         — code fetches from BWS by UUID at runtime
+#   coolify-env-hash  { instance, resource_type, uuid, key } — env holds sha256(credential), not the
+#                                                           value (orchestrator M2M map); a raw
+#                                                           deploy there would break auth
+#
+# Sibling registries (spec decision 1 — each credential lives in its OWNING repo's file):
+# orchestrator (its M2M bearers + the sds-operator BWS token), change-manager (its M2M bearers),
+# factory-runner (FACTORY_PR_TOKEN). Every credential id must be unique across all files.
 # Syntax note: this file is parsed by a strict SUBSET parser — single-line values
 # only (arrays must open and close on one line).
 
@@ -219,3 +226,80 @@ disposition = "revoke-no-replacement"
 # - Account-level GitHub SSH keys not API-listable with the current keeper scope
 #   (needs admin:public_key) — pre-revoke enumeration is a Devon UI step.
 # - Surfaces off this Mac (other personal machines, browsers) not scanned.
+
+# ── 6. BWS machine tokens of the platform (SDS 1.1 L1b, registered 2026-10-06) ───
+# Class bws-machine-token is never executor-run: console-minted only. These entries
+# exist so the rotation-age finding fires; none carries consumers_verified, so every
+# rotation is the manual checklist by design. Fingerprints are sha256[:8] of the value,
+# computed in-process from the Keychain items on 2026-10-06; access-key ids are the
+# non-secret token-id prefix. A machine token has no BWS copy of itself.
+
+# tok-ops-mini-20260730 — the replacement minted in WS-P2.13 for the exposed
+# tok-ops-mini (access-key 8ba33ccd-…, revoked 2026-07-30; that exposure is CLOSED and
+# belongs to the retired token, so none is recorded here). One credential under three
+# Keychain names (closeout §2). Machine account "Developer Machines", Ops + Content.
+[[credential]]
+id = "bws-tok-ops-mini-20260730"
+class = "bws-machine-token"
+fingerprint_sha256_8 = "562c2b00"
+provider = "bitwarden-sm"
+provider_identity = "Bitwarden SM machine account Developer Machines, access token tok-ops-mini-20260730 (access-key 838d187e-…)"
+created = "2026-07-30"
+disposition = "reissue"
+
+  [[credential.consumer]]
+  kind = "keychain"
+  service = "Claude"
+  account = "BWS_ACCESS_TOKEN_INFRA_DRIFT"
+  note = "scripts/drift-audit.sh (03:00 infra-drift) and change-window.sh bootstrap identity"
+
+  [[credential.consumer]]
+  kind = "keychain"
+  service = "Claude"
+  account = "BWS_ACCESS_TOKEN_INFRAOPS"
+  note = "start.sh: the infraops MCP server bootstrap"
+
+  [[credential.consumer]]
+  kind = "keychain"
+  service = "Claude"
+  account = "BWS_ACCESS_TOKEN_VPS_BACKUP"
+  note = "vps-backup bws-token.sh: backup.sh, backup-orb.sh, backup-mini.sh, verify-backup.sh; also the BROAD identity orchestrator launchers name"
+
+# tok-content-mini — the same account's other token, VideoCreator only. Never exposed;
+# deliberately not rotated in WS-P2.13. Created 2026-06-12 (vps-backup
+# docs/2026-06-12-bws-rearchitecture.md); moved into the Keychain 2026-06-17.
+# Registered here, not in VideoCreator: that repo does not gitignore .worktrees and
+# has no check target, and the token belongs to the platform's machine account.
+[[credential]]
+id = "bws-tok-content-mini"
+class = "bws-machine-token"
+fingerprint_sha256_8 = "562394a7"
+provider = "bitwarden-sm"
+provider_identity = "Bitwarden SM machine account Developer Machines, access token tok-content-mini (access-key d857248c-…)"
+created = "2026-06-12"
+disposition = "reissue"
+
+  [[credential.consumer]]
+  kind = "keychain"
+  service = "Claude"
+  account = "BWS_ACCESS_TOKEN_VIDEOCREATOR"
+  note = "VideoCreator start.sh (launchd) reads it at boot"
+
+# The dedicated cred-rotation token (PR #33, 2026-07-02): the ONLY local token with
+# secret write on Ops / Platform. Read by src/cli/change-mgr-cli.ts credRotationBwsToken();
+# overridable by the BWS_CRED_ROTATION_TOKEN env var. Absent => executor rotations block.
+# Created date = the Keychain item's creation (2026-07-02T22:44Z), the same evening as #33.
+[[credential]]
+id = "bws-cred-rotation-token"
+class = "bws-machine-token"
+fingerprint_sha256_8 = "0f0b60a2"
+provider = "bitwarden-sm"
+provider_identity = "Bitwarden SM cred-rotation machine account (read+write, Ops / Platform), access-key 9a597098-…"
+created = "2026-07-02"
+disposition = "reissue"
+
+  [[credential.consumer]]
+  kind = "keychain"
+  service = "Claude"
+  account = "BWS_ACCESS_TOKEN_CRED_ROTATION"
+  note = "change-mgr-cli.ts: the 04:00 rotation executor's bws child processes only"

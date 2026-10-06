@@ -11,6 +11,7 @@ interface ClassPolicy {
     landmines: string[];
 }
 export declare const CLASS_POLICY: Record<string, ClassPolicy>;
+export declare const SUPPORTED_CONSUMER_KINDS: ReadonlySet<string>;
 export declare class RotationStateIntegrityError extends Error {
     constructor(message: string);
 }

@@ -18,17 +18,38 @@ const REPO_TOML = path.join(__dirname, '..', '.cred-consumers.toml');
 describe("the repo's own .cred-consumers.toml", () => {
   const specs = parseCredConsumers(fs.readFileSync(REPO_TOML, 'utf8'));
 
-  it('parses and carries the 5 leaked-cred entries with attested consumer sets', () => {
-    expect(specs.map((s) => s.id).sort()).toEqual([
-      'bitbucket-mirror-token',
-      'github-classic-aihelper',
-      'github-classic-lifeops',
-      'github-finegrained-mirror',
-      'openai-project',
-      'openrouter-generic',
-    ]);
-    for (const s of specs)
+  const LEAKED = [
+    'bitbucket-mirror-token',
+    'github-classic-aihelper',
+    'github-classic-lifeops',
+    'github-finegrained-mirror',
+    'openai-project',
+    'openrouter-generic',
+  ];
+  const MACHINE_TOKENS = [
+    'bws-cred-rotation-token',
+    'bws-tok-content-mini',
+    'bws-tok-ops-mini-20260730',
+  ];
+
+  it('parses and carries the leaked-cred entries (sweep-attested) and the platform BWS machine tokens', () => {
+    expect(specs.map((s) => s.id).sort()).toEqual([...MACHINE_TOKENS, ...LEAKED].sort());
+    for (const s of specs.filter((x) => LEAKED.includes(x.id)))
       expect(s.consumers_verified, `${s.id} must be sweep-attested`).toBeTruthy();
+  });
+
+  it('ages the machine tokens from their created date and routes them to the manual checklist', () => {
+    const state = { resolvedExposures: {}, lastRotated: {} };
+    const tokens = specs.filter((s) => MACHINE_TOKENS.includes(s.id));
+    for (const s of tokens) expect(s.created, `${s.id} needs an age anchor`).toBeTruthy();
+    expect(credFindings(tokens, state, '2026-10-06T03:00:00Z')).toEqual([]);
+    const later = credFindings(tokens, state, '2027-08-01T03:00:00Z');
+    expect(later.map((f) => f.check)).toEqual(Array(3).fill('cred.rotation-age'));
+    const cls = buildCredClassifications(tokens, state);
+    for (const f of later) {
+      const c = classify(f, { autoFixAllowlist: [], credClassifications: cls });
+      expect(c!.remediation).toHaveProperty('manual');
+    }
   });
 
   it('routes every emitted finding to its registry-built classification, never the unplanned fallback', () => {

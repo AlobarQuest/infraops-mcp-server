@@ -77,10 +77,30 @@ export const CLASS_POLICY: Record<string, ClassPolicy> = {
       'BWS machine tokens are console-minted only — create/revoke in the Bitwarden console; never via CLI.',
     ],
   },
+  // Opaque M2M bearers the orchestrator (sds.alobar.net) authenticates. Coolify holds only
+  // sha256(token) per key id, so no executor consumer kind can deploy a new value.
+  'orchestrator-m2m-bearer': {
+    maxAgeDays: 365,
+    executor: false,
+    landmines: [
+      'Coolify ORCHESTRATOR_M2M_CREDENTIALS holds sha256(token) per key id, never the token: replace only the hash of that entry, keep the key id and agent_id (attribution is permanent).',
+      'Write ORCHESTRATOR_M2M_CREDENTIALS before ORCHESTRATOR_M2M_ROLES and verify each in the container before the next restart (roles without credentials fail boot closed); never restart while a dispatched run is live.',
+    ],
+  },
+  // change-manager (change-mgr.alobar.net) bearers: plaintext Coolify env per scope.
+  'change-manager-m2m-bearer': {
+    maxAgeDays: 365,
+    executor: false,
+    landmines: [
+      'Never give two change-manager scope variables the same value: auth._token_scopes keeps the FIRST scope for a value (read, propose, observe, full), so a shared value is silently narrowed.',
+      'An unset M2M_TOKEN* grants nothing: blanking one mid-rotation 401s every consumer of that scope until the redeploy lands.',
+    ],
+  },
 };
 
-// Consumer kinds the executor knows how to deploy to. Anything else forces manual.
-const SUPPORTED_CONSUMER_KINDS = new Set([
+// Consumer kinds the executor knows how to deploy to. Anything else forces manual —
+// at plan-build time here, and again in the executor's run-time guards before any write.
+export const SUPPORTED_CONSUMER_KINDS: ReadonlySet<string> = new Set([
   'bws-secret',
   'keychain',
   'coolify-env',
@@ -150,8 +170,19 @@ export function credFindings(
       continue; // exposure supersedes age for the same credential
     }
     const policy = CLASS_POLICY[spec.class];
+    if (!policy) {
+      // A class outside CLASS_POLICY has no max age, so it would never age and nothing
+      // would say so. Report it per credential; the rest of the registry still loads.
+      findings.push({
+        severity: 'WARN',
+        check: 'cred.unknown-class',
+        target: credTarget(spec.id),
+        detail: `${credTarget(spec.id)} declares class '${spec.class}', which has no rotation policy — it is never aged; fix the class in its .cred-consumers.toml`,
+      });
+      continue;
+    }
     const anchor = state.lastRotated[spec.id] ?? spec.last_rotated ?? spec.created;
-    if (!policy || !anchor || !Number.isFinite(policy.maxAgeDays)) continue;
+    if (!anchor || !Number.isFinite(policy.maxAgeDays)) continue;
     const ageDays = (nowMs - new Date(anchor).getTime()) / 86400_000;
     if (ageDays > policy.maxAgeDays) {
       findings.push({
@@ -257,6 +288,17 @@ export function buildCredClassifications(
       ...rotate,
       tier: 'NORMAL',
       title: `Rotation due: ${spec.id} (${spec.class})`,
+    };
+    out[`cred.unknown-class|${target}`] = {
+      tier: 'NORMAL',
+      kind: 'question',
+      risk: 'caution',
+      remediation: {
+        manual: [
+          `Set ${spec.id}'s class to one defined in CLASS_POLICY (src/security-drift/cred-rotation.ts), or add the class there with executor:false.`,
+        ],
+      },
+      title: `Unknown credential class: ${spec.id} (${spec.class})`,
     };
   }
   return out;

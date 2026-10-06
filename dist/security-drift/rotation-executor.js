@@ -18,7 +18,7 @@
 // value is briefly visible in the local process list. Single-user machine; the
 // alternatives (shell interpolation, files) are strictly worse.
 import { execFileSync } from 'node:child_process';
-import { CLASS_POLICY } from './cred-rotation.js';
+import { CLASS_POLICY, SUPPORTED_CONSUMER_KINDS, } from './cred-rotation.js';
 /** Register-and-scrub: every secret value touched at runtime is redacted from details. */
 class Scrubber {
     values = [];
@@ -49,6 +49,9 @@ export async function runRotationPlan(plan, deps) {
             return finish('blocked', `class ${plan.credClass} is not executor-runnable`);
         if (!plan.consumersVerified)
             return finish('blocked', 'consumer set not attested — refusing (fail-safe)');
+        const unsupported = plan.consumers.filter((c) => !SUPPORTED_CONSUMER_KINDS.has(c.kind));
+        if (unsupported.length)
+            return finish('blocked', `consumer kind(s) ${unsupported.map((c) => `'${c.kind}'`).join(', ')} not executor-deployable — refusing before any write`);
         let newValue = null;
         let oldValue = null;
         let quarantineUuid = null;
@@ -205,8 +208,8 @@ async function deployConsumer(consumer, plan, newValue, deps, scrub) {
             return `deploy: gh secret ${consumer.repo}/${consumer.name} set`;
         }
         default:
-            // Plan building already refuses unsupported kinds; hitting this means the plan
-            // and executor disagree — fail loudly rather than skip silently.
+            // Unreachable: the run-time guards refuse unsupported kinds before any write.
+            // Kept so a kind added to SUPPORTED_CONSUMER_KINDS without a deployer fails loudly.
             throw new Error(`unsupported consumer kind '${consumer.kind}'`);
     }
 }

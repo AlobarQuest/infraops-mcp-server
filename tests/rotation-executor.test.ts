@@ -268,7 +268,7 @@ describe('runRotationPlan — structural guards', () => {
     expect(r.detail).toMatch(/not attested/);
   });
 
-  it('fails loudly on a consumer kind the executor does not support', async () => {
+  it('refuses a consumer kind the executor does not support, before the keeper is touched', async () => {
     const s = baseState();
     s.keychain.set('cred-rotation/openrouter-generic', NEW_VAL);
     s.probes[NEW_VAL] = 200;
@@ -276,8 +276,9 @@ describe('runRotationPlan — structural guards', () => {
       reissuePlan({ consumers: [{ kind: 'shell-export', file: '~/.zshrc', var: 'X' }] }),
       fakeDeps(s),
     );
-    expect(r.outcome).toBe('failed');
-    expect(r.detail).toMatch(/unsupported consumer kind/);
+    expect(r.outcome).toBe('blocked');
+    expect(r.detail).toMatch(/not executor-deployable — refusing before any write/);
+    expect(s.bws.get('keeper-uuid')!.value).toBe(OLD_VAL);
   });
 
   it('scrubs secret values out of error details', async () => {
@@ -293,4 +294,35 @@ describe('runRotationPlan — structural guards', () => {
     expect(r.detail).not.toContain(NEW_VAL);
     expect(r.detail).toContain('[redacted]');
   });
+});
+
+describe('runRotationPlan — consumer-kind guard runs before any write', () => {
+  it.each(['coolify-env-hash', 'shell-export', 'runtime-fetch'])(
+    "refuses an unsupported '%s' consumer with the new value staged and verified-good, writing nothing",
+    async (kind) => {
+      const s = baseState({ probes: { [NEW_VAL]: 200 } });
+      s.keychain.set('cred-rotation/openrouter-generic', NEW_VAL);
+      const deps = fakeDeps(s);
+      const create = vi.spyOn(deps.bws, 'create');
+      const edit = vi.spyOn(deps.bws, 'editValue');
+      const remove = vi.spyOn(deps.bws, 'remove');
+      const kcWrite = vi.spyOn(deps.keychain, 'write');
+      const plan = reissuePlan({
+        consumers: [
+          { kind: 'bws-secret', uuid: 'keeper-uuid' },
+          { kind: 'keychain', service: 'openrouter-api', account: 'devon' },
+          { kind, uuid: 'app-uuid', key: 'K' },
+        ],
+      });
+      const r = await runRotationPlan(plan, deps);
+      expect(r.outcome).toBe('blocked');
+      expect(r.detail).toContain(`'${kind}'`);
+      for (const spy of [create, edit, remove, kcWrite, deps.coolify.setEnv, deps.ghSecretSet])
+        expect(spy).not.toHaveBeenCalled();
+      expect(s.bws.get('keeper-uuid')!.value).toBe(OLD_VAL);
+      expect([...s.bws.keys()]).toEqual(['keeper-uuid']); // no quarantine copy created
+      expect(s.keychain.get('openrouter-api/devon')).toBeUndefined();
+      expect(s.resolved).toEqual([]);
+    },
+  );
 });
