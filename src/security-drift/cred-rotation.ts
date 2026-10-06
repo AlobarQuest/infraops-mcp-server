@@ -77,6 +77,25 @@ export const CLASS_POLICY: Record<string, ClassPolicy> = {
       'BWS machine tokens are console-minted only — create/revoke in the Bitwarden console; never via CLI.',
     ],
   },
+  // Opaque M2M bearers the orchestrator (sds.alobar.net) authenticates. Coolify holds only
+  // sha256(token) per key id, so no executor consumer kind can deploy a new value.
+  'orchestrator-m2m-bearer': {
+    maxAgeDays: 365,
+    executor: false,
+    landmines: [
+      'Coolify ORCHESTRATOR_M2M_CREDENTIALS holds sha256(token) per key id, never the token: replace only the hash of that entry, keep the key id and agent_id (attribution is permanent).',
+      'Write ORCHESTRATOR_M2M_CREDENTIALS before ORCHESTRATOR_M2M_ROLES and verify each in the container before the next restart (roles without credentials fail boot closed); never restart while a dispatched run is live.',
+    ],
+  },
+  // change-manager (change-mgr.alobar.net) bearers: plaintext Coolify env per scope.
+  'change-manager-m2m-bearer': {
+    maxAgeDays: 365,
+    executor: false,
+    landmines: [
+      'Never give two change-manager scope variables the same value: auth._token_scopes keeps the FIRST scope for a value (read, propose, observe, full), so a shared value is silently narrowed.',
+      'An unset M2M_TOKEN* grants nothing: blanking one mid-rotation 401s every consumer of that scope until the redeploy lands.',
+    ],
+  },
 };
 
 // Consumer kinds the executor knows how to deploy to. Anything else forces manual.

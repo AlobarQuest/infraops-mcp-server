@@ -282,3 +282,26 @@ describe('CLASS_POLICY sanity', () => {
     }
   });
 });
+
+describe('M2M bearer classes (SDS 1.1 L1b)', () => {
+  it('are never executor-run, even with an attested, executor-supported consumer set', () => {
+    for (const cls of ['orchestrator-m2m-bearer', 'change-manager-m2m-bearer']) {
+      expect(CLASS_POLICY[cls].executor).toBe(false);
+      const spec: CredentialSpec = {
+        id: `x-${cls}`,
+        class: cls,
+        bws_uuid: 'keeper-uuid',
+        consumers_verified: '2026-10-06',
+        disposition: 'reissue',
+        rotation_preconditions: [],
+        consumers: [{ kind: 'bws-secret', uuid: 'keeper-uuid' }],
+        exposures: [],
+      };
+      const c = buildCredClassifications([spec], { resolvedExposures: {}, lastRotated: {} })[
+        `cred.exposure-rotate|cred:x-${cls}`
+      ];
+      expect(c.remediation).toHaveProperty('manual');
+      expect(c.remediation).not.toHaveProperty('rotation');
+    }
+  });
+});
