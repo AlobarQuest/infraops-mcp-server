@@ -76,7 +76,7 @@ function rotationDeps(oldStatus: number): { deps: RotationDeps; removed: string[
 function windowDeps(
   items: ApprovedItem[],
   rotation?: RotationDeps,
-  rotatedBySds: (credId: string) => boolean = () => false,
+  refusesRotation: (credId: string) => boolean = () => false,
 ) {
   const outcomes: { id: number; outcome: string; detail?: string }[] = [];
   const integrity: string[] = [];
@@ -95,7 +95,7 @@ function windowDeps(
       emitStateFile,
       maxChanges: 10,
       rotation,
-      rotatedBySds,
+      refusesRotation,
     },
   };
 }
@@ -139,7 +139,7 @@ describe('runSecurityWindow — rotation remediation dispatch', () => {
     expect(s.blocked).toBe(1);
     expect(s.applied).toBe(0);
     expect(asked).toEqual(['github-classic-aihelper']);
-    expect(outcomes[0].detail).toMatch(/rotated by the SDS/);
+    expect(outcomes[0].detail).toMatch(/rotated by the SDS .* absent from the live registry/);
     expect(probeSpy).not.toHaveBeenCalled();
     expect(getSpy).not.toHaveBeenCalled();
     expect(removed).toEqual([]);

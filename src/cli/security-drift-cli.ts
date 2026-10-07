@@ -119,11 +119,6 @@ export function doRecordRotation(args: Record<string, string | boolean>): void {
   );
 }
 
-/** The credential-rotation findings as JSON, for the orchestrator's rotation proposer
- *  (ADR-0054 amendment 1). READ-ONLY: it loads the listed registries and the rotation state
- *  exactly as `run` does and writes nothing. Only `cred.*` findings that carry `facts` are
- *  printed, each as its check plus those fields -- never the prose detail. A registry that does
- *  not parse throws, so the caller gets a non-zero exit rather than an empty list. */
 /** The registry's contribution to the 03:00 scan: its findings, less the rotation triggers of
  *  credentials the SDS rotates (`scanFindings`), and their pre-built classifications. */
 export function credScan(
@@ -136,7 +131,10 @@ export function credScan(
     const state = loadRotationState(stateFile);
     return {
       findings: scanFindings(credFindings(specs, state, now), specs),
-      classifications: buildCredClassifications(specs, state),
+      classifications: buildCredClassifications(
+        specs.filter((spec) => spec.rotated_by_sds !== true),
+        state,
+      ),
     };
   } catch (e) {
     return {
@@ -153,6 +151,11 @@ export function credScan(
   }
 }
 
+/** The credential-rotation findings as JSON, for the orchestrator's rotation proposer
+ *  (ADR-0054 amendment 1). READ-ONLY: it loads the listed registries and the rotation state
+ *  exactly as `run` does and writes nothing. Only `cred.*` findings that carry `facts` are
+ *  printed, each as its check plus those fields -- never the prose detail. A registry that does
+ *  not parse throws, so the caller gets a non-zero exit rather than an empty list. */
 export function doCredFindings(args: Record<string, string | boolean>): void {
   const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
   const p = securityPaths();
@@ -167,9 +170,16 @@ export function doCredFindings(args: Record<string, string | boolean>): void {
     throw new Error(`cred-findings: no rotation state at ${p.credRotationStateFile}`);
   const specs = loadCredConsumerFiles(files);
   const state = loadRotationState(p.credRotationStateFile);
+  const owned = new Set(specs.filter((c) => c.rotated_by_sds === true).map((c) => c.id));
   const findings = credFindings(specs, state, now)
     .filter((f) => f.facts !== undefined)
-    .map((f) => ({ check: f.check, ...f.facts }));
+    .map((f) => ({
+      check: f.check,
+      ...f.facts,
+      // Whether the SDS owns this credential's rotation. The proposer acts only where this is
+      // true, so a standing package alone can never put two executors on one credential.
+      rotated_by_sds: owned.has(String(f.facts?.id)),
+    }));
   process.stdout.write(JSON.stringify({ schema_version: 1, findings }) + '\n');
 }
 

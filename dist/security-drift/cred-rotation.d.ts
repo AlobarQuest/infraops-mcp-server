@@ -47,9 +47,6 @@ export declare function isRecordedRevoked(spec: CredentialSpec, state: RotationS
 export declare function credTarget(credId: string): string;
 /** Findings for the current registry + state. Pure — no I/O. */
 export declare function credFindings(specs: CredentialSpec[], state: RotationState, now: string): Finding[];
-/** The executor-runnable rotation plan — hash-gated verbatim through change-manager.
- *  NO secret value ever appears here: everything is referenced by BWS UUID,
- *  Keychain item name, or consumer coordinates. */
 /** The findings that start a rotation. For a credential the SDS rotates, these reach only the
  *  rotation proposer; every other finding about it (a bad registry field, an unknown class) is
  *  still the scan's to report. */
@@ -58,6 +55,9 @@ export declare const ROTATION_TRIGGER_CHECKS: ReadonlySet<string>;
  *  credentials, which would otherwise become change-manager security items the 04:00 window
  *  could act on outside the SDS. */
 export declare function scanFindings(findings: Finding[], specs: CredentialSpec[]): Finding[];
+/** The executor-runnable rotation plan — hash-gated verbatim through change-manager.
+ *  NO secret value ever appears here: everything is referenced by BWS UUID,
+ *  Keychain item name, or consumer coordinates. */
 export interface RotationPlanSpec {
     credId: string;
     credClass: string;

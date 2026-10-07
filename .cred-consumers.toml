@@ -190,6 +190,9 @@ class = "openrouter-key"
 fingerprint_sha256_8 = "1f9697cd"
 # ADR-0054: the orchestrator's rotation proposer rotates this credential; the 04:00 window refuses it.
 rotated_by_sds = true
+# The first SDS rotation, requested by Devon 2026-10-07. Its package revision carries the
+# occurrence '2026-10-07-requested', so this date must not change while that rotation runs.
+rotate_requested = "2026-10-07"
 provider = "openrouter"
 provider_identity = "OpenRouter → Keys, label sk-or-v1-1b7…2b3"
 bws_uuid = "9661da8f-ac66-4e97-a31f-b42500bb849c"

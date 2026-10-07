@@ -229,9 +229,6 @@ export function credFindings(specs, state, now) {
     return findings;
 }
 // ── Plans ────────────────────────────────────────────────────────────────────────
-/** The executor-runnable rotation plan — hash-gated verbatim through change-manager.
- *  NO secret value ever appears here: everything is referenced by BWS UUID,
- *  Keychain item name, or consumer coordinates. */
 /** The findings that start a rotation. For a credential the SDS rotates, these reach only the
  *  rotation proposer; every other finding about it (a bad registry field, an unknown class) is
  *  still the scan's to report. */

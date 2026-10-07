@@ -100,9 +100,10 @@ async function doRunWindow(reportDir: string | undefined, now: string): Promise<
   process.stdout.write(md + '\n');
 }
 
-/** Which credentials the SDS rotates, from the live registry. An unreadable registry cannot say
- *  which credentials are the SDS's, so every rotation plan is refused rather than guessed. */
-export function sdsRotatedCredentials(listFile: string): (credId: string) => boolean {
+/** Which rotation plans the window must refuse, from the live registry: any credential the SDS
+ *  rotates, and any credential the registry does not hold (so a list naming no file refuses
+ *  everything). A registry that cannot be read refuses every plan. */
+export function rotationRefusals(listFile: string): (credId: string) => boolean {
   let files: string[];
   try {
     files = fs
@@ -114,12 +115,9 @@ export function sdsRotatedCredentials(listFile: string): (credId: string) => boo
     return () => true;
   }
   try {
-    const ids = new Set(
-      loadCredConsumerFiles(files)
-        .filter((c) => c.rotated_by_sds === true)
-        .map((c) => c.id),
-    );
-    return (credId) => ids.has(credId);
+    const specs = loadCredConsumerFiles(files);
+    const legacy = new Set(specs.filter((c) => c.rotated_by_sds !== true).map((c) => c.id));
+    return (credId) => !legacy.has(credId);
   } catch {
     return () => true;
   }
@@ -134,9 +132,9 @@ async function doRunSecurityWindow(reportDir: string | undefined, now: string): 
     from: process.env.INFRADRIFT_EMAIL_FROM ?? 'infra@devonwatkins.com',
     to: process.env.INFRADRIFT_EMAIL_TO ?? 'devon.watkins@gmail.com',
   };
-  const rotatedBySds = sdsRotatedCredentials(p.credConsumersList);
+  const refusesRotation = rotationRefusals(p.credConsumersList);
   const summary = await runSecurityWindow({
-    rotatedBySds,
+    refusesRotation,
     getApprovedSecurity: () => c.getApprovedBySource('security'),
     claim: async (id) => {
       await c.claim(id);

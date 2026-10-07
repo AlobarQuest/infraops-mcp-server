@@ -715,7 +715,7 @@ rotate_requested = "2026-10-01"
     );
   });
 
-  it('drops the exposure trigger too, once its age and request are unlocked by resolving it', () => {
+  it('drops the age and request triggers that appear once the exposure is resolved', () => {
     const resolved: RotationState = {
       resolvedExposures: { 'sds-cred:e1': { ts: '2026-09-02', detail: 'x' } },
       lastRotated: {},

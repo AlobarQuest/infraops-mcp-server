@@ -66,7 +66,9 @@ export interface CredentialSpec {
   rotate_requested_invalid?: string;
   /** The SDS owns this credential's rotation (ADR-0054). The 03:00 scan posts none of its
    *  rotation findings to change-manager and the 04:00 window refuses its rotation plans; the
-   *  orchestrator's rotation proposer reads them through `cred-findings` instead. */
+   *  orchestrator's rotation proposer reads them through `cred-findings` instead.
+   *  Set it only when no legacy rotation is in flight: the next 03:00 sync resolves the
+   *  credential's open security item, stranding a half-done reissue's quarantine copy. */
   rotated_by_sds?: boolean;
   rotation_preconditions: string[];
   consumers: ConsumerSpec[];
