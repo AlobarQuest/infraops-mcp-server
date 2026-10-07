@@ -275,6 +275,25 @@ export function credFindings(
 
 // ── Plans ────────────────────────────────────────────────────────────────────────
 
+/** The findings that start a rotation. For a credential the SDS rotates, these reach only the
+ *  rotation proposer; every other finding about it (a bad registry field, an unknown class) is
+ *  still the scan's to report. */
+export const ROTATION_TRIGGER_CHECKS: ReadonlySet<string> = new Set([
+  'cred.exposure-rotate',
+  'cred.rotation-age',
+  'cred.rotation-requested',
+]);
+
+/** What the 03:00 scan posts: every finding except the rotation triggers of SDS-rotated
+ *  credentials, which would otherwise become change-manager security items the 04:00 window
+ *  could act on outside the SDS. */
+export function scanFindings(findings: Finding[], specs: CredentialSpec[]): Finding[] {
+  const sds = new Set(specs.filter((s) => s.rotated_by_sds === true).map((s) => s.id));
+  return findings.filter(
+    (f) => !(ROTATION_TRIGGER_CHECKS.has(f.check) && sds.has(String(f.facts?.id))),
+  );
+}
+
 /** The executor-runnable rotation plan — hash-gated verbatim through change-manager.
  *  NO secret value ever appears here: everything is referenced by BWS UUID,
  *  Keychain item name, or consumer coordinates. */

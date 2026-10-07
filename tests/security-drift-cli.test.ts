@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { doRecordRotation, main, parseArgs } from '../src/cli/security-drift-cli.js';
+import { credScan, doRecordRotation, main, parseArgs } from '../src/cli/security-drift-cli.js';
 import { loadRotationState, saveRotationState } from '../src/security-drift/cred-rotation.js';
 
 const TOML = `version = 1
@@ -179,12 +179,19 @@ class = "mystery"
     const document = JSON.parse(out);
     expect(document.schema_version).toBe(1);
     expect(document.findings).toEqual([
-      { check: 'cred.rotation-age', id: 'cred-age', class: 'openrouter-key', anchor: '2025-01-02' },
+      {
+        check: 'cred.rotation-age',
+        id: 'cred-age',
+        class: 'openrouter-key',
+        anchor: '2025-01-02',
+        rotated_by_sds: false,
+      },
       {
         check: 'cred.rotation-requested',
         id: 'cred-requested',
         class: 'openai-key',
         rotate_requested: '2026-10-07',
+        rotated_by_sds: false,
       },
       {
         check: 'cred.exposure-rotate',
@@ -192,8 +199,9 @@ class = "mystery"
         class: 'github-pat-classic',
         exposure_id: 'transcript-1',
         exposure_date: '2026-09-02',
+        rotated_by_sds: false,
       },
-      { check: 'cred.unknown-class', id: 'cred-odd', class: 'mystery' },
+      { check: 'cred.unknown-class', id: 'cred-odd', class: 'mystery', rotated_by_sds: false },
     ]);
     expect(out).not.toContain('rotate now');
     expect(out).not.toContain('a transcript');
@@ -239,5 +247,83 @@ class = "mystery"
     fs.writeFileSync(path.join(dir, 'reg.cred-consumers.toml'), 'not = [valid\n');
     await expect(main(['cred-findings'])).rejects.toThrow();
     expect(out).toBe('');
+  });
+});
+
+describe('security-drift-cli credScan — what the 03:00 run posts', () => {
+  it("leaves out an SDS credential's rotation trigger and keeps the legacy one's", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cred-scan-'));
+    const toml = path.join(dir, 'r.cred-consumers.toml');
+    fs.writeFileSync(
+      toml,
+      'version = 1\n[[credential]]\nid = "sds"\nclass = "openrouter-key"\n' +
+        'rotate_requested = "2026-10-01"\nrotated_by_sds = true\n' +
+        '[[credential]]\nid = "legacy"\nclass = "openrouter-key"\nrotate_requested = "2026-10-01"\n',
+    );
+    const list = path.join(dir, 'cred-consumers.list');
+    fs.writeFileSync(list, `${toml}\n`);
+    const state = path.join(dir, 'state.json');
+    saveRotationState(state, { resolvedExposures: {}, lastRotated: {} });
+
+    const { findings } = credScan(list, state, '2026-10-07T12:00:00.000Z');
+    const ids = findings.map((f) => `${f.check}:${f.facts?.id}`);
+    expect(ids).toContain('cred.rotation-requested:legacy');
+    expect(ids).not.toContain('cred.rotation-requested:sds');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('security-drift-cli — the SDS handover flag', () => {
+  let dir: string;
+  let out: string;
+  const savedEnv = { ...process.env };
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'handover-'));
+    const toml = path.join(dir, 'r.cred-consumers.toml');
+    fs.writeFileSync(
+      toml,
+      'version = 1\n[[credential]]\nid = "sds"\nclass = "openrouter-key"\n' +
+        'rotate_requested = "2026-10-01"\nrotated_by_sds = true\n' +
+        '[[credential]]\nid = "legacy"\nclass = "openrouter-key"\nrotate_requested = "2026-10-01"\n',
+    );
+    fs.writeFileSync(path.join(dir, 'cred-consumers.list'), `${toml}\n`);
+    saveRotationState(path.join(dir, 'cred-rotation-state.json'), {
+      resolvedExposures: {},
+      lastRotated: {},
+    });
+    process.env.INFRADRIFT_CONFIG_DIR = dir;
+    process.env.SECURITY_DRIFT_STATE_DIR = dir;
+    out = '';
+    vi.spyOn(process.stdout, 'write').mockImplementation((s) => {
+      out += String(s);
+      return true;
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.env = { ...savedEnv };
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('cred-findings says, per finding, whether the SDS owns the credential', async () => {
+    await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
+    const owned = Object.fromEntries(
+      JSON.parse(out).findings.map((f: { id: string; rotated_by_sds: boolean }) => [
+        f.id,
+        f.rotated_by_sds,
+      ]),
+    );
+    expect(owned).toEqual({ sds: true, legacy: false });
+  });
+
+  it('the 03:00 scan builds no rotation plan for an SDS credential', () => {
+    const { classifications } = credScan(
+      path.join(dir, 'cred-consumers.list'),
+      path.join(dir, 'cred-rotation-state.json'),
+      '2026-10-07T12:00:00.000Z',
+    );
+    const keys = Object.keys(classifications ?? {});
+    expect(keys.some((k) => k.endsWith('cred:legacy'))).toBe(true);
+    expect(keys.some((k) => k.endsWith('cred:sds'))).toBe(false);
   });
 });

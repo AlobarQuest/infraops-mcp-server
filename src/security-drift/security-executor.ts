@@ -30,6 +30,11 @@ export interface SecurityWindowDeps {
   exec?: (cmd: string[]) => ExecResult;
   /** deps for `{ rotation }` remediations (WS-0.7). Absent ⇒ rotation items are blocked. */
   rotation?: RotationDeps;
+  /** True when this window must not run a rotation plan for the credential: the SDS rotates it
+   *  (ADR-0054), or the live registry does not hold it. Read from the live registry at window
+   *  time, never from the approved plan, so two executors never act on one credential. Required,
+   *  so no runner can omit it. */
+  refusesRotation: (credId: string) => boolean;
   timeoutMs?: number;
 }
 
@@ -132,6 +137,13 @@ export async function runSecurityWindow(deps: SecurityWindowDeps): Promise<Secur
       if (!deps.rotation) {
         summary.blocked++;
         const detail = 'rotation deps unavailable in this runner — cannot execute rotation plan';
+        summary.results.push({ name: item.resource_name, outcome: 'blocked', detail });
+        await deps.postOutcome(item.id, { outcome: 'blocked', detail }).catch(() => {});
+        continue;
+      }
+      if (deps.refusesRotation(String(remediation.rotation.credId))) {
+        summary.blocked++;
+        const detail = `${String(remediation.rotation.credId)} is rotated by the SDS (ADR-0054) or absent from the live registry — this window never acts on it`;
         summary.results.push({ name: item.resource_name, outcome: 'blocked', detail });
         await deps.postOutcome(item.id, { outcome: 'blocked', detail }).catch(() => {});
         continue;

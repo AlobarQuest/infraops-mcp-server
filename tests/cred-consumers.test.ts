@@ -391,3 +391,23 @@ class = "openrouter-key"
     expect(loadCredConsumerFiles([])).toEqual([]);
   });
 });
+
+describe('rotated_by_sds', () => {
+  const doc = (value: string) =>
+    `version = 1\n[[credential]]\nid = "c1"\nclass = "openrouter-key"\nrotated_by_sds = ${value}\n`;
+
+  it('reads true and false', () => {
+    expect(parseCredConsumers(doc('true'))[0].rotated_by_sds).toBe(true);
+    expect(parseCredConsumers(doc('false'))[0].rotated_by_sds).toBe(false);
+  });
+
+  it('is absent unless declared', () => {
+    const text = 'version = 1\n[[credential]]\nid = "c1"\nclass = "openrouter-key"\n';
+    expect(parseCredConsumers(text)[0].rotated_by_sds).toBeUndefined();
+  });
+
+  it('refuses anything but a boolean, since "yes" would read as truthy to one reader and not another', () => {
+    expect(() => parseCredConsumers(doc('"yes"'))).toThrow(CredConsumersParseError);
+    expect(() => parseCredConsumers(doc('1'))).toThrow(/rotated_by_sds must be true or false/);
+  });
+});

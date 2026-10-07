@@ -22,7 +22,7 @@ import { classify } from '../security-drift/taxonomy.js';
 import { buildEscalations } from '../security-drift/emit.js';
 import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION, } from '../security-drift/scanner-version.js';
 import { loadCredConsumerFiles } from '../security-drift/cred-consumers.js';
-import { buildCredClassifications, credFindings, loadRotationState, recordRotation, saveRotationState, } from '../security-drift/cred-rotation.js';
+import { buildCredClassifications, credFindings, scanFindings, loadRotationState, recordRotation, saveRotationState, } from '../security-drift/cred-rotation.js';
 export function parseArgs(argv) {
     const args = {};
     if (argv[0] && !argv[0].startsWith('--'))
@@ -104,6 +104,31 @@ export function doRecordRotation(args) {
     saveRotationState(p.credRotationStateFile, state);
     process.stdout.write(`recorded: ${cred} lastRotated ${previous ?? '(none)'} -> ${recorded} in ${p.credRotationStateFile}\n`);
 }
+/** The registry's contribution to the 03:00 scan: its findings, less the rotation triggers of
+ *  credentials the SDS rotates (`scanFindings`), and their pre-built classifications. */
+export function credScan(listFile, stateFile, now) {
+    try {
+        const specs = loadCredConsumerFiles(readList(listFile));
+        const state = loadRotationState(stateFile);
+        return {
+            findings: scanFindings(credFindings(specs, state, now), specs),
+            classifications: buildCredClassifications(specs.filter((spec) => spec.rotated_by_sds !== true), state),
+        };
+    }
+    catch (e) {
+        return {
+            findings: [
+                {
+                    severity: 'FAIL',
+                    check: 'cred.registry-error',
+                    target: 'cred-consumers',
+                    detail: `rotation registry unreadable: ${e instanceof Error ? e.message : String(e)}`,
+                },
+            ],
+            classifications: undefined,
+        };
+    }
+}
 /** The credential-rotation findings as JSON, for the orchestrator's rotation proposer
  *  (ADR-0054 amendment 1). READ-ONLY: it loads the listed registries and the rotation state
  *  exactly as `run` does and writes nothing. Only `cred.*` findings that carry `facts` are
@@ -123,9 +148,16 @@ export function doCredFindings(args) {
         throw new Error(`cred-findings: no rotation state at ${p.credRotationStateFile}`);
     const specs = loadCredConsumerFiles(files);
     const state = loadRotationState(p.credRotationStateFile);
+    const owned = new Set(specs.filter((c) => c.rotated_by_sds === true).map((c) => c.id));
     const findings = credFindings(specs, state, now)
         .filter((f) => f.facts !== undefined)
-        .map((f) => ({ check: f.check, ...f.facts }));
+        .map((f) => ({
+        check: f.check,
+        ...f.facts,
+        // Whether the SDS owns this credential's rotation. The proposer acts only where this is
+        // true, so a standing package alone can never put two executors on one credential.
+        rotated_by_sds: owned.has(String(f.facts?.id)),
+    }));
     process.stdout.write(JSON.stringify({ schema_version: 1, findings }) + '\n');
 }
 export async function main(argv = process.argv.slice(2)) {
@@ -198,24 +230,7 @@ export async function main(argv = process.argv.slice(2)) {
     // --- WS-0.7 credential-rotation registry: findings + pre-built classifications.
     // A broken registry/state is itself escalated (cred.registry-error → URGENT manual
     // via the taxonomy's deny-by-default cred.* fallback), never silently skipped.
-    let credExtraFindings = [];
-    let credClassifications;
-    try {
-        const credSpecs = loadCredConsumerFiles(readList(p.credConsumersList));
-        const credState = loadRotationState(p.credRotationStateFile);
-        credExtraFindings = credFindings(credSpecs, credState, now);
-        credClassifications = buildCredClassifications(credSpecs, credState);
-    }
-    catch (e) {
-        credExtraFindings = [
-            {
-                severity: 'FAIL',
-                check: 'cred.registry-error',
-                target: 'cred-consumers',
-                detail: `rotation registry unreadable: ${e instanceof Error ? e.message : String(e)}`,
-            },
-        ];
-    }
+    const { findings: credExtraFindings, classifications: credClassifications } = credScan(p.credConsumersList, p.credRotationStateFile, now);
     const result = await runSecurityDrift({
         scanStdout: captureScan(p.scanPath),
         now,

@@ -94,6 +94,13 @@ export async function runSecurityWindow(deps) {
                 await deps.postOutcome(item.id, { outcome: 'blocked', detail }).catch(() => { });
                 continue;
             }
+            if (deps.refusesRotation(String(remediation.rotation.credId))) {
+                summary.blocked++;
+                const detail = `${String(remediation.rotation.credId)} is rotated by the SDS (ADR-0054) or absent from the live registry — this window never acts on it`;
+                summary.results.push({ name: item.resource_name, outcome: 'blocked', detail });
+                await deps.postOutcome(item.id, { outcome: 'blocked', detail }).catch(() => { });
+                continue;
+            }
             const r = await runRotationPlan(remediation.rotation, deps.rotation);
             if (r.outcome === 'done')
                 summary.applied++;

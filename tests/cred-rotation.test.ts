@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   credFindings,
+  scanFindings,
   buildCredClassifications,
   loadRotationState,
   saveRotationState,
@@ -672,5 +673,55 @@ describe('coolify-env-hash consumer kind', () => {
     expect((c.remediation as { manual: string[] }).manual).toContain(
       "NOT executor-eligible: consumer kind 'coolify-env-hash' not supported by the executor",
     );
+  });
+});
+
+describe('scanFindings — what the 03:00 scan posts', () => {
+  const specs = parseCredConsumers(`version = 1
+[[credential]]
+id = "sds-cred"
+class = "openrouter-key"
+created = "2025-01-02"
+rotate_requested = "2026-10-01"
+rotated_by_sds = true
+  [[credential.exposure]]
+  id = "e1"
+  date = "2026-09-01"
+[[credential]]
+id = "sds-odd"
+class = "mystery"
+rotated_by_sds = true
+[[credential]]
+id = "legacy-cred"
+class = "openrouter-key"
+created = "2025-01-02"
+rotate_requested = "2026-10-01"
+`);
+  const empty: RotationState = { resolvedExposures: {}, lastRotated: {} };
+
+  it("drops an SDS credential's rotation triggers and keeps every other credential's", () => {
+    const all = credFindings(specs, empty, '2026-10-07T12:00:00.000Z');
+    const posted = scanFindings(all, specs).map((f) => `${f.check}:${f.facts?.id}`);
+    expect(all.some((f) => f.facts?.id === 'sds-cred')).toBe(true);
+    expect(posted.filter((p) => p.endsWith(':sds-cred'))).toEqual([]);
+    expect(posted).toContain('cred.rotation-age:legacy-cred');
+    expect(posted).toContain('cred.rotation-requested:legacy-cred');
+  });
+
+  it('still posts a finding about an SDS credential that is not a rotation trigger', () => {
+    const all = credFindings(specs, empty, '2026-10-07T12:00:00.000Z');
+    expect(scanFindings(all, specs).map((f) => `${f.check}:${f.facts?.id}`)).toContain(
+      'cred.unknown-class:sds-odd',
+    );
+  });
+
+  it('drops the age and request triggers that appear once the exposure is resolved', () => {
+    const resolved: RotationState = {
+      resolvedExposures: { 'sds-cred:e1': { ts: '2026-09-02', detail: 'x' } },
+      lastRotated: {},
+    };
+    const all = credFindings(specs, resolved, '2026-10-07T12:00:00.000Z');
+    expect(all.filter((f) => f.facts?.id === 'sds-cred').length).toBeGreaterThan(0);
+    expect(scanFindings(all, specs).filter((f) => f.facts?.id === 'sds-cred')).toEqual([]);
   });
 });

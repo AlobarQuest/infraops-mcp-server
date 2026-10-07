@@ -58,6 +58,7 @@ function deps(items: ApprovedItem[], exec?: (cmd: string[]) => ExecResult) {
         integrity.push({ id: it.id, reason });
       },
       emitStateFile,
+      refusesRotation: () => false,
       maxChanges: 10,
       exec,
     },
