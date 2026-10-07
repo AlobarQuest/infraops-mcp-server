@@ -8,7 +8,7 @@
 //
 // Operator commands against the 0600 rotation state:
 //   resolve-exposure --cred <id> --exposure <id>      confirmed provider revoke, no probe
-//   record-rotation  --cred <id> --date <ISO | now>   after a verified rotation
+//   record-rotation  --cred <id> --date <YYYY-MM-DD | now>   after a verified rotation
 
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -106,18 +106,11 @@ export function doRecordRotation(args: Record<string, string | boolean>): void {
   const cred = typeof args.cred === 'string' ? args.cred : '';
   const date = typeof args.date === 'string' ? args.date : '';
   if (!cred || !date)
-    throw new Error("record-rotation requires --cred <id> and --date <ISO date | 'now'>");
+    throw new Error('record-rotation requires --cred <id> and --date <YYYY-MM-DD | now>');
   const p = securityPaths();
-  const knownIds = new Set(loadCredConsumerFiles(readList(p.credConsumersList)).map((c) => c.id));
+  const specs = loadCredConsumerFiles(readList(p.credConsumersList));
   const state = loadRotationState(p.credRotationStateFile);
-  const now = new Date().toISOString();
-  const { previous, recorded } = recordRotation(
-    state,
-    knownIds,
-    cred,
-    date === 'now' ? now : date,
-    now,
-  );
+  const { previous, recorded } = recordRotation(state, specs, cred, date, new Date().toISOString());
   saveRotationState(p.credRotationStateFile, state);
   process.stdout.write(
     `recorded: ${cred} lastRotated ${previous ?? '(none)'} -> ${recorded} in ${p.credRotationStateFile}\n`,

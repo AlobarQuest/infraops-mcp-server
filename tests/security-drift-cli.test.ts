@@ -9,6 +9,10 @@ const TOML = `version = 1
 [[credential]]
 id = "cred-a"
 class = "openrouter-key"
+[[credential]]
+id = "cred-revoked"
+class = "github-pat-classic"
+disposition = "revoke-no-replacement"
 `;
 
 describe('security-drift-cli record-rotation', () => {
@@ -77,6 +81,23 @@ describe('security-drift-cli record-rotation', () => {
     const before = fs.readFileSync(stateFile, 'utf8');
     expect(() => run(['--cred', 'cred-a'])).toThrow(/requires --cred <id> and --date/);
     expect(() => run(['--cred', 'cred-a', '--date'])).toThrow(/requires --cred <id> and --date/);
+    expect(fs.readFileSync(stateFile, 'utf8')).toBe(before);
+  });
+
+  it.each([['2026'], ['2026-02-30'], ['10/07/2026'], ['2099-01-01']])(
+    'refuses --date %s without writing',
+    (date) => {
+      const before = fs.readFileSync(stateFile, 'utf8');
+      expect(() => run(['--cred', 'cred-a', '--date', date])).toThrow(/invalid date|future/);
+      expect(fs.readFileSync(stateFile, 'utf8')).toBe(before);
+    },
+  );
+
+  it('refuses a revoke-no-replacement credential without writing', () => {
+    const before = fs.readFileSync(stateFile, 'utf8');
+    expect(() => run(['--cred', 'cred-revoked', '--date', 'now'])).toThrow(
+      /recorded by the rotation executor/,
+    );
     expect(fs.readFileSync(stateFile, 'utf8')).toBe(before);
   });
 

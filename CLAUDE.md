@@ -226,12 +226,17 @@ The same detect→approve→execute loop rotates credentials as a change-class
 - **Detect:** `cred-rotation.ts` emits `cred.exposure-rotate` (FAIL, one-shot until the
   exposure is recorded resolved in the 0600 `cred-rotation-state.json`),
   `cred.rotation-age` (WARN past per-class max age; infra-brain rules #1031/#1032) and
-  `cred.rotation-requested` (WARN, same NORMAL tier and plan as rotation-age, while a
-  registry entry's `rotate_requested = "YYYY-MM-DD"` is later than the credential's last
-  rotation — state `lastRotated`, else registry `last_rotated`; `created` does not count).
-  An open exposure supersedes both. A `revoke-no-replacement` credential whose revoke is
-  recorded in state (`lastRotated` set — the executor writes it on revoke-confirm) raises
-  neither, so retired credentials never age back into findings. Merged
+  `cred.rotation-requested` (WARN, same NORMAL tier and plan as rotation-age) from the
+  date in a registry entry's `rotate_requested = "YYYY-MM-DD"` (UTC; a future date waits)
+  until a rotation is recorded on or after it — state `lastRotated`, else registry
+  `last_rotated`; `created` does not count. A `rotate_requested` that is not a quoted
+  real date is contained to its credential as `cred.invalid-rotate-requested` (WARN);
+  every other credential still loads (it is the only key whose bad value does not fail
+  the whole registry). An open exposure supersedes age and request. A
+  `revoke-no-replacement` credential is recorded revoked only when one of its registry
+  exposures was resolved with a `ts` equal to its `lastRotated` — the single write the
+  executor's revoke-confirm makes; it then raises neither, and a `lastRotated` from an
+  ordinary rotation before a re-classification still ages. Merged
   into the 3am run via `extraFindings`; classifications are pre-built per credential and
   routed through `taxonomy.ts`'s `cred.*` branch (no plan ⇒ URGENT manual, never guessed).
 - **Execute:** approved `{ rotation: RotationPlanSpec }` remediations run in
@@ -249,8 +254,11 @@ The same detect→approve→execute loop rotates credentials as a change-class
 - **Recording a rotation done outside the executor** (e.g. an SDS rotation unit): after
   the new credential is verified, run
   `node dist/cli/security-drift-cli.js record-rotation --cred <id> --date <YYYY-MM-DD | now>`.
-  It refuses an id absent from every listed `.cred-consumers.toml`, an unparseable or
-  future date, writes `lastRotated` atomically (0600, tmp+rename), and prints old -> new.
+  It refuses an id absent from every listed `.cred-consumers.toml`, a
+  `revoke-no-replacement` credential (revokes are recorded by the executor), and a date
+  that is not a real `YYYY-MM-DD` (UTC midnight) or is in the future; `now` records the
+  current instant. It writes `lastRotated` atomically (0600, fsync, tmp+rename) and
+  prints old -> new.
   That clears `cred.rotation-age` and any `cred.rotation-requested` on the next 3am run.
 - **Never in the lane:** Coolify PG passwords (volume-recreate only), BWS machine tokens
   (console-only), brain MCP keys (claude.ai connector re-key — manual, paired reconfig).

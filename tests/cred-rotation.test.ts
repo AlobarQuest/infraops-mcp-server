@@ -10,6 +10,7 @@ import {
   RotationStateIntegrityError,
   CLASS_POLICY,
   credTarget,
+  isRecordedRevoked,
   recordRotation,
   STAGING_SERVICE,
   SUPPORTED_CONSUMER_KINDS,
@@ -161,7 +162,7 @@ describe('credFindings — revoked credentials (revoke-no-replacement)', () => {
   });
 
   it('raises no rotation-requested finding for a revoked credential either', () => {
-    const spec = { ...revoked(), rotate_requested: NOW };
+    const spec = { ...revoked(), rotate_requested: '2026-07-01' };
     expect(credFindings([spec], revokedState(spec), NOW)).toEqual([]);
   });
 
@@ -170,6 +171,45 @@ describe('credFindings — revoked credentials (revoke-no-replacement)', () => {
     expect(credFindings([spec], emptyState(), NOW).map((f) => f.check)).toEqual([
       'cred.rotation-age',
     ]);
+  });
+
+  it('still ages a revoke-no-replacement credential whose lastRotated is an ordinary rotation', () => {
+    // Rotated (reissue) long ago, then re-classified revoke-no-replacement: the resolved
+    // exposure and lastRotated were not written by one revoke-confirm.
+    const spec = revoked();
+    const state = revokedState(spec);
+    state.lastRotated[spec.id] = daysAgo(201);
+    expect(credFindings([spec], state, NOW).map((f) => f.check)).toEqual(['cred.rotation-age']);
+  });
+
+  it('still ages one whose lastRotated has no resolved exposure at all', () => {
+    const spec = revoked();
+    const state: RotationState = {
+      resolvedExposures: {},
+      lastRotated: { [spec.id]: daysAgo(200) },
+    };
+    expect(credFindings([spec], state, NOW).map((f) => f.check)).toEqual(['cred.exposure-rotate']);
+    const noExp = { ...spec, exposures: [] };
+    expect(credFindings([noExp], state, NOW).map((f) => f.check)).toEqual(['cred.rotation-age']);
+  });
+
+  it('ignores a matching resolved exposure that is not in the registry', () => {
+    const spec = { ...revoked(), exposures: [] };
+    const state = revokedState(spec);
+    expect(credFindings([spec], state, NOW).map((f) => f.check)).toEqual(['cred.rotation-age']);
+  });
+
+  it('isRecordedRevoked: needs the disposition, a lastRotated, and a resolved exposure stamped with it', () => {
+    const spec = revoked();
+    expect(isRecordedRevoked(spec, revokedState(spec))).toBe(true);
+    expect(isRecordedRevoked({ ...spec, disposition: 'reissue' }, revokedState(spec))).toBe(false);
+    expect(isRecordedRevoked(spec, emptyState())).toBe(false);
+    const noLast = revokedState(spec);
+    noLast.lastRotated = {};
+    expect(isRecordedRevoked(spec, noLast)).toBe(false);
+    const unequal = revokedState(spec);
+    unequal.lastRotated[spec.id] = daysAgo(1);
+    expect(isRecordedRevoked(spec, unequal)).toBe(false);
   });
 
   it('still ages a reissue credential with the same old lastRotated', () => {
@@ -226,6 +266,20 @@ describe('credFindings — rotate_requested', () => {
     expect(credFindings([spec], state, NOW)).toEqual([]);
   });
 
+  it('does not fire before the requested date', () => {
+    const spec = fresh({ rotate_requested: '2026-07-03' });
+    expect(credFindings([spec], emptyState(), NOW)).toEqual([]);
+    expect(credFindings([spec], emptyState(), '2026-07-03T00:00:00.000Z')).toHaveLength(1);
+  });
+
+  it('a future request is not pre-cleared, and is cleared by a rotation recorded on its day', () => {
+    const spec = fresh({ rotate_requested: '2026-07-03', last_rotated: '2026-07-02' });
+    expect(credFindings([spec], emptyState(), '2026-07-03T09:00:00.000Z')).toHaveLength(1);
+    const state = emptyState();
+    recordRotation(state, [spec], spec.id, 'now', '2026-07-03T09:00:00.000Z');
+    expect(credFindings([spec], state, '2026-07-03T09:00:00.000Z')).toEqual([]);
+  });
+
   it('emits nothing when rotate_requested is absent', () => {
     expect(credFindings([fresh()], emptyState(), NOW)).toEqual([]);
   });
@@ -248,6 +302,54 @@ describe('credFindings — rotate_requested', () => {
     ]);
   });
 
+  it('emits cred.invalid-rotate-requested for a malformed value, alongside its other findings', () => {
+    const bad = fresh({ id: 'bad', rotate_requested_invalid: '2026', created: daysAgo(300) });
+    const good = fresh({ id: 'good', rotate_requested: '2026-06-01' });
+    const findings = credFindings([bad, good], emptyState(), NOW);
+    expect(findings.map((f) => [f.check, f.target])).toEqual([
+      ['cred.invalid-rotate-requested', 'cred:bad'],
+      ['cred.rotation-age', 'cred:bad'],
+      ['cred.rotation-requested', 'cred:good'],
+    ]);
+    expect(findings[0].severity).toBe('WARN');
+    const c = classify(findings[0], {
+      autoFixAllowlist: [],
+      credClassifications: buildCredClassifications([bad, good], emptyState()),
+    });
+    expect(c!.tier).toBe('NORMAL');
+    expect(c!.title).toBe('Invalid rotate_requested: bad');
+  });
+
+  it('a registry with one bad rotate_requested still yields every other finding', () => {
+    const specs = parseCredConsumers(`version = 1
+[[credential]]
+id = "bad"
+class = "openrouter-key"
+rotate_requested = 2026-10-07
+[[credential]]
+id = "old"
+class = "github-pat-classic"
+created = "2025-01-01"
+[[credential]]
+id = "asked"
+class = "openrouter-key"
+created = "2026-06-01"
+rotate_requested = "2026-06-15"
+[[credential]]
+id = "leaked"
+class = "openrouter-key"
+  [[credential.exposure]]
+  id = "e1"
+  date = "2026-06-01"
+`);
+    expect(credFindings(specs, emptyState(), NOW).map((f) => [f.check, f.target])).toEqual([
+      ['cred.invalid-rotate-requested', 'cred:bad'],
+      ['cred.rotation-age', 'cred:old'],
+      ['cred.rotation-requested', 'cred:asked'],
+      ['cred.exposure-rotate', 'cred:leaked'],
+    ]);
+  });
+
   it('routes through classify() to the same tier and plan as rotation-age', () => {
     const spec = fresh({ rotate_requested: '2026-06-01' });
     const [finding] = credFindings([spec], emptyState(), NOW);
@@ -262,42 +364,64 @@ describe('credFindings — rotate_requested', () => {
 });
 
 describe('recordRotation', () => {
-  const known = new Set(['cred-x']);
+  const specs = [baseSpec(), baseSpec({ id: 'cred-gone', disposition: 'revoke-no-replacement' })];
 
   it('sets lastRotated as a full ISO timestamp and returns the previous value', () => {
     const state: RotationState = {
       resolvedExposures: {},
       lastRotated: { 'cred-x': '2026-01-01T00:00:00.000Z' },
     };
-    expect(recordRotation(state, known, 'cred-x', '2026-06-30', NOW)).toEqual({
+    expect(recordRotation(state, specs, 'cred-x', '2026-06-30', NOW)).toEqual({
       previous: '2026-01-01T00:00:00.000Z',
       recorded: '2026-06-30T00:00:00.000Z',
     });
     expect(state.lastRotated['cred-x']).toBe('2026-06-30T00:00:00.000Z');
   });
 
-  it('accepts a date equal to now', () => {
+  it("records 'now' as the current instant", () => {
     const state = emptyState();
-    expect(recordRotation(state, known, 'cred-x', NOW, NOW).recorded).toBe(NOW);
+    expect(recordRotation(state, specs, 'cred-x', 'now', NOW).recorded).toBe(NOW);
+  });
+
+  it("accepts today's date", () => {
+    const state = emptyState();
+    expect(recordRotation(state, specs, 'cred-x', '2026-07-02', NOW).recorded).toBe(NOW);
   });
 
   it('refuses an unknown credential id and leaves state untouched', () => {
     const state = emptyState();
-    expect(() => recordRotation(state, known, 'cred-typo', '2026-06-30', NOW)).toThrow(
+    expect(() => recordRotation(state, specs, 'cred-typo', '2026-06-30', NOW)).toThrow(
       /unknown credential id 'cred-typo'/,
     );
     expect(state.lastRotated).toEqual({});
   });
 
-  it('refuses an unparseable date', () => {
+  it('refuses a revoke-no-replacement credential — the executor records revokes', () => {
     const state = emptyState();
-    expect(() => recordRotation(state, known, 'cred-x', 'yesterday', NOW)).toThrow(/invalid date/);
+    expect(() => recordRotation(state, specs, 'cred-gone', '2026-06-30', NOW)).toThrow(
+      /revoke-no-replacement.*recorded by the rotation executor/,
+    );
+    expect(state.lastRotated).toEqual({});
+  });
+
+  it.each([
+    ['yesterday'],
+    ['2026'],
+    ['1'],
+    ['2026-02-30'],
+    ['10/07/2026'],
+    ['2026-06-30T00:00:00Z'],
+    ['2026-6-30'],
+    [''],
+  ])('refuses the date %j', (date) => {
+    const state = emptyState();
+    expect(() => recordRotation(state, specs, 'cred-x', date, NOW)).toThrow(/invalid date/);
     expect(state.lastRotated).toEqual({});
   });
 
   it('refuses a date in the future', () => {
     const state = emptyState();
-    expect(() => recordRotation(state, known, 'cred-x', '2026-07-03', NOW)).toThrow(/future/);
+    expect(() => recordRotation(state, specs, 'cred-x', '2026-07-03', NOW)).toThrow(/future/);
     expect(state.lastRotated).toEqual({});
   });
 });

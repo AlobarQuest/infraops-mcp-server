@@ -5,7 +5,8 @@
 // max age) and `cred.rotation-requested` (WARN while a registry `rotate_requested`
 // date is later than the last recorded rotation) findings, merged into the 3am
 // security-drift run via extraFindings. A revoke-no-replacement credential whose
-// revoke is recorded in state raises neither of the last two.
+// revoke is recorded in state raises neither of the last two. A malformed
+// rotate_requested raises `cred.invalid-rotate-requested` for that credential only.
 //
 // PLAN: for each managed credential, builds the Classification the taxonomy hands
 // back for its findings. Executor-runnable rotation plans are built ONLY when every
@@ -22,7 +23,7 @@
 import { loadValidated0600Json, saveValidated0600Json } from './validated-store.js';
 import type { Finding } from './scan-parser.js';
 import type { Classification, Remediation } from './taxonomy.js';
-import type { ConsumerSpec, CredentialSpec } from './cred-consumers.js';
+import { parseIsoDay, type ConsumerSpec, type CredentialSpec } from './cred-consumers.js';
 
 export type ProviderProbe = 'github' | 'openrouter' | 'openai' | 'bitbucket';
 
@@ -145,27 +146,48 @@ export function saveRotationState(file: string, state: RotationState): void {
 }
 
 /**
- * Record a verified rotation: set `lastRotated[credId]` to `isoDate` (normalized to
- * a full ISO timestamp). Refuses an id outside the registry, an unparseable date, and
- * a date after `now` (a future lastRotated would silence the age finding).
- * Mutates `state`; the caller persists it. Returns the previous value.
+ * Record a verified rotation: set `lastRotated[credId]` to `date` — a strict
+ * `YYYY-MM-DD` (UTC midnight) or `'now'`. Refuses an id outside the registry, a
+ * revoke-no-replacement credential (its revoke is recorded by the executor's
+ * revoke-confirm, and a lastRotated written here would not mark it revoked), a
+ * malformed or impossible date, and a date after `now` (a future lastRotated would
+ * silence the age finding). Mutates `state`; the caller persists it.
  */
 export function recordRotation(
   state: RotationState,
-  knownIds: ReadonlySet<string>,
+  specs: readonly CredentialSpec[],
   credId: string,
-  isoDate: string,
+  date: string,
   now: string,
 ): { previous: string | undefined; recorded: string } {
-  if (!knownIds.has(credId))
+  const spec = specs.find((s) => s.id === credId);
+  if (!spec)
     throw new Error(`unknown credential id '${credId}' — not in any listed .cred-consumers.toml`);
-  const ms = Date.parse(isoDate);
-  if (Number.isNaN(ms)) throw new Error(`invalid date '${isoDate}' — use an ISO date or 'now'`);
-  if (ms > Date.parse(now)) throw new Error(`date '${isoDate}' is in the future`);
+  if (spec.disposition === 'revoke-no-replacement')
+    throw new Error(
+      `${credId} is revoke-no-replacement: there is no rotation to record — its revoke is recorded by the rotation executor's revoke-confirm`,
+    );
+  const nowMs = Date.parse(now);
+  const ms = date === 'now' ? nowMs : parseIsoDay(date);
+  if (ms === null) throw new Error(`invalid date '${date}' — use a real YYYY-MM-DD date or 'now'`);
+  if (ms > nowMs) throw new Error(`date '${date}' is in the future`);
   const previous = state.lastRotated[credId];
   const recorded = new Date(ms).toISOString();
   state.lastRotated[credId] = recorded;
   return { previous, recorded };
+}
+
+/**
+ * A revoke-no-replacement credential is recorded revoked when the executor's
+ * revoke-confirm wrote it: completeRotation stamps the resolved exposure and
+ * lastRotated with the same timestamp in one write. A lastRotated alone (an ordinary
+ * rotation before a re-classification) is not a revoke.
+ */
+export function isRecordedRevoked(spec: CredentialSpec, state: RotationState): boolean {
+  if (spec.disposition !== 'revoke-no-replacement') return false;
+  const at = state.lastRotated[spec.id];
+  if (at === undefined) return false;
+  return spec.exposures.some((e) => state.resolvedExposures[`${spec.id}:${e.id}`]?.ts === at);
 }
 
 // ── Findings ─────────────────────────────────────────────────────────────────────
@@ -183,6 +205,14 @@ export function credFindings(
   const findings: Finding[] = [];
   const nowMs = new Date(now).getTime();
   for (const spec of specs) {
+    if (spec.rotate_requested_invalid !== undefined) {
+      findings.push({
+        severity: 'WARN',
+        check: 'cred.invalid-rotate-requested',
+        target: credTarget(spec.id),
+        detail: `${credTarget(spec.id)} has rotate_requested = ${spec.rotate_requested_invalid}, which is not a quoted real date ("YYYY-MM-DD") — the request is ignored; fix it in its .cred-consumers.toml`,
+      });
+    }
     const openExposures = spec.exposures.filter(
       (e) => !state.resolvedExposures[`${spec.id}:${e.id}`],
     );
@@ -208,9 +238,8 @@ export function credFindings(
       });
       continue;
     }
-    // The executor records a revoke-no-replacement credential's confirmed revoke as
-    // its lastRotated; a revoked credential has nothing left to rotate.
-    if (spec.disposition === 'revoke-no-replacement' && state.lastRotated[spec.id]) continue;
+    // A revoked credential has nothing left to rotate.
+    if (isRecordedRevoked(spec, state)) continue;
     const anchor = state.lastRotated[spec.id] ?? spec.last_rotated ?? spec.created;
     if (anchor && Number.isFinite(policy.maxAgeDays)) {
       const ageDays = (nowMs - new Date(anchor).getTime()) / 86400_000;
@@ -223,9 +252,10 @@ export function credFindings(
         });
       }
     }
-    if (spec.rotate_requested) {
+    const requestedMs = spec.rotate_requested ? Date.parse(spec.rotate_requested) : NaN;
+    if (nowMs >= requestedMs) {
       const rotated = state.lastRotated[spec.id] ?? spec.last_rotated;
-      if (!rotated || Date.parse(rotated) < Date.parse(spec.rotate_requested)) {
+      if (!rotated || Date.parse(rotated) < requestedMs) {
         findings.push({
           severity: 'WARN',
           check: 'cred.rotation-requested',
@@ -335,6 +365,17 @@ export function buildCredClassifications(
       ...rotate,
       tier: 'NORMAL',
       title: `Rotation requested: ${spec.id} (${spec.class})`,
+    };
+    out[`cred.invalid-rotate-requested|${target}`] = {
+      tier: 'NORMAL',
+      kind: 'question',
+      risk: 'caution',
+      remediation: {
+        manual: [
+          `Fix ${spec.id}'s rotate_requested in its .cred-consumers.toml: a quoted real date, e.g. rotate_requested = "2026-10-07".`,
+        ],
+      },
+      title: `Invalid rotate_requested: ${spec.id}`,
     };
     out[`cred.unknown-class|${target}`] = {
       tier: 'NORMAL',

@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   parseCredConsumers,
+  parseIsoDay,
   loadCredConsumerFiles,
   CredConsumersParseError,
 } from '../src/security-drift/cred-consumers.js';
@@ -199,16 +200,76 @@ rotate_requested = "2026-10-07"   # requested by Devon
     expect(c.rotate_requested).toBeUndefined();
   });
 
-  it.each([['2026'], ['20261007'], ['"not-a-date"'], ['true']])(
-    'throws on a rotate_requested that is not a quoted date: %s',
-    (value) => {
-      expect(() =>
-        parseCredConsumers(
-          `[[credential]]\nid = "c"\nclass = "openrouter-key"\nrotate_requested = ${value}\n`,
-        ),
-      ).toThrow(/rotate_requested must be a quoted ISO date/);
-    },
-  );
+  it.each([
+    ['2026'],
+    ['1'],
+    ['"2026"'],
+    ['"1"'],
+    ['"2026-02-30"'],
+    ['"10/07/2026"'],
+    ['"2026-10-07T00:00:00Z"'],
+    ['2026-10-07'],
+    ['true'],
+    ['["2026-10-07"]'],
+    ['"a"b"'],
+  ])('contains a rotate_requested of %s to its own credential', (value) => {
+    const specs = parseCredConsumers(`version = 1
+[[credential]]
+id = "bad"
+class = "openrouter-key"
+rotate_requested = ${value}
+[[credential]]
+id = "good"
+class = "openrouter-key"
+rotate_requested = "2026-10-07"
+`);
+    expect(specs.map((c) => c.id)).toEqual(['bad', 'good']);
+    expect(specs[0].rotate_requested).toBeUndefined();
+    expect(specs[0].rotate_requested_invalid).toBe(value);
+    expect(specs[1].rotate_requested).toBe('2026-10-07');
+    expect(specs[1].rotate_requested_invalid).toBeUndefined();
+  });
+
+  it('a later invalid rotate_requested replaces an earlier valid one', () => {
+    const [c] = parseCredConsumers(
+      '[[credential]]\nid = "c"\nclass = "openrouter-key"\nrotate_requested = "2026-10-07"\nrotate_requested = 2026\n',
+    );
+    expect(c.rotate_requested).toBeUndefined();
+    expect(c.rotate_requested_invalid).toBe('2026');
+  });
+
+  it('a later valid rotate_requested replaces an earlier invalid one', () => {
+    const [c] = parseCredConsumers(
+      '[[credential]]\nid = "c"\nclass = "openrouter-key"\nrotate_requested = 2026\nrotate_requested = "2026-10-07"\n',
+    );
+    expect(c).toMatchObject({ rotate_requested: '2026-10-07' });
+    expect(c.rotate_requested_invalid).toBeUndefined();
+  });
+
+  it('still throws on a bad value for any other key', () => {
+    expect(() =>
+      parseCredConsumers(
+        '[[credential]]\nid = "c"\nclass = "openrouter-key"\ncreated = 2026-10-07\n',
+      ),
+    ).toThrow(CredConsumersParseError);
+  });
+
+  it.each([
+    ['2026-10-07', Date.UTC(2026, 9, 7)],
+    ['2024-02-29', Date.UTC(2024, 1, 29)],
+    ['2026-02-30', null],
+    ['2025-02-29', null],
+    ['2026-13-01', null],
+    ['2026-00-10', null],
+    ['2026', null],
+    ['1', null],
+    ['10/07/2026', null],
+    [' 2026-10-07', null],
+    ['2026-10-07T00:00:00Z', null],
+    ['0050-01-01', new Date('0050-01-01T00:00:00Z').getTime()],
+  ])('parseIsoDay(%j) is %j', (text, expected) => {
+    expect(parseIsoDay(text)).toBe(expected);
+  });
 
   it('throws when an exposure is missing id or date', () => {
     const doc = `

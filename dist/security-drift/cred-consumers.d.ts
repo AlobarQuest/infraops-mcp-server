@@ -37,13 +37,18 @@ export interface CredentialSpec {
     probe_workspace?: string;
     created?: string;
     last_rotated?: string;
-    /** On-demand rotation request (ISO date). Raises cred.rotation-requested until a
-     *  rotation is recorded on or after this date. */
+    /** On-demand rotation request ("YYYY-MM-DD", UTC). Raises cred.rotation-requested from
+     *  that date until a rotation is recorded on or after it. */
     rotate_requested?: string;
+    /** Raw text of a rotate_requested that is not a quoted real date. Contained to this
+     *  credential (cred.invalid-rotate-requested) rather than failing the whole registry. */
+    rotate_requested_invalid?: string;
     rotation_preconditions: string[];
     consumers: ConsumerSpec[];
     exposures: ExposureSpec[];
 }
+/** UTC midnight of a strict `YYYY-MM-DD` that names a real calendar date, else null. */
+export declare function parseIsoDay(text: string): number | null;
 /** Parse one .cred-consumers.toml document. Throws CredConsumersParseError on any deviation. */
 export declare function parseCredConsumers(text: string): CredentialSpec[];
 /**
