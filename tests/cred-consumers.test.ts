@@ -183,6 +183,33 @@ uuid = "u1"
     expect(() => parseCredConsumers(doc)).toThrow(CredConsumersParseError);
   });
 
+  it('parses rotate_requested as a plain quoted date', () => {
+    const [c] = parseCredConsumers(`
+version = 1
+[[credential]]
+id = "c"
+class = "openrouter-key"
+rotate_requested = "2026-10-07"   # requested by Devon
+`);
+    expect(c.rotate_requested).toBe('2026-10-07');
+  });
+
+  it('leaves rotate_requested undefined when absent', () => {
+    const [c] = parseCredConsumers('[[credential]]\nid = "c"\nclass = "openrouter-key"\n');
+    expect(c.rotate_requested).toBeUndefined();
+  });
+
+  it.each([['2026'], ['20261007'], ['"not-a-date"'], ['true']])(
+    'throws on a rotate_requested that is not a quoted date: %s',
+    (value) => {
+      expect(() =>
+        parseCredConsumers(
+          `[[credential]]\nid = "c"\nclass = "openrouter-key"\nrotate_requested = ${value}\n`,
+        ),
+      ).toThrow(/rotate_requested must be a quoted ISO date/);
+    },
+  );
+
   it('throws when an exposure is missing id or date', () => {
     const doc = `
 version = 1

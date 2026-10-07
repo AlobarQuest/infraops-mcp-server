@@ -25,6 +25,16 @@ export interface RotationState {
 }
 export declare function loadRotationState(file: string): RotationState;
 export declare function saveRotationState(file: string, state: RotationState): void;
+/**
+ * Record a verified rotation: set `lastRotated[credId]` to `isoDate` (normalized to
+ * a full ISO timestamp). Refuses an id outside the registry, an unparseable date, and
+ * a date after `now` (a future lastRotated would silence the age finding).
+ * Mutates `state`; the caller persists it. Returns the previous value.
+ */
+export declare function recordRotation(state: RotationState, knownIds: ReadonlySet<string>, credId: string, isoDate: string, now: string): {
+    previous: string | undefined;
+    recorded: string;
+};
 export declare function credTarget(credId: string): string;
 /** Findings for the current registry + state. Pure — no I/O. */
 export declare function credFindings(specs: CredentialSpec[], state: RotationState, now: string): Finding[];

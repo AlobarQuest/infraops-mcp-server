@@ -37,6 +37,9 @@ export interface CredentialSpec {
     probe_workspace?: string;
     created?: string;
     last_rotated?: string;
+    /** On-demand rotation request (ISO date). Raises cred.rotation-requested until a
+     *  rotation is recorded on or after this date. */
+    rotate_requested?: string;
     rotation_preconditions: string[];
     consumers: ConsumerSpec[];
     exposures: ExposureSpec[];

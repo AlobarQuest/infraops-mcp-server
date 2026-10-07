@@ -25,7 +25,14 @@
 # orchestrator (its M2M bearers + the sds-operator BWS token), change-manager (its M2M bearers),
 # factory-runner (FACTORY_PR_TOKEN). Every credential id must be unique across all files.
 # Syntax note: this file is parsed by a strict SUBSET parser — single-line values
-# only (arrays must open and close on one line).
+# only (arrays must open and close on one line; array items split on commas).
+#
+# On-demand rotation: add `rotate_requested = "YYYY-MM-DD"` (a quoted ISO date) to a
+# [[credential]] to raise cred.rotation-requested before the credential is due. It
+# clears once a rotation is recorded on or after that date — the executor records it,
+# or after a verified rotation run
+#   node dist/cli/security-drift-cli.js record-rotation --cred <id> --date <YYYY-MM-DD | now>
+# Remove the key afterwards to keep the file tidy (leaving it is harmless).
 
 version = 1
 

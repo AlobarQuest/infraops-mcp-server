@@ -224,8 +224,14 @@ The same detect→approve→execute loop rotates credentials as a change-class
   (deny-by-default: unlisted ⇒ unmanaged). Parsed by `cred-consumers.ts` (strict-subset
   TOML parser, deliberately dependency-free in the 4am write path).
 - **Detect:** `cred-rotation.ts` emits `cred.exposure-rotate` (FAIL, one-shot until the
-  exposure is recorded resolved in the 0600 `cred-rotation-state.json`) and
-  `cred.rotation-age` (WARN past per-class max age; infra-brain rules #1031/#1032). Merged
+  exposure is recorded resolved in the 0600 `cred-rotation-state.json`),
+  `cred.rotation-age` (WARN past per-class max age; infra-brain rules #1031/#1032) and
+  `cred.rotation-requested` (WARN, same NORMAL tier and plan as rotation-age, while a
+  registry entry's `rotate_requested = "YYYY-MM-DD"` is later than the credential's last
+  rotation — state `lastRotated`, else registry `last_rotated`; `created` does not count).
+  An open exposure supersedes both. A `revoke-no-replacement` credential whose revoke is
+  recorded in state (`lastRotated` set — the executor writes it on revoke-confirm) raises
+  neither, so retired credentials never age back into findings. Merged
   into the 3am run via `extraFindings`; classifications are pre-built per credential and
   routed through `taxonomy.ts`'s `cred.*` branch (no plan ⇒ URGENT manual, never guessed).
 - **Execute:** approved `{ rotation: RotationPlanSpec }` remediations run in
@@ -240,6 +246,12 @@ The same detect→approve→execute loop rotates credentials as a change-class
   handoff = Keychain item `cred-rotation/<cred-id>` filled in a real Terminal. Orphan
   creds with no probe-able old value are closed via
   `security-drift-cli.js resolve-exposure --cred <id> --exposure <id>`.
+- **Recording a rotation done outside the executor** (e.g. an SDS rotation unit): after
+  the new credential is verified, run
+  `node dist/cli/security-drift-cli.js record-rotation --cred <id> --date <YYYY-MM-DD | now>`.
+  It refuses an id absent from every listed `.cred-consumers.toml`, an unparseable or
+  future date, writes `lastRotated` atomically (0600, tmp+rename), and prints old -> new.
+  That clears `cred.rotation-age` and any `cred.rotation-requested` on the next 3am run.
 - **Never in the lane:** Coolify PG passwords (volume-recreate only), BWS machine tokens
   (console-only), brain MCP keys (claude.ai connector re-key — manual, paired reconfig).
 - **Consumer mapping:** `scripts/cred-consumer-sweep.py` — fingerprint (sha256) hash-compare

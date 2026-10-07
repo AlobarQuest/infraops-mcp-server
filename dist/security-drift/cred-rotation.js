@@ -1,8 +1,11 @@
 // WS-0.7 credential-rotation detection + plan building.
 //
 // DETECT: emits `cred.exposure-rotate` (FAIL, one-shot rotate-now until the
-// exposure is recorded resolved) and `cred.rotation-age` (WARN past the per-class
-// max age) findings, merged into the 3am security-drift run via extraFindings.
+// exposure is recorded resolved), `cred.rotation-age` (WARN past the per-class
+// max age) and `cred.rotation-requested` (WARN while a registry `rotate_requested`
+// date is later than the last recorded rotation) findings, merged into the 3am
+// security-drift run via extraFindings. A revoke-no-replacement credential whose
+// revoke is recorded in state raises neither of the last two.
 //
 // PLAN: for each managed credential, builds the Classification the taxonomy hands
 // back for its findings. Executor-runnable rotation plans are built ONLY when every
@@ -109,6 +112,25 @@ export function loadRotationState(file) {
 export function saveRotationState(file, state) {
     saveValidated0600Json(file, state);
 }
+/**
+ * Record a verified rotation: set `lastRotated[credId]` to `isoDate` (normalized to
+ * a full ISO timestamp). Refuses an id outside the registry, an unparseable date, and
+ * a date after `now` (a future lastRotated would silence the age finding).
+ * Mutates `state`; the caller persists it. Returns the previous value.
+ */
+export function recordRotation(state, knownIds, credId, isoDate, now) {
+    if (!knownIds.has(credId))
+        throw new Error(`unknown credential id '${credId}' — not in any listed .cred-consumers.toml`);
+    const ms = Date.parse(isoDate);
+    if (Number.isNaN(ms))
+        throw new Error(`invalid date '${isoDate}' — use an ISO date or 'now'`);
+    if (ms > Date.parse(now))
+        throw new Error(`date '${isoDate}' is in the future`);
+    const previous = state.lastRotated[credId];
+    const recorded = new Date(ms).toISOString();
+    state.lastRotated[credId] = recorded;
+    return { previous, recorded };
+}
 // ── Findings ─────────────────────────────────────────────────────────────────────
 export function credTarget(credId) {
     return `cred:${credId}`;
@@ -141,17 +163,32 @@ export function credFindings(specs, state, now) {
             });
             continue;
         }
-        const anchor = state.lastRotated[spec.id] ?? spec.last_rotated ?? spec.created;
-        if (!anchor || !Number.isFinite(policy.maxAgeDays))
+        // The executor records a revoke-no-replacement credential's confirmed revoke as
+        // its lastRotated; a revoked credential has nothing left to rotate.
+        if (spec.disposition === 'revoke-no-replacement' && state.lastRotated[spec.id])
             continue;
-        const ageDays = (nowMs - new Date(anchor).getTime()) / 86400_000;
-        if (ageDays > policy.maxAgeDays) {
-            findings.push({
-                severity: 'WARN',
-                check: 'cred.rotation-age',
-                target: credTarget(spec.id),
-                detail: `${credTarget(spec.id)} (class ${spec.class}) is ${Math.floor(ageDays)}d old — class max is ${policy.maxAgeDays}d; schedule rotation`,
-            });
+        const anchor = state.lastRotated[spec.id] ?? spec.last_rotated ?? spec.created;
+        if (anchor && Number.isFinite(policy.maxAgeDays)) {
+            const ageDays = (nowMs - new Date(anchor).getTime()) / 86400_000;
+            if (ageDays > policy.maxAgeDays) {
+                findings.push({
+                    severity: 'WARN',
+                    check: 'cred.rotation-age',
+                    target: credTarget(spec.id),
+                    detail: `${credTarget(spec.id)} (class ${spec.class}) is ${Math.floor(ageDays)}d old — class max is ${policy.maxAgeDays}d; schedule rotation`,
+                });
+            }
+        }
+        if (spec.rotate_requested) {
+            const rotated = state.lastRotated[spec.id] ?? spec.last_rotated;
+            if (!rotated || Date.parse(rotated) < Date.parse(spec.rotate_requested)) {
+                findings.push({
+                    severity: 'WARN',
+                    check: 'cred.rotation-requested',
+                    target: credTarget(spec.id),
+                    detail: `${credTarget(spec.id)} (class ${spec.class}) has a rotation requested ${spec.rotate_requested}; last rotated ${rotated ?? 'never'} — rotate, then record-rotation`,
+                });
+            }
         }
     }
     return findings;
@@ -201,6 +238,11 @@ export function buildCredClassifications(specs, state) {
             ...rotate,
             tier: 'NORMAL',
             title: `Rotation due: ${spec.id} (${spec.class})`,
+        };
+        out[`cred.rotation-requested|${target}`] = {
+            ...rotate,
+            tier: 'NORMAL',
+            title: `Rotation requested: ${spec.id} (${spec.class})`,
         };
         out[`cred.unknown-class|${target}`] = {
             tier: 'NORMAL',

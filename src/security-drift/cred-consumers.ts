@@ -57,6 +57,9 @@ export interface CredentialSpec {
   probe_workspace?: string;
   created?: string;
   last_rotated?: string;
+  /** On-demand rotation request (ISO date). Raises cred.rotation-requested until a
+   *  rotation is recorded on or after this date. */
+  rotate_requested?: string;
   rotation_preconditions: string[];
   consumers: ConsumerSpec[];
   exposures: ExposureSpec[];
@@ -166,6 +169,14 @@ export function parseCredConsumers(text: string): CredentialSpec[] {
     for (const exposure of c.exposures) {
       if (!exposure.id || !exposure.date)
         throw new CredConsumersParseError(`credential ${c.id}: exposure missing id/date`);
+    }
+    if (
+      c.rotate_requested !== undefined &&
+      (typeof c.rotate_requested !== 'string' || Number.isNaN(Date.parse(c.rotate_requested)))
+    ) {
+      throw new CredConsumersParseError(
+        `credential ${c.id}: rotate_requested must be a quoted ISO date`,
+      );
     }
   }
   const ids = new Set<string>();

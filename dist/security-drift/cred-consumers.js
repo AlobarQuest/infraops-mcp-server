@@ -124,6 +124,10 @@ export function parseCredConsumers(text) {
             if (!exposure.id || !exposure.date)
                 throw new CredConsumersParseError(`credential ${c.id}: exposure missing id/date`);
         }
+        if (c.rotate_requested !== undefined &&
+            (typeof c.rotate_requested !== 'string' || Number.isNaN(Date.parse(c.rotate_requested)))) {
+            throw new CredConsumersParseError(`credential ${c.id}: rotate_requested must be a quoted ISO date`);
+        }
     }
     const ids = new Set();
     for (const c of creds) {
