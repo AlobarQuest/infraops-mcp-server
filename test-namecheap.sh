@@ -24,7 +24,7 @@ fetch_bws_secret() {
     echo ""
     return
   fi
-  bws secret get "$secret_id" --output json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])" 2>/dev/null || echo ""
+  bws secret get "$secret_id" --output json --color no 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])" 2>/dev/null || echo ""
 }
 
 # Reference secrets by stable UUID (infra-brain lesson #277). Production UUIDs default inline;

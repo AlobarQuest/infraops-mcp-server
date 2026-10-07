@@ -382,7 +382,7 @@ export function defaultRotationDeps(io: {
     bws: {
       async getValue(uuid) {
         try {
-          const out = bwsExec(['bws', 'secret', 'get', uuid, '--output', 'json']);
+          const out = bwsExec(['bws', 'secret', 'get', uuid, '--output', 'json', '--color', 'no']);
           return (JSON.parse(out) as { value?: string }).value ?? null;
         } catch {
           return null;
@@ -397,6 +397,8 @@ export function defaultRotationDeps(io: {
           ...(projectId ? [projectId] : []),
           '--output',
           'json',
+          '--color',
+          'no',
         ];
         const all = JSON.parse(bwsExec(cmd)) as Array<{ id: string; key: string; value: string }>;
         const hit = all.find((s) => s.key === name);
@@ -412,6 +414,8 @@ export function defaultRotationDeps(io: {
           projectId,
           '--output',
           'json',
+          '--color',
+          'no',
         ]);
         return (JSON.parse(out) as { id: string }).id;
       },

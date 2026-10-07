@@ -30,6 +30,16 @@ describe('defaultRotationDeps token isolation', () => {
     execFileSync.mockReturnValue(JSON.stringify({ value: 'v' }));
     await deps('ROTATION-SCOPED-TOKEN').bws.getValue('uuid-1');
     expect(execFileSync).toHaveBeenCalledTimes(1);
+    // --color no: FORCE_COLOR/CLICOLOR_FORCE otherwise wrap the JSON in ANSI codes.
+    expect(execFileSync.mock.calls[0][1]).toEqual([
+      'secret',
+      'get',
+      'uuid-1',
+      '--output',
+      'json',
+      '--color',
+      'no',
+    ]);
     const opts = execFileSync.mock.calls[0][2];
     expect(opts.env.BWS_ACCESS_TOKEN).toBe('ROTATION-SCOPED-TOKEN');
     expect(opts.env.BWS_ACCESS_TOKEN).not.toBe('AMBIENT-BROAD-TOKEN');
