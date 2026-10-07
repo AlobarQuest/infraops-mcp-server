@@ -43,6 +43,10 @@ export interface CredentialSpec {
     /** Raw text of a rotate_requested that is not a quoted real date. Contained to this
      *  credential (cred.invalid-rotate-requested) rather than failing the whole registry. */
     rotate_requested_invalid?: string;
+    /** The SDS owns this credential's rotation (ADR-0054). The 03:00 scan posts none of its
+     *  rotation findings to change-manager and the 04:00 window refuses its rotation plans; the
+     *  orchestrator's rotation proposer reads them through `cred-findings` instead. */
+    rotated_by_sds?: boolean;
     rotation_preconditions: string[];
     consumers: ConsumerSpec[];
     exposures: ExposureSpec[];

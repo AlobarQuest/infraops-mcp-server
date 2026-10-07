@@ -12,6 +12,7 @@ import { sendAlertEmail } from '../security-drift/notify.js';
 import { execFileSync } from 'child_process';
 import { defaultRotationDeps } from '../security-drift/rotation-executor.js';
 import { loadRotationState, saveRotationState } from '../security-drift/cred-rotation.js';
+import { loadCredConsumerFiles } from '../security-drift/cred-consumers.js';
 import { coolifyGet, coolifyPatch, coolifyPost } from '../services/coolify-client.js';
 
 /** The dedicated, least-privilege cred-rotation BWS token (read+write on the
@@ -99,6 +100,31 @@ async function doRunWindow(reportDir: string | undefined, now: string): Promise<
   process.stdout.write(md + '\n');
 }
 
+/** Which credentials the SDS rotates, from the live registry. An unreadable registry cannot say
+ *  which credentials are the SDS's, so every rotation plan is refused rather than guessed. */
+export function sdsRotatedCredentials(listFile: string): (credId: string) => boolean {
+  let files: string[];
+  try {
+    files = fs
+      .readFileSync(listFile, 'utf8')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'));
+  } catch {
+    return () => true;
+  }
+  try {
+    const ids = new Set(
+      loadCredConsumerFiles(files)
+        .filter((c) => c.rotated_by_sds === true)
+        .map((c) => c.id),
+    );
+    return (credId) => ids.has(credId);
+  } catch {
+    return () => true;
+  }
+}
+
 async function doRunSecurityWindow(reportDir: string | undefined, now: string): Promise<void> {
   const c = client('security-executor');
   const p = securityPaths();
@@ -108,7 +134,9 @@ async function doRunSecurityWindow(reportDir: string | undefined, now: string): 
     from: process.env.INFRADRIFT_EMAIL_FROM ?? 'infra@devonwatkins.com',
     to: process.env.INFRADRIFT_EMAIL_TO ?? 'devon.watkins@gmail.com',
   };
+  const rotatedBySds = sdsRotatedCredentials(p.credConsumersList);
   const summary = await runSecurityWindow({
+    rotatedBySds,
     getApprovedSecurity: () => c.getApprovedBySource('security'),
     claim: async (id) => {
       await c.claim(id);

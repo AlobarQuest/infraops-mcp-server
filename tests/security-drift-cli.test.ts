@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { doRecordRotation, main, parseArgs } from '../src/cli/security-drift-cli.js';
+import { credScan, doRecordRotation, main, parseArgs } from '../src/cli/security-drift-cli.js';
 import { loadRotationState, saveRotationState } from '../src/security-drift/cred-rotation.js';
 
 const TOML = `version = 1
@@ -239,5 +239,28 @@ class = "mystery"
     fs.writeFileSync(path.join(dir, 'reg.cred-consumers.toml'), 'not = [valid\n');
     await expect(main(['cred-findings'])).rejects.toThrow();
     expect(out).toBe('');
+  });
+});
+
+describe('security-drift-cli credScan — what the 03:00 run posts', () => {
+  it("leaves out an SDS credential's rotation trigger and keeps the legacy one's", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cred-scan-'));
+    const toml = path.join(dir, 'r.cred-consumers.toml');
+    fs.writeFileSync(
+      toml,
+      'version = 1\n[[credential]]\nid = "sds"\nclass = "openrouter-key"\n' +
+        'rotate_requested = "2026-10-01"\nrotated_by_sds = true\n' +
+        '[[credential]]\nid = "legacy"\nclass = "openrouter-key"\nrotate_requested = "2026-10-01"\n',
+    );
+    const list = path.join(dir, 'cred-consumers.list');
+    fs.writeFileSync(list, `${toml}\n`);
+    const state = path.join(dir, 'state.json');
+    saveRotationState(state, { resolvedExposures: {}, lastRotated: {} });
+
+    const { findings } = credScan(list, state, '2026-10-07T12:00:00.000Z');
+    const ids = findings.map((f) => `${f.check}:${f.facts?.id}`);
+    expect(ids).toContain('cred.rotation-requested:legacy');
+    expect(ids).not.toContain('cred.rotation-requested:sds');
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

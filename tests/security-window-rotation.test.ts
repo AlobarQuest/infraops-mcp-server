@@ -73,7 +73,11 @@ function rotationDeps(oldStatus: number): { deps: RotationDeps; removed: string[
   };
 }
 
-function windowDeps(items: ApprovedItem[], rotation?: RotationDeps) {
+function windowDeps(
+  items: ApprovedItem[],
+  rotation?: RotationDeps,
+  rotatedBySds: (credId: string) => boolean = () => false,
+) {
   const outcomes: { id: number; outcome: string; detail?: string }[] = [];
   const integrity: string[] = [];
   return {
@@ -91,6 +95,7 @@ function windowDeps(items: ApprovedItem[], rotation?: RotationDeps) {
       emitStateFile,
       maxChanges: 10,
       rotation,
+      rotatedBySds,
     },
   };
 }
@@ -117,6 +122,27 @@ describe('runSecurityWindow — rotation remediation dispatch', () => {
     expect(s.blocked).toBe(1);
     expect(probeSpy).not.toHaveBeenCalled();
     expect(integrity).toHaveLength(1);
+  });
+
+  it('REFUSES a rotation plan for a credential the SDS rotates — no rotation step runs', async () => {
+    const it7 = item();
+    saveEmitState(emitStateFile, { fpX: { hash: planHash(it7.plan), ts: '2026-07-02T03:00:00Z' } });
+    const { deps: rot, removed } = rotationDeps(401);
+    const probeSpy = vi.spyOn(rot, 'probe');
+    const getSpy = vi.spyOn(rot.bws, 'getValue');
+    const asked: string[] = [];
+    const { d, outcomes } = windowDeps([it7], rot, (credId) => {
+      asked.push(credId);
+      return credId === 'github-classic-aihelper';
+    });
+    const s = await runSecurityWindow(d);
+    expect(s.blocked).toBe(1);
+    expect(s.applied).toBe(0);
+    expect(asked).toEqual(['github-classic-aihelper']);
+    expect(outcomes[0].detail).toMatch(/rotated by the SDS/);
+    expect(probeSpy).not.toHaveBeenCalled();
+    expect(getSpy).not.toHaveBeenCalled();
+    expect(removed).toEqual([]);
   });
 
   it('blocks rotation items when the runner has no rotation deps wired', async () => {

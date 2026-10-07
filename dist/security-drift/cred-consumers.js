@@ -151,6 +151,8 @@ export function parseCredConsumers(text) {
         if (typeof c.id !== 'string' || typeof c.class !== 'string' || !c.id || !c.class) {
             throw new CredConsumersParseError(`credential missing string id/class (id=${String(c.id) || '?'})`);
         }
+        if (c.rotated_by_sds !== undefined && typeof c.rotated_by_sds !== 'boolean')
+            throw new CredConsumersParseError(`credential ${c.id}: rotated_by_sds must be true or false`);
         for (const consumer of c.consumers) {
             if (!consumer.kind)
                 throw new CredConsumersParseError(`credential ${c.id}: consumer missing kind`);
