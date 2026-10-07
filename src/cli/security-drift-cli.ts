@@ -9,6 +9,7 @@
 // Operator commands against the 0600 rotation state:
 //   resolve-exposure --cred <id> --exposure <id>      confirmed provider revoke, no probe
 //   record-rotation  --cred <id> --date <YYYY-MM-DD | now>   after a verified rotation
+//   cred-findings    [--now <ISO>]                     rotation findings as JSON (read-only)
 
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -117,8 +118,28 @@ export function doRecordRotation(args: Record<string, string | boolean>): void {
   );
 }
 
+/** The credential-rotation findings as JSON, for the orchestrator's rotation proposer
+ *  (ADR-0054 amendment 1). READ-ONLY: it loads the listed registries and the rotation state
+ *  exactly as `run` does and writes nothing. Only `cred.*` findings that carry `facts` are
+ *  printed, each as its check plus those fields -- never the prose detail. A registry that does
+ *  not parse throws, so the caller gets a non-zero exit rather than an empty list. */
+export function doCredFindings(args: Record<string, string | boolean>): void {
+  const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
+  const p = securityPaths();
+  const specs = loadCredConsumerFiles(readList(p.credConsumersList));
+  const state = loadRotationState(p.credRotationStateFile);
+  const findings = credFindings(specs, state, now)
+    .filter((f) => f.facts !== undefined)
+    .map((f) => ({ check: f.check, ...f.facts }));
+  process.stdout.write(JSON.stringify({ schema_version: 1, findings }) + '\n');
+}
+
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
+  if (args.command === 'cred-findings') {
+    doCredFindings(args);
+    return;
+  }
   if (args.command === 'resolve-exposure') {
     doResolveExposure(args);
     return;
@@ -129,7 +150,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
   if (args.command !== 'run')
     throw new Error(
-      `unknown command: ${String(args.command)} (use: run | resolve-exposure | record-rotation)`,
+      `unknown command: ${String(args.command)} (use: run | resolve-exposure | record-rotation | cred-findings)`,
     );
   const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
   const reportDir = typeof args['report-dir'] === 'string' ? args['report-dir'] : undefined;

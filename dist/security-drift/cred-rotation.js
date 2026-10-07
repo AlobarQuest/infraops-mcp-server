@@ -167,6 +167,7 @@ export function credFindings(specs, state, now) {
                 severity: 'WARN',
                 check: 'cred.invalid-rotate-requested',
                 target: credTarget(spec.id),
+                facts: { id: spec.id, class: spec.class },
                 detail: `${credTarget(spec.id)} has rotate_requested = ${spec.rotate_requested_invalid}, which is not a quoted real date ("YYYY-MM-DD") — the request is ignored; fix it in its .cred-consumers.toml`,
             });
         }
@@ -177,6 +178,7 @@ export function credFindings(specs, state, now) {
                 severity: 'FAIL',
                 check: 'cred.exposure-rotate',
                 target: credTarget(spec.id),
+                facts: { id: spec.id, class: spec.class, exposure_id: exp.id, exposure_date: exp.date },
                 detail: `${credTarget(spec.id)} (class ${spec.class}, fp ${spec.fingerprint_sha256_8 ?? '?'}) exposed ${exp.date} via ${exp.source ?? 'recorded exposure'} — rotate now (exposure ${exp.id})`,
             });
             continue; // exposure supersedes age for the same credential
@@ -189,6 +191,7 @@ export function credFindings(specs, state, now) {
                 severity: 'WARN',
                 check: 'cred.unknown-class',
                 target: credTarget(spec.id),
+                facts: { id: spec.id, class: spec.class },
                 detail: `${credTarget(spec.id)} declares class '${spec.class}', which has no rotation policy — it is never aged; fix the class in its .cred-consumers.toml`,
             });
             continue;
@@ -204,6 +207,7 @@ export function credFindings(specs, state, now) {
                     severity: 'WARN',
                     check: 'cred.rotation-age',
                     target: credTarget(spec.id),
+                    facts: { id: spec.id, class: spec.class, anchor },
                     detail: `${credTarget(spec.id)} (class ${spec.class}) is ${Math.floor(ageDays)}d old — class max is ${policy.maxAgeDays}d; schedule rotation`,
                 });
             }
@@ -216,6 +220,7 @@ export function credFindings(specs, state, now) {
                     severity: 'WARN',
                     check: 'cred.rotation-requested',
                     target: credTarget(spec.id),
+                    facts: { id: spec.id, class: spec.class, rotate_requested: spec.rotate_requested },
                     detail: `${credTarget(spec.id)} (class ${spec.class}) has a rotation requested ${spec.rotate_requested}; last rotated ${rotated ?? 'never'} — rotate, then record-rotation`,
                 });
             }
