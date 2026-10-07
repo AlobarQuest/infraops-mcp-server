@@ -209,6 +209,24 @@ class = "mystery"
     expect(age.anchor).toBe('2025-03-04T05:06:07.000Z');
   });
 
+  it('refuses rather than report nothing due when the registry list is missing', async () => {
+    fs.rmSync(path.join(dir, 'cred-consumers.list'));
+    await expect(main(['cred-findings'])).rejects.toThrow(/no registry files listed/);
+    expect(out).toBe('');
+  });
+
+  it('refuses rather than report nothing due when the registry list names no file', async () => {
+    fs.writeFileSync(path.join(dir, 'cred-consumers.list'), '# none\n');
+    await expect(main(['cred-findings'])).rejects.toThrow(/no registry files listed/);
+    expect(out).toBe('');
+  });
+
+  it('refuses rather than resurrect resolved exposures when the state file is missing', async () => {
+    fs.rmSync(stateFile);
+    await expect(main(['cred-findings'])).rejects.toThrow(/no rotation state/);
+    expect(out).toBe('');
+  });
+
   it('writes nothing', async () => {
     const before = fs.readFileSync(stateFile, 'utf8');
     const listing = fs.readdirSync(dir).sort();

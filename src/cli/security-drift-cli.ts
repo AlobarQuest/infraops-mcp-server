@@ -126,7 +126,16 @@ export function doRecordRotation(args: Record<string, string | boolean>): void {
 export function doCredFindings(args: Record<string, string | boolean>): void {
   const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
   const p = securityPaths();
-  const specs = loadCredConsumerFiles(readList(p.credConsumersList));
+  // Fail rather than answer "nothing is due". The 03:00 scan reads an absent registry list or
+  // state file as an empty one, which suits a scan; but this command's only question is what is
+  // due, and a wrong HOME under launchd would answer "nothing" forever. A missing state file is
+  // worse than empty: every resolved exposure would come back as due.
+  const files = readList(p.credConsumersList);
+  if (files.length === 0)
+    throw new Error(`cred-findings: no registry files listed in ${p.credConsumersList}`);
+  if (!fs.existsSync(p.credRotationStateFile))
+    throw new Error(`cred-findings: no rotation state at ${p.credRotationStateFile}`);
+  const specs = loadCredConsumerFiles(files);
   const state = loadRotationState(p.credRotationStateFile);
   const findings = credFindings(specs, state, now)
     .filter((f) => f.facts !== undefined)
