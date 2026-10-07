@@ -31,11 +31,19 @@ export function loadValidated0600Json(file, label, ErrorCtor) {
     }
     return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
-/** Atomic write with mode 0600. */
+/** Atomic, durable write with mode 0600: the temp file is fsynced before the rename,
+ *  so a crash cannot leave the store renamed onto unflushed (empty) data. */
 export function saveValidated0600Json(file, data) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const tmp = `${file}.tmp.${process.pid}`;
-    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), { mode: 0o600 });
+    const fd = fs.openSync(tmp, 'w', 0o600);
+    try {
+        fs.writeFileSync(fd, JSON.stringify(data, null, 2));
+        fs.fsyncSync(fd);
+    }
+    finally {
+        fs.closeSync(fd);
+    }
     fs.chmodSync(tmp, 0o600);
     fs.renameSync(tmp, file);
     fs.chmodSync(file, 0o600);

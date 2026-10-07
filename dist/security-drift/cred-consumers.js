@@ -8,12 +8,43 @@
 // integer, boolean, array-of-strings), [[credential]] and
 // [[credential.consumer]] / [[credential.exposure]] tables. Anything else throws
 // CredConsumersParseError — deny-by-default: a malformed file yields NO
-// rotation-eligible credentials, never a guessed one.
+// rotation-eligible credentials, never a guessed one. One exception: a bad
+// `rotate_requested` value is contained to its credential (see parseRotateRequested).
 import * as fs from 'node:fs';
 export class CredConsumersParseError extends Error {
     constructor(message) {
         super(message);
         this.name = 'CredConsumersParseError';
+    }
+}
+/** UTC midnight of a strict `YYYY-MM-DD` that names a real calendar date, else null. */
+export function parseIsoDay(text) {
+    const ms = Date.parse(`${text}T00:00:00Z`);
+    // The round-trip is the whole check: toISOString's date part is always exactly
+    // \d{4}-\d{2}-\d{2}, so equality enforces that shape, and it refuses impossible
+    // dates whether the engine rolls them over (2026-02-30 -> 03-02) or rejects them.
+    if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 10) !== text)
+        return null;
+    return ms;
+}
+/** rotate_requested is the one key whose bad value is contained to its credential:
+ *  it only ever ADDS a finding, so failing the whole registry for it would silence
+ *  every other credential's findings. */
+function parseRotateRequested(cred, raw, line) {
+    let value;
+    try {
+        value = parseValue(raw, line);
+    }
+    catch {
+        value = undefined;
+    }
+    if (typeof value === 'string' && parseIsoDay(value) !== null) {
+        cred.rotate_requested = value;
+        delete cred.rotate_requested_invalid;
+    }
+    else {
+        cred.rotate_requested_invalid = raw.trim().slice(0, 40);
+        delete cred.rotate_requested;
     }
 }
 function parseValue(raw, line) {
@@ -97,6 +128,10 @@ export function parseCredConsumers(text) {
         const key = line.slice(0, eq).trim();
         if (!/^[A-Za-z0-9_-]+$/.test(key))
             throw new CredConsumersParseError(`line ${n}: bad key ${key}`);
+        if (key === 'rotate_requested' && cred && !sub) {
+            parseRotateRequested(cred, line.slice(eq + 1), n);
+            continue;
+        }
         const value = parseValue(line.slice(eq + 1), n);
         if (sub) {
             sub[key] = value;

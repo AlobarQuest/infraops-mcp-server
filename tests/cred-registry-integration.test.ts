@@ -64,6 +64,26 @@ describe("the repo's own .cred-consumers.toml", () => {
     }
   });
 
+  it('raises no age finding for the revoked classic PATs after their 180-day mark', () => {
+    // Mirrors the live state: the executor confirmed both revokes on 2026-07-02 and
+    // recorded the exposure resolved plus lastRotated in one write.
+    const revoked = ['github-classic-aihelper', 'github-classic-lifeops'];
+    const ts = '2026-07-02T22:49:52.254Z';
+    const state = {
+      resolvedExposures: Object.fromEntries(
+        revoked.map((id) => [
+          `${id}:codex-2026-07-02`,
+          { ts, detail: 'revoke confirmed dead (401)' },
+        ]),
+      ),
+      lastRotated: Object.fromEntries(revoked.map((id) => [id, ts])),
+    };
+    const pats = specs.filter((s) => revoked.includes(s.id));
+    expect(pats.map((s) => s.disposition)).toEqual(Array(2).fill('revoke-no-replacement'));
+    expect(credFindings(pats, state, '2026-12-30T03:00:00Z')).toEqual([]);
+    expect(credFindings(pats, state, '2028-01-01T03:00:00Z')).toEqual([]);
+  });
+
   it('yields executor-runnable plans for exactly the eligible creds (openrouter + the 2 BWS-held classic PATs)', () => {
     const state = { resolvedExposures: {}, lastRotated: {} };
     const cls = buildCredClassifications(specs, state);

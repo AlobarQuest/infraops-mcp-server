@@ -5,6 +5,10 @@
 // Runs ~/.claude/bin/security-scan.sh, classifies + diffs, auto-fixes the narrow set,
 // posts the rest to the change-manager (source="security"), and emails NEW urgent
 // items immediately. All write-state files are mode 0600.
+//
+// Operator commands against the 0600 rotation state:
+//   resolve-exposure --cred <id> --exposure <id>      confirmed provider revoke, no probe
+//   record-rotation  --cred <id> --date <YYYY-MM-DD | now>   after a verified rotation
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -17,8 +21,8 @@ import { classify } from '../security-drift/taxonomy.js';
 import { buildEscalations } from '../security-drift/emit.js';
 import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION, } from '../security-drift/scanner-version.js';
 import { loadCredConsumerFiles } from '../security-drift/cred-consumers.js';
-import { buildCredClassifications, credFindings, loadRotationState, saveRotationState, } from '../security-drift/cred-rotation.js';
-function parseArgs(argv) {
+import { buildCredClassifications, credFindings, loadRotationState, recordRotation, saveRotationState, } from '../security-drift/cred-rotation.js';
+export function parseArgs(argv) {
     const args = {};
     if (argv[0] && !argv[0].startsWith('--'))
         args.command = argv[0];
@@ -84,14 +88,33 @@ function doResolveExposure(args) {
     saveRotationState(p.credRotationStateFile, state);
     process.stdout.write(`resolved: ${key} — the finding clears on the next 3am run\n`);
 }
-async function main() {
-    const args = parseArgs(process.argv.slice(2));
+/** Record a verified rotation (or a no-replacement credential's confirmed revoke):
+ *  sets lastRotated for a registry credential, which clears its rotation-age and
+ *  rotation-requested findings on the next 3am run. */
+export function doRecordRotation(args) {
+    const cred = typeof args.cred === 'string' ? args.cred : '';
+    const date = typeof args.date === 'string' ? args.date : '';
+    if (!cred || !date)
+        throw new Error('record-rotation requires --cred <id> and --date <YYYY-MM-DD | now>');
+    const p = securityPaths();
+    const specs = loadCredConsumerFiles(readList(p.credConsumersList));
+    const state = loadRotationState(p.credRotationStateFile);
+    const { previous, recorded } = recordRotation(state, specs, cred, date, new Date().toISOString());
+    saveRotationState(p.credRotationStateFile, state);
+    process.stdout.write(`recorded: ${cred} lastRotated ${previous ?? '(none)'} -> ${recorded} in ${p.credRotationStateFile}\n`);
+}
+export async function main(argv = process.argv.slice(2)) {
+    const args = parseArgs(argv);
     if (args.command === 'resolve-exposure') {
         doResolveExposure(args);
         return;
     }
+    if (args.command === 'record-rotation') {
+        doRecordRotation(args);
+        return;
+    }
     if (args.command !== 'run')
-        throw new Error(`unknown command: ${String(args.command)} (use: run | resolve-exposure)`);
+        throw new Error(`unknown command: ${String(args.command)} (use: run | resolve-exposure | record-rotation)`);
     const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
     const reportDir = typeof args['report-dir'] === 'string' ? args['report-dir'] : undefined;
     const base = process.env.CHANGE_MGR_API_BASE ?? '';
