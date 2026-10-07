@@ -260,6 +260,12 @@ The same detect→approve→execute loop rotates credentials as a change-class
   current instant. It writes `lastRotated` atomically (0600, fsync, tmp+rename) and
   prints old -> new.
   That clears `cred.rotation-age` and any `cred.rotation-requested` on the next 3am run.
+- **What is due, for the SDS:** `node dist/cli/security-drift-cli.js cred-findings [--now <ISO>]`
+  prints the `cred.*` findings as JSON (`{"schema_version": 1, "findings": [...]}`), each as
+  its check plus the values its detail embeds (`id`, `class`, and `exposure_id`/`exposure_date`,
+  `rotate_requested` or `anchor`). It is read-only. The orchestrator's rotation proposer
+  (ADR-0054 amendment 1) reads it so that "due" is decided here and nowhere else; its
+  `tests/fixtures/rotation_findings.json` pins the shape, so change both together.
 - **Never in the lane:** Coolify PG passwords (volume-recreate only), BWS machine tokens
   (console-only), brain MCP keys (claude.ai connector re-key — manual, paired reconfig).
 - **Consumer mapping:** `scripts/cred-consumer-sweep.py` — fingerprint (sha256) hash-compare

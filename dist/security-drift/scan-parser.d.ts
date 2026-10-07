@@ -7,6 +7,10 @@ export interface Finding {
     detail: string;
     /** the path/resource the finding is about — used for autofix-allowlist match + fingerprinting */
     target: string;
+    /** cred.* findings only: the values the detail embeds, as fields (registry names and dates,
+     *  never a secret). Read by `security-drift-cli cred-findings` so a consumer never parses the
+     *  detail's prose. Not part of the fingerprint and not sent to the change-manager. */
+    facts?: Record<string, string>;
 }
 /**
  * Extract the stable target (path/resource) from a finding's detail.

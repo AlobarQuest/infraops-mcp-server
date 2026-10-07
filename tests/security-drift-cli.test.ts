@@ -119,3 +119,125 @@ describe('security-drift-cli record-rotation', () => {
     expect(out).toContain('lastRotated (none) ->');
   });
 });
+
+describe('security-drift-cli cred-findings', () => {
+  const REGISTRY = `version = 1
+[[credential]]
+id = "cred-age"
+class = "openrouter-key"
+created = "2025-01-02"
+[[credential]]
+id = "cred-requested"
+class = "openai-key"
+created = "2026-09-01"
+rotate_requested = "2026-10-07"
+[[credential]]
+id = "cred-exposed"
+class = "github-pat-classic"
+created = "2026-09-01"
+  [[credential.exposure]]
+  id = "transcript-1"
+  date = "2026-09-02"
+  source = "a transcript"
+[[credential]]
+id = "cred-fresh"
+class = "openai-key"
+created = "2026-09-01"
+[[credential]]
+id = "cred-odd"
+class = "mystery"
+`;
+  let dir: string;
+  let stateFile: string;
+  let out: string;
+  const savedEnv = { ...process.env };
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cred-findings-'));
+    const toml = path.join(dir, 'reg.cred-consumers.toml');
+    fs.writeFileSync(toml, REGISTRY);
+    fs.writeFileSync(path.join(dir, 'cred-consumers.list'), `${toml}\n`);
+    process.env.INFRADRIFT_CONFIG_DIR = dir;
+    process.env.SECURITY_DRIFT_STATE_DIR = dir;
+    stateFile = path.join(dir, 'cred-rotation-state.json');
+    saveRotationState(stateFile, { resolvedExposures: {}, lastRotated: {} });
+    out = '';
+    vi.spyOn(process.stdout, 'write').mockImplementation((s) => {
+      out += String(s);
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    process.env = { ...savedEnv };
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('prints each rotation finding as its check plus structured facts, never the detail', async () => {
+    await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
+    const document = JSON.parse(out);
+    expect(document.schema_version).toBe(1);
+    expect(document.findings).toEqual([
+      { check: 'cred.rotation-age', id: 'cred-age', class: 'openrouter-key', anchor: '2025-01-02' },
+      {
+        check: 'cred.rotation-requested',
+        id: 'cred-requested',
+        class: 'openai-key',
+        rotate_requested: '2026-10-07',
+      },
+      {
+        check: 'cred.exposure-rotate',
+        id: 'cred-exposed',
+        class: 'github-pat-classic',
+        exposure_id: 'transcript-1',
+        exposure_date: '2026-09-02',
+      },
+      { check: 'cred.unknown-class', id: 'cred-odd', class: 'mystery' },
+    ]);
+    expect(out).not.toContain('rotate now');
+    expect(out).not.toContain('a transcript');
+  });
+
+  it('dates an age finding by the last recorded rotation, not by the clock', async () => {
+    saveRotationState(stateFile, {
+      resolvedExposures: {},
+      lastRotated: { 'cred-age': '2025-03-04T05:06:07.000Z' },
+    });
+    await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
+    const age = JSON.parse(out).findings.find((f: { id: string }) => f.id === 'cred-age');
+    expect(age.anchor).toBe('2025-03-04T05:06:07.000Z');
+  });
+
+  it('refuses rather than report nothing due when the registry list is missing', async () => {
+    fs.rmSync(path.join(dir, 'cred-consumers.list'));
+    await expect(main(['cred-findings'])).rejects.toThrow(/no registry files listed/);
+    expect(out).toBe('');
+  });
+
+  it('refuses rather than report nothing due when the registry list names no file', async () => {
+    fs.writeFileSync(path.join(dir, 'cred-consumers.list'), '# none\n');
+    await expect(main(['cred-findings'])).rejects.toThrow(/no registry files listed/);
+    expect(out).toBe('');
+  });
+
+  it('refuses rather than resurrect resolved exposures when the state file is missing', async () => {
+    fs.rmSync(stateFile);
+    await expect(main(['cred-findings'])).rejects.toThrow(/no rotation state/);
+    expect(out).toBe('');
+  });
+
+  it('writes nothing', async () => {
+    const before = fs.readFileSync(stateFile, 'utf8');
+    const listing = fs.readdirSync(dir).sort();
+    await main(['cred-findings']);
+    expect(fs.readFileSync(stateFile, 'utf8')).toBe(before);
+    expect(fs.readdirSync(dir).sort()).toEqual(listing);
+  });
+
+  it('refuses rather than answering an empty list when a registry does not parse', async () => {
+    fs.writeFileSync(path.join(dir, 'reg.cred-consumers.toml'), 'not = [valid\n');
+    await expect(main(['cred-findings'])).rejects.toThrow();
+    expect(out).toBe('');
+  });
+});
