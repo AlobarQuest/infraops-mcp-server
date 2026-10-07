@@ -176,7 +176,11 @@ bws_token = run(
 ).strip()
 if bws_token:
     env = dict(os.environ, BWS_ACCESS_TOKEN=bws_token)
-    out = run(["bws", "secret", "list", "--output", "json"], timeout=60, env=env)
+    out = run(
+        ["bws", "secret", "list", "--output", "json", "--color", "no"],
+        timeout=60,
+        env=env,
+    )
     try:
         secrets = json.loads(out)
         for s in secrets:
@@ -228,7 +232,11 @@ def coolify_scan(label, base, token):
 
 
 def bws_get(uuid, env):
-    out = run(["bws", "secret", "get", uuid, "--output", "json"], timeout=30, env=env)
+    out = run(
+        ["bws", "secret", "get", uuid, "--output", "json", "--color", "no"],
+        timeout=30,
+        env=env,
+    )
     try:
         return json.loads(out).get("value", "")
     except Exception:

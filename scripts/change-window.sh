@@ -53,7 +53,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 # mutable, UUIDs are stable). Mirrors start.sh. Empty string if absent. Every secret
 # is referenced by UUID (defaulted inline, overridable via BWS_*_SECRET_ID).
 get_secret_by_id() {
-  bws secret get "$1" --output json 2>/dev/null \
+  bws secret get "$1" --output json --color no 2>/dev/null \
     | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])" 2>/dev/null || echo ""
 }
 
