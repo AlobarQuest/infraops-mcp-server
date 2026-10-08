@@ -265,7 +265,19 @@ The same detect→approve→execute loop rotates credentials as a change-class
   its check plus the values its detail embeds (`id`, `class`, and `exposure_id`/`exposure_date`,
   `rotate_requested` or `anchor`). It is read-only. The orchestrator's rotation proposer
   (ADR-0054 amendment 1) reads it so that "due" is decided here and nowhere else; its
-  `tests/fixtures/rotation_findings.json` pins the shape, so change both together.
+  `tests/fixtures/rotation_findings.json` pins the shape, so change both together. It exits
+  non-zero, rather than reporting nothing due, when the registry list names no file or the
+  rotation state file is missing.
+- **Handover to the SDS:** `rotated_by_sds = true` on a registry entry (a boolean; anything else
+  fails the registry) hands that credential's rotation to the orchestrator's proposer. The 3am
+  scan then posts none of its rotation triggers (`cred.exposure-rotate`, `cred.rotation-age`,
+  `cred.rotation-requested`) to change-manager and builds no rotation plan for it; its other
+  findings still post. The 4am window refuses any rotation plan whose credential is flagged OR
+  absent from the live registry, read at window time (`change-mgr-cli.ts::rotationRefusals`), so an
+  item approved before the flag is refused too, and an unreadable registry refuses every plan.
+  `cred-findings` reports `rotated_by_sds` on every finding; the proposer acts only on flagged
+  credentials. Flag a credential only when no legacy rotation of it is in flight: the next 3am
+  sync resolves its open security item and would strand a half-done reissue's quarantine copy.
 - **Never in the lane:** Coolify PG passwords (volume-recreate only), BWS machine tokens
   (console-only), brain MCP keys (claude.ai connector re-key — manual, paired reconfig).
 - **Consumer mapping:** `scripts/cred-consumer-sweep.py` — fingerprint (sha256) hash-compare
