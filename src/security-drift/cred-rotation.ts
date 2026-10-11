@@ -81,6 +81,14 @@ export const CLASS_POLICY: Record<string, ClassPolicy> = {
       'BWS machine tokens are console-minted only — create/revoke in the Bitwarden console; never via CLI.',
     ],
   },
+  // The orchestrator's rotation executor's canary (ADR-0055 increment 4): a credential with no
+  // consumer and no real provider, rotated only to prove the executor end to end. It never ages,
+  // and this window never rotates it (it is rotated_by_sds).
+  'rotation-canary': {
+    maxAgeDays: Number.POSITIVE_INFINITY,
+    executor: false,
+    landmines: [],
+  },
   // Opaque M2M bearers the orchestrator (sds.alobar.net) authenticates. Coolify holds only
   // sha256(token) per key id, so no executor consumer kind can deploy a new value.
   'orchestrator-m2m-bearer': {

@@ -597,6 +597,22 @@ describe('M2M bearer classes (SDS 1.1 L1b)', () => {
   });
 });
 
+describe('the rotation executor canary class (orchestrator ADR-0055 increment 4)', () => {
+  it('never ages, is never executor-run, and raises nothing for an old canary', () => {
+    expect(CLASS_POLICY['rotation-canary'].executor).toBe(false);
+    const specs = parseCredConsumers(`
+version = 1
+
+[[credential]]
+id = "rotation-canary"
+class = "rotation-canary"
+created = "2000-01-01"
+rotated_by_sds = true
+`);
+    expect(credFindings(specs, { resolvedExposures: {}, lastRotated: {} }, NOW)).toEqual([]);
+  });
+});
+
 describe('unknown credential class', () => {
   const doc = `
 version = 1
