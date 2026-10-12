@@ -179,10 +179,15 @@ replacement_scope = "Repository: Read + Write on the alobarquest workspace (the 
   source = "github-to-bitbucket-mirror container logs (creds-in-git-URL + command tracing; vector fixed 2026-07-02)"
 
 # ── 4. OpenRouter generic key (leaked fp 57543baa) — THE CURRENT ACTIVE KEY ─────
-# Sweep 2026-07-02: BWS OPENROUTER_API_KEY + Keychain openrouter-api/devon (the
-# shell exports OPENROUTER_API_KEY from the Keychain item at init — no literal in
-# any shell file). Brains use the SEPARATE BRAIN_OPENROUTER_API_KEY (39055caf…),
-# confirmed non-matching ⇒ no brain redeploy on rotation.
+# Sweep 2026-10-12 (orchestrator ADR-0055 increment 5): the keeper is the ONLY
+# consumer. The Keychain item openrouter-api/devon and the ~/.zshrc export were
+# dropped (ADR-0055 per-class section): the only reader of the export was the
+# octo plugin's OpenRouter seat, disabled the same day; the key's own usage was
+# zero. Searched: every repository and ~/Developer for the UUID and the variable
+# name, shell init files, LaunchAgents, Claude configs, prod and dev Coolify env
+# names, and both VPS filesystems. Brains use the SEPARATE BRAIN_OPENROUTER_API_KEY
+# (39055caf…): brain-app and brain-open hold OPENROUTER_API_KEY rows whose values
+# hash-equal that key, not this one ⇒ no brain redeploy on rotation.
 [[credential]]
 id = "openrouter-generic"
 class = "openrouter-key"
@@ -193,22 +198,16 @@ rotated_by_sds = true
 # The first SDS rotation (requested 2026-10-07) was retired unworked on 2026-10-08: orchestrator
 # ADR-0055 redoes it under the rotation executor. No machine path until then; rotate by hand if exposed.
 provider = "openrouter"
-provider_identity = "OpenRouter → Keys, label sk-or-v1-1b7…2b3"
+provider_identity = "OpenRouter → Keys; identify by fingerprint, never by label"
 bws_uuid = "9661da8f-ac66-4e97-a31f-b42500bb849c"
-consumers_verified = "2026-07-02"
-verified_by = "scripts/cred-consumer-sweep.py"
+consumers_verified = "2026-10-12"
+verified_by = "orchestrator ADR-0055 increment 5 inventory (see the comment above)"
 disposition = "reissue"
 
   [[credential.consumer]]
   kind = "bws-secret"
   uuid = "9661da8f-ac66-4e97-a31f-b42500bb849c"
-  note = "OPENROUTER_API_KEY (Ops / Platform)"
-
-  [[credential.consumer]]
-  kind = "keychain"
-  service = "openrouter-api"
-  account = "devon"
-  note = "shell env OPENROUTER_API_KEY is exported from this item at shell init"
+  note = "the keeper, OPENROUTER_API_KEY: the only stored copy"
 
   [[credential.exposure]]
   id = "codex-2026-07-02"
