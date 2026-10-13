@@ -191,14 +191,13 @@ replacement_scope = "Repository: Read + Write on the alobarquest workspace (the 
 [[credential]]
 id = "openrouter-generic"
 class = "openrouter-key"
-# The live value, read from both consumers on 2026-10-07; 57543baa was the key leaked 2026-07-02.
-fingerprint_sha256_8 = "1f9697cd"
+# The live value, minted by the orchestrator's rotation executor on 2026-10-13; 1f9697cd was the key
+# it retired, and 57543baa the key leaked 2026-07-02.
+fingerprint_sha256_8 = "018a8ca6"
 # ADR-0054: the orchestrator's rotation proposer rotates this credential; the 04:00 window refuses it.
 rotated_by_sds = true
-# The first SDS rotation (requested 2026-10-07) was retired unworked on 2026-10-08. Orchestrator
-# ADR-0055 increment 5 rotates it through the rotation executor: requested 2026-10-12, package
-# rotation-openrouter-generic revision 3 (approved 2026-10-13). Remove rotate_requested after it lands.
-rotate_requested = "2026-10-12"
+# Rotated by the orchestrator's rotation executor on 2026-10-13 (ADR-0055 increment 5; package
+# rotation-openrouter-generic revision 3): every minted key carries a $5 limit and a 400-day expiry.
 provider = "openrouter"
 provider_identity = "OpenRouter → Keys; identify by fingerprint, never by label"
 bws_uuid = "9661da8f-ac66-4e97-a31f-b42500bb849c"
