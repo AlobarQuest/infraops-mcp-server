@@ -17,9 +17,13 @@
 # presence keeps the credential manual-lane by design):
 #   shell-export      { file, var }                         — literal export line in a shell file
 #   runtime-fetch     { repo, ref }                         — code fetches from BWS by UUID at runtime
-#   coolify-env-hash  { instance, resource_type, uuid, key } — env holds sha256(credential), not the
-#                                                           value (orchestrator M2M map); a raw
-#                                                           deploy there would break auth
+#   coolify-env-hash  { instance, resource_type, uuid, key, entry } — env holds sha256(credential),
+#                                                           not the value (orchestrator M2M map); a
+#                                                           raw deploy there would break auth.
+#                                                           `entry` is the key id inside the JSON
+#                                                           the credential's hash sits under; the
+#                                                           SDS rotation executor rewrites only that
+#                                                           entry (orchestrator ADR-0055 am. 9)
 #
 # Sibling registries (spec decision 1 — each credential lives in its OWNING repo's file):
 # orchestrator (its M2M bearers + the sds-operator BWS token), change-manager (its M2M bearers),
