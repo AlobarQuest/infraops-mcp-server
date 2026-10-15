@@ -1,0 +1,11 @@
+# Allowlist of known-safe security-standards scanner findings — THIS repo only.
+# Each entry exempts ONE exact finding (rule + file + evidence). Any other finding still reports.
+
+# `src/security-drift/cred-rotation.ts` (and its compiled `dist/` copy) holds the default BWS
+# PROJECT id for the rotation lane. It's a project id, not a secret id, so the manifest can't
+# declare it. The scanner counts every UUID in a file that mentions BWS, and can't tell them apart.
+[[allow]]
+rule = "bws.manifest-matches-usage"
+file = ".bws-secrets.toml"
+evidence = "undeclared UUID in code: 26ff7e3e-8769-45ff-885c-b415013b4bbf"
+reason = "BWS project id (Ops / Platform), not a secret id."
