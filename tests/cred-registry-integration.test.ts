@@ -94,8 +94,10 @@ describe("the repo's own .cred-consumers.toml", () => {
     expect(kindOf('openrouter-generic')).toBe('rotation');
     expect(kindOf('github-classic-aihelper')).toBe('rotation');
     expect(kindOf('github-classic-lifeops')).toBe('rotation');
-    expect(kindOf('github-finegrained-mirror')).toBe('rotation'); // mirror.py leak fixed+deployed → precondition cleared
-    expect(kindOf('bitbucket-mirror-token')).toBe('rotation'); // atlassian-api-token class + bitbucket probe
+    // The mirror fetches both tokens from BWS each cycle (runtime-fetch), a kind this executor
+    // never deploys to; the orchestrator's rotation executor rotates them (ADR-0055 increment 7).
+    expect(kindOf('github-finegrained-mirror')).toBe('manual');
+    expect(kindOf('bitbucket-mirror-token')).toBe('manual');
     expect(kindOf('openai-project')).toBe('manual'); // no BWS copy to probe
   });
 });
