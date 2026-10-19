@@ -129,13 +129,11 @@ replacement_scope = "fine-grained: Contents:read + Metadata on owned repos (mirr
   note = "github-mirror-bitbucket (Ops / Platform)"
 
   [[credential.consumer]]
-  kind = "coolify-env"
-  instance = "prod"
-  resource_type = "application"
-  uuid = "v04wc0wos0o0440k0ok8g08k"
-  key = "GITHUB_TOKEN"
-  redeploy = true
-  note = "github-to-bitbucket-mirror app"
+  kind = "runtime-fetch"
+  repo = "github-to-bitbucket-mirror"
+  ref = "mirror.py"
+  healthchecks_check = "github-to-bitbucket-mirror"
+  note = "Coolify app v04wc0wos0o0440k0ok8g08k fetches it from BWS each hourly cycle with its own machine account (orchestrator ADR-0055 amendment 10); Healthchecks check github-to-bitbucket-mirror"
 
   [[credential.exposure]]
   id = "codex-2026-07-02"
@@ -169,13 +167,11 @@ replacement_scope = "Repository: Read + Write on the alobarquest workspace (the 
   note = "BITBUCKET_API_TOKEN (Ops / Platform)"
 
   [[credential.consumer]]
-  kind = "coolify-env"
-  instance = "prod"
-  resource_type = "application"
-  uuid = "v04wc0wos0o0440k0ok8g08k"
-  key = "BITBUCKET_TOKEN"
-  redeploy = true
-  note = "github-to-bitbucket-mirror app"
+  kind = "runtime-fetch"
+  repo = "github-to-bitbucket-mirror"
+  ref = "mirror.py"
+  healthchecks_check = "github-to-bitbucket-mirror"
+  note = "Coolify app v04wc0wos0o0440k0ok8g08k fetches it from BWS each hourly cycle with its own machine account (orchestrator ADR-0055 amendment 10); Healthchecks check github-to-bitbucket-mirror"
 
   [[credential.exposure]]
   id = "container-log-2026-06-20"
