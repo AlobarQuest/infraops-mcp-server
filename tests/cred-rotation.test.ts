@@ -494,16 +494,19 @@ describe('buildCredClassifications', () => {
     expect(manual.join('\n')).toContain('shell-export');
   });
 
-  it.each(['coolify-pg-password', 'bws-machine-token', 'brain-mcp-key'])(
-    'class %s is always manual — never an executor rotation plan',
-    (cls) => {
-      const spec = baseSpec({ class: cls });
-      const out = buildCredClassifications([spec], emptyState());
-      const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
-      expect('rotation' in rotate.remediation).toBe(false);
-      expect(rotate.kind).toBe('question');
-    },
-  );
+  it.each([
+    'coolify-pg-password',
+    'bws-machine-token',
+    'brain-mcp-key',
+    'anthropic-api-key',
+    'github-app-private-key',
+  ])('class %s is always manual — never an executor rotation plan', (cls) => {
+    const spec = baseSpec({ class: cls });
+    const out = buildCredClassifications([spec], emptyState());
+    const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
+    expect('rotation' in rotate.remediation).toBe(false);
+    expect(rotate.kind).toBe('question');
+  });
 
   it('mentions the NEVER-cycle landmine for coolify-pg-password', () => {
     const spec = baseSpec({ class: 'coolify-pg-password' });
@@ -511,6 +514,15 @@ describe('buildCredClassifications', () => {
     const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
     const manual = (rotate.remediation as { manual: string[] }).manual;
     expect(manual.join('\n')).toContain('NEVER cycle');
+  });
+
+  it('tells the operator to delete the old key pair for github-app-private-key', () => {
+    const spec = baseSpec({ class: 'github-app-private-key' });
+    const out = buildCredClassifications([spec], emptyState());
+    const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
+    const manual = (rotate.remediation as { manual: string[] }).manual;
+    expect(manual.join('\n')).toContain('delete the old key pair');
+    expect(manual.join('\n')).toContain('Key pairs tab');
   });
 
   it('falls back to manual with no BWS copy of the old value (orphan credential)', () => {
@@ -568,8 +580,20 @@ describe('CLASS_POLICY sanity', () => {
       'brain-mcp-key',
       'coolify-pg-password',
       'bws-machine-token',
+      'anthropic-api-key',
+      'github-app-private-key',
     ]) {
       expect(CLASS_POLICY[cls]).toBeDefined();
+    }
+  });
+});
+
+describe('fork-sync lane classes', () => {
+  it('are manual-lane only, with no provider probe, and age at 365 days', () => {
+    for (const cls of ['anthropic-api-key', 'github-app-private-key']) {
+      expect(CLASS_POLICY[cls].executor).toBe(false);
+      expect(CLASS_POLICY[cls].probe).toBeUndefined();
+      expect(CLASS_POLICY[cls].maxAgeDays).toBe(365);
     }
   });
 });

@@ -45,6 +45,17 @@ export const CLASS_POLICY = {
     // Atlassian API token (Bitbucket): Basic auth (email:token), not Bearer. The probe
     // needs probe_email + probe_workspace on the registry entry (below).
     'atlassian-api-token': { maxAgeDays: 365, probe: 'bitbucket', executor: true, landmines: [] },
+    // Anthropic API key (fork-sync lane: ANTHROPIC_API_KEY Actions secrets in the forks). No
+    // provider probe exists for Anthropic, so it stays on the manual checklist.
+    'anthropic-api-key': { maxAgeDays: 365, executor: false, landmines: [] },
+    // A GitHub App's private key (the fork-sync lane's APP_PRIVATE_KEY Actions secrets).
+    'github-app-private-key': {
+        maxAgeDays: 365,
+        executor: false,
+        landmines: [
+            "A GitHub App can hold several key pairs; generating a new one does not revoke the old. After re-setting every copy, delete the old key pair on the App's Credentials page (Key pairs tab).",
+        ],
+    },
     'brain-mcp-key': {
         maxAgeDays: 365,
         executor: false,
