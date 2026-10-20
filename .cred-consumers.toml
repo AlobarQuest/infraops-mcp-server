@@ -126,7 +126,7 @@ replacement_scope = "fine-grained: Contents:read + Metadata on owned repos (mirr
   [[credential.consumer]]
   kind = "bws-secret"
   uuid = "c85e33ad-1c18-4f53-9326-b40301077959"
-  note = "github-mirror-bitbucket (Ops / Platform)"
+  note = "github-mirror-bitbucket (Rotation / Keepers)"
 
   [[credential.consumer]]
   kind = "runtime-fetch"
@@ -164,7 +164,7 @@ replacement_scope = "Repository: Read + Write on the alobarquest workspace (the 
   [[credential.consumer]]
   kind = "bws-secret"
   uuid = "1078dcaf-c1cd-48a0-a794-b4030100cf24"
-  note = "BITBUCKET_API_TOKEN (Ops / Platform)"
+  note = "BITBUCKET_API_TOKEN (Rotation / Keepers)"
 
   [[credential.consumer]]
   kind = "runtime-fetch"
