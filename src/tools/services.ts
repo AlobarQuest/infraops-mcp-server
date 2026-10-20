@@ -24,7 +24,48 @@ import type { CoolifyInstance } from '../services/coolify-client.js';
 import { jsonResponse } from '../utils/response.js';
 import { summarize, toServiceSummary } from '../utils/summaries.js';
 import { maskSensitive } from '../utils/masking.js';
-import type { CoolifyService } from '../types.js';
+import type { CoolifyProject, CoolifyService } from '../types.js';
+
+/**
+ * Coolify's services API takes per-sub-service URLs, not a `domains` string:
+ * `name` is the compose service (sub-application) name. An unknown body field
+ * such as `domains` fails the whole request with "Validation failed".
+ */
+const ServiceUrlsSchema = z
+  .array(
+    z.object({
+      name: z.string().min(1).describe('Compose service (sub-application) name, e.g. uptime-kuma'),
+      url: z.string().min(1).describe('URL for that sub-service, e.g. http://kuma.local:3001'),
+    }),
+  )
+  .optional()
+  .describe('URLs per compose service, sent as Coolify `urls`');
+
+type ServiceUrl = { name: string; url: string };
+
+/**
+ * Resolve the environment a service is created in. An omitted name resolves to
+ * the project's only environment; any other miss lists the valid names, which
+ * Coolify's own "Environment not found" does not.
+ */
+async function resolveEnvironmentName(
+  projectUuid: string,
+  requested: string | undefined,
+  instance: CoolifyInstance,
+): Promise<string> {
+  const project = await coolifyGet<CoolifyProject>(`/projects/${projectUuid}`, undefined, instance);
+  const names = (project.environments ?? []).map((e) => e.name);
+  if (requested !== undefined) {
+    if (names.includes(requested)) return requested;
+    throw new Error(
+      `Environment '${requested}' not found in project ${projectUuid}. Valid: ${names.join(', ') || '(none)'}`,
+    );
+  }
+  if (names.length === 1) return names[0];
+  throw new Error(
+    `environment_name is required: project ${projectUuid} has ${names.length} environments (${names.join(', ') || 'none'})`,
+  );
+}
 
 export function registerServiceTools(server: McpServer): void {
   // ── List Services ────────────────────────────────────────────────
@@ -117,9 +158,17 @@ export function registerServiceTools(server: McpServer): void {
         "For Devon's Flavor C apps (like Contact Hub), supply the docker-compose.yml content.",
       inputSchema: {
         project_uuid: z.string().min(1).describe('UUID of the target project'),
-        environment_name: z.string().default('production').describe('Environment name'),
+        environment_name: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Environment name; omit to use the project's only environment"),
         server_uuid: z.string().min(1).describe('Server UUID'),
-        destination_uuid: z.string().min(1).describe('Destination UUID'),
+        destination_uuid: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Destination UUID; omit to use the server's only destination"),
         type: z
           .string()
           .describe(
@@ -131,7 +180,7 @@ export function registerServiceTools(server: McpServer): void {
           .string()
           .optional()
           .describe('Raw docker-compose.yml content (required if type is docker-compose)'),
-        domains: z.string().optional().describe('FQDN for the service'),
+        urls: ServiceUrlsSchema,
         instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
@@ -143,28 +192,32 @@ export function registerServiceTools(server: McpServer): void {
     },
     async (params: {
       project_uuid: string;
-      environment_name: string;
+      environment_name?: string;
       server_uuid: string;
-      destination_uuid: string;
+      destination_uuid?: string;
       type: string;
       name?: string;
       description?: string;
       docker_compose_raw?: string;
-      domains?: string;
+      urls?: ServiceUrl[];
       instance: CoolifyInstance;
     }) => {
       try {
         const body: Record<string, unknown> = {
           project_uuid: params.project_uuid,
-          environment_name: params.environment_name,
+          environment_name: await resolveEnvironmentName(
+            params.project_uuid,
+            params.environment_name,
+            params.instance,
+          ),
           server_uuid: params.server_uuid,
-          destination_uuid: params.destination_uuid,
           type: params.type,
         };
+        if (params.destination_uuid) body.destination_uuid = params.destination_uuid;
         if (params.name) body.name = params.name;
         if (params.description) body.description = params.description;
         if (params.docker_compose_raw) body.docker_compose_raw = params.docker_compose_raw;
-        if (params.domains) body.domains = params.domains;
+        if (params.urls?.length) body.urls = params.urls;
 
         const svc = await coolifyPost<CoolifyService>('/services', body, params.instance);
         return {
@@ -191,7 +244,7 @@ export function registerServiceTools(server: McpServer): void {
         name: z.string().optional().describe('New name'),
         description: z.string().optional().describe('New description'),
         docker_compose_raw: z.string().optional().describe('Updated docker-compose.yml content'),
-        domains: z.string().optional().describe('New FQDN'),
+        urls: ServiceUrlsSchema,
         instance: CoolifyInstanceRequiredSchema,
       },
       annotations: {
@@ -206,7 +259,7 @@ export function registerServiceTools(server: McpServer): void {
         const uuid = params.uuid as string;
         const instance = params.instance as CoolifyInstance;
         const body: Record<string, unknown> = {};
-        for (const field of ['name', 'description', 'domains']) {
+        for (const field of ['name', 'description', 'urls']) {
           if (params[field] !== undefined) body[field] = params[field];
         }
         if (params['docker_compose_raw'] !== undefined) {
