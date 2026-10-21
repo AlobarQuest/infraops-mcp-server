@@ -110,15 +110,17 @@ disposition = "revoke-no-replacement"
 [[credential]]
 id = "github-finegrained-mirror"
 class = "github-pat-fine-grained"
-fingerprint_sha256_8 = "64b11252"
+fingerprint_sha256_8 = "bf161265"
 provider = "github"
 provider_identity = "AlobarQuest (fine-grained PAT)"
 bws_uuid = "c85e33ad-1c18-4f53-9326-b40301077959"
 consumers_verified = "2026-07-02"
 verified_by = "scripts/cred-consumer-sweep.py"
+created = "2026-10-20"
 disposition = "reissue-least-privilege"
+# Rotated by the rotation executor 2026-10-20 (retire unit 308213a6): new value sha256 bf161265,
+# old PAT revoked and refused. Request cleared.
 rotated_by_sds = true
-rotate_requested = "2026-10-20"
 replacement_scope = "fine-grained: Contents:read + Metadata on owned repos (mirror is read-from-GitHub only)"
 # Precondition CLEARED 2026-07-02: the mirror.py log-leak vector was fixed (GIT_ASKPASS
 # rewrite, PR #1) AND verified live in the deployed container — 48h of logs show every
@@ -152,7 +154,7 @@ replacement_scope = "fine-grained: Contents:read + Metadata on owned repos (mirr
 [[credential]]
 id = "bitbucket-mirror-token"
 class = "atlassian-api-token"
-fingerprint_sha256_8 = "894dd52f"
+fingerprint_sha256_8 = "2728c8d5"
 provider = "bitbucket"
 provider_identity = "Atlassian account (id.atlassian.com → Security → API tokens); Bitbucket workspace alobarquest"
 bws_uuid = "1078dcaf-c1cd-48a0-a794-b4030100cf24"
@@ -160,9 +162,12 @@ probe_email = "devon.watkins@gmail.com"
 probe_workspace = "alobarquest"
 consumers_verified = "2026-07-02"
 verified_by = "scripts/cred-consumer-sweep.py"
+created = "2026-10-20"
 disposition = "reissue"
+# Rotated by the rotation executor 2026-10-20 to 2026-10-21 (confirm unit d938bc15): new value
+# sha256 2728c8d5; Devon revoked the old token 2026-10-21 and the executor confirmed it refused.
+# Request cleared.
 rotated_by_sds = true
-rotate_requested = "2026-10-20"
 replacement_scope = "Repository: Read + Write on the alobarquest workspace (the mirror creates repos + pushes)"
 
   [[credential.consumer]]
