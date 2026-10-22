@@ -41,13 +41,14 @@ describe("the repo's own .cred-consumers.toml", () => {
 
   it('ages the machine tokens from their created date and routes them to the manual checklist', () => {
     const state = { resolvedExposures: {}, lastRotated: {} };
-    const tokens = specs.filter((s) => MACHINE_TOKENS.includes(s.id));
+    // The tokens still rotated by hand; one the SDS rotates (rotated_by_sds) is routed to the
+    // orchestrator's rotation proposer instead.
+    const tokens = specs.filter((s) => MACHINE_TOKENS.includes(s.id) && !s.rotated_by_sds);
+    expect(tokens.length).toBeGreaterThan(0);
     for (const s of tokens) expect(s.created, `${s.id} needs an age anchor`).toBeTruthy();
     expect(credFindings(tokens, state, '2026-10-06T03:00:00Z')).toEqual([]);
     const later = credFindings(tokens, state, '2027-08-01T03:00:00Z');
-    expect(later.map((f) => f.check)).toEqual(
-      Array(MACHINE_TOKENS.length).fill('cred.rotation-age'),
-    );
+    expect(later.map((f) => f.check)).toEqual(Array(tokens.length).fill('cred.rotation-age'));
     const cls = buildCredClassifications(tokens, state);
     for (const f of later) {
       const c = classify(f, { autoFixAllowlist: [], credClassifications: cls });
