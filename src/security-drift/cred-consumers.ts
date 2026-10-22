@@ -49,6 +49,10 @@ export interface CredentialSpec {
   provider?: string;
   provider_identity?: string;
   bws_uuid?: string;
+  /** A machine token's keeper, which has no BWS copy of itself: one of its Keychain items
+   *  (orchestrator ADR-0055 amendment 12). Set both, and no bws_uuid. */
+  keeper_service?: string;
+  keeper_account?: string;
   consumers_verified?: string;
   verified_by?: string;
   disposition?: string;

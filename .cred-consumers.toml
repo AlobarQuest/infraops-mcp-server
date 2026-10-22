@@ -326,3 +326,25 @@ disposition = "reissue"
   service = "Claude"
   account = "BWS_ACCESS_TOKEN_CRED_ROTATION"
   note = "change-mgr-cli.ts: the 04:00 rotation executor's bws child processes only"
+
+# The brains token: read-only on BWS project "brains". Created 2026-07-02 (the Keychain item's
+# creation). No reader was found by name across the portfolio, launchd and ~/.claude
+# (2026-10-21 and 2026-10-22); Devon keeps it (2026-10-22), and it is the first BWS machine
+# token the rotation executor's Keychain instance rotates (orchestrator ADR-0055 amendment 12).
+# A machine token has no BWS copy of itself, so its keeper is its one Keychain item.
+[[credential]]
+id = "bws-tok-brain-ops"
+class = "bws-machine-token"
+fingerprint_sha256_8 = "ecad842e"
+provider = "bitwarden-sm"
+provider_identity = "Bitwarden SM machine account reading project brains, access-key 2a4e8bd2-…"
+created = "2026-07-02"
+disposition = "reissue"
+keeper_service = "Claude"
+keeper_account = "BWS_ACCESS_TOKEN_BRAIN_OPS"
+
+  [[credential.consumer]]
+  kind = "keychain"
+  service = "Claude"
+  account = "BWS_ACCESS_TOKEN_BRAIN_OPS"
+  note = "no reader found; the keeper itself"
