@@ -28,6 +28,7 @@ describe("the repo's own .cred-consumers.toml", () => {
   ];
   const MACHINE_TOKENS = [
     'bws-cred-rotation-token',
+    'bws-tok-brain-ops',
     'bws-tok-content-mini',
     'bws-tok-ops-mini-20260730',
   ];
@@ -44,7 +45,9 @@ describe("the repo's own .cred-consumers.toml", () => {
     for (const s of tokens) expect(s.created, `${s.id} needs an age anchor`).toBeTruthy();
     expect(credFindings(tokens, state, '2026-10-06T03:00:00Z')).toEqual([]);
     const later = credFindings(tokens, state, '2027-08-01T03:00:00Z');
-    expect(later.map((f) => f.check)).toEqual(Array(3).fill('cred.rotation-age'));
+    expect(later.map((f) => f.check)).toEqual(
+      Array(MACHINE_TOKENS.length).fill('cred.rotation-age'),
+    );
     const cls = buildCredClassifications(tokens, state);
     for (const f of later) {
       const c = classify(f, { autoFixAllowlist: [], credClassifications: cls });
