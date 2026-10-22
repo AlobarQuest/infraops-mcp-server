@@ -342,6 +342,10 @@ created = "2026-07-02"
 disposition = "reissue"
 keeper_service = "Claude"
 keeper_account = "BWS_ACCESS_TOKEN_BRAIN_OPS"
+# Handed to the SDS (Devon, 2026-10-22): the rotation executor's Keychain instance rotates it
+# (orchestrator ADR-0055 amendment 12); the first rotation is requested for today.
+rotated_by_sds = true
+rotate_requested = "2026-10-22"
 
   [[credential.consumer]]
   kind = "keychain"
