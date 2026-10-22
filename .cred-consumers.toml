@@ -335,17 +335,18 @@ disposition = "reissue"
 [[credential]]
 id = "bws-tok-brain-ops"
 class = "bws-machine-token"
-fingerprint_sha256_8 = "ecad842e"
+fingerprint_sha256_8 = "4e19e90a"
 provider = "bitwarden-sm"
-provider_identity = "Bitwarden SM machine account reading project brains, access-key 2a4e8bd2-…"
-created = "2026-07-02"
+provider_identity = "Bitwarden SM machine account reading project brains"
+created = "2026-10-22"
 disposition = "reissue"
 keeper_service = "Claude"
 keeper_account = "BWS_ACCESS_TOKEN_BRAIN_OPS"
 # Handed to the SDS (Devon, 2026-10-22): the rotation executor's Keychain instance rotates it
-# (orchestrator ADR-0055 amendment 12); the first rotation is requested for today.
+# (orchestrator ADR-0055 amendment 12). Rotated by it 2026-10-22, the first BWS machine-token
+# rotation (units 718d9650, 90fe056e and b0f5832a): new value sha256 4e19e90a, old ecad842e proved
+# refused after the 75-minute window; request cleared.
 rotated_by_sds = true
-rotate_requested = "2026-10-22"
 
   [[credential.consumer]]
   kind = "keychain"
