@@ -301,12 +301,15 @@ provider = "bitwarden-sm"
 provider_identity = "Bitwarden SM machine account Developer Machines, access token tok-content-mini (access-key d857248c-…)"
 created = "2026-06-12"
 disposition = "reissue"
+# A machine token has no BWS copy of itself, so its keeper is its one Keychain item.
+keeper_service = "Claude"
+keeper_account = "BWS_ACCESS_TOKEN_VIDEOCREATOR"
 
   [[credential.consumer]]
   kind = "keychain"
   service = "Claude"
   account = "BWS_ACCESS_TOKEN_VIDEOCREATOR"
-  note = "VideoCreator start.sh (launchd) reads it at boot"
+  note = "the keeper; VideoCreator's start.sh (launchd com.devon.videocreator) reads it once at boot, and that agent is disabled (2026-10-23): a restart of VideoCreator is the only switch it needs, and nothing runs today to restart"
 
 # The dedicated cred-rotation token (PR #33, 2026-07-02): the ONLY local token with
 # secret write on Ops / Platform. Read by src/cli/change-mgr-cli.ts credRotationBwsToken();
