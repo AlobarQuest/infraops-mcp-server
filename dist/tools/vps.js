@@ -2,7 +2,7 @@
  * VPS operations tools — shell, health, file, and Docker operations on a chosen VPS.
  *
  * Every tool accepts an `instance` parameter:
- *   - "prod" (default) → Hetzner VPS via SSH (existing path, unchanged).
+ *   - "prod" (default) → OVHcloud VPS via SSH (existing path, unchanged).
  *   - "dev"            → OrbStack `ubuntu` machine via `orb run` (no user SSH setup required).
  *
  * Callers already use `coolify_*({instance: "dev"})` to query the dev Coolify; these tools
@@ -14,7 +14,7 @@ import { vpsExec, vpsReadFile, vpsWriteFile, dockerCmdPrefix, handleVpsError, } 
 const instanceSchema = z
     .enum(['prod', 'dev'])
     .default('prod')
-    .describe("Which VPS to target: 'prod' (Hetzner at 178.156.247.239 via SSH) or 'dev' " +
+    .describe("Which VPS to target: 'prod' (OVHcloud at 40.160.102.182 via SSH) or 'dev' " +
     "(local OrbStack machine via `orb run`). Defaults to 'prod'. Must match the Coolify " +
     'instance when debugging Coolify-managed containers — mismatched routing silently hits the wrong host.');
 export function registerVPSTools(server) {
@@ -22,7 +22,7 @@ export function registerVPSTools(server) {
     server.registerTool('vps_exec', {
         title: 'Execute VPS Command',
         description: 'Run a shell command on the selected VPS and return stdout, stderr, and exit code. ' +
-            "Targets Hetzner prod by default; pass instance='dev' to run inside the OrbStack ubuntu machine. " +
+            "Targets OVHcloud prod by default; pass instance='dev' to run inside the OrbStack ubuntu machine. " +
             'Use for any ad-hoc operation: checking processes, installing packages, inspecting logs, etc.',
         inputSchema: {
             instance: instanceSchema,
@@ -69,7 +69,7 @@ export function registerVPSTools(server) {
         title: 'VPS Health Check',
         description: 'Get a comprehensive health snapshot of the selected VPS: uptime, CPU load, memory usage, ' +
             'disk usage, running Docker containers count, and top processes by CPU. ' +
-            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
+            "Targets OVHcloud prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
         inputSchema: {
             instance: instanceSchema,
         },
@@ -117,7 +117,7 @@ export function registerVPSTools(server) {
     server.registerTool('vps_read_file', {
         title: 'Read VPS File',
         description: 'Read the contents of a file on the selected VPS. ' +
-            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
+            "Targets OVHcloud prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
         inputSchema: {
             instance: instanceSchema,
             path: z.string().min(1).describe('Absolute path to the file on the VPS'),
@@ -146,7 +146,7 @@ export function registerVPSTools(server) {
     server.registerTool('vps_write_file', {
         title: 'Write VPS File',
         description: "Write content to a file on the selected VPS. Creates the file if it doesn't exist, overwrites if it does. " +
-            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
+            "Targets OVHcloud prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
         inputSchema: {
             instance: instanceSchema,
             path: z.string().min(1).describe('Absolute path for the file on the VPS'),
@@ -176,7 +176,7 @@ export function registerVPSTools(server) {
     server.registerTool('vps_docker_ps', {
         title: 'List Docker Containers',
         description: 'List running Docker containers on the selected VPS. Shows name, image, status, ports, and size. ' +
-            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine " +
+            "Targets OVHcloud prod by default; pass instance='dev' for the OrbStack ubuntu machine " +
             '(docker is invoked via sudo on dev).',
         inputSchema: {
             instance: instanceSchema,
@@ -208,7 +208,7 @@ export function registerVPSTools(server) {
     server.registerTool('vps_docker_logs', {
         title: 'Get Docker Container Logs',
         description: 'Retrieve logs from a Docker container on the selected VPS. ' +
-            "Targets Hetzner prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
+            "Targets OVHcloud prod by default; pass instance='dev' for the OrbStack ubuntu machine.",
         inputSchema: {
             instance: instanceSchema,
             container: z.string().min(1).describe('Container name or ID'),
@@ -261,7 +261,7 @@ export function registerVPSTools(server) {
     server.registerTool('vps_docker_stats', {
         title: 'Docker Container Resource Usage',
         description: 'Get current CPU, memory, network, and disk I/O usage for all running containers on the selected VPS. ' +
-            "One-shot snapshot (not streaming). Targets Hetzner prod by default; pass instance='dev' for " +
+            "One-shot snapshot (not streaming). Targets OVHcloud prod by default; pass instance='dev' for " +
             'the OrbStack ubuntu machine.',
         inputSchema: {
             instance: instanceSchema,

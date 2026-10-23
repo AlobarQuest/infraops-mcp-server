@@ -1,7 +1,7 @@
 /**
  * VPS dispatcher — routes VPS operations to the correct backend based on instance.
  *
- *   instance: "prod" → sshExec (Hetzner at 178.156.247.239, root)
+ *   instance: "prod" → sshExec (OVHcloud at 40.160.102.182, root)
  *   instance: "dev"  → orbExec (OrbStack ubuntu machine, devon)
  *
  * This mirrors the multi-instance pattern already in place for coolify-client.ts so that
@@ -17,7 +17,7 @@ import { orbExec, getOrbMachine, handleOrbError } from './orb-client.js';
 /**
  * Execute a shell command on the selected VPS instance.
  *
- * - prod → SSH into Hetzner (existing code path, untouched)
+ * - prod → SSH into the OVHcloud prod VPS (existing code path, untouched)
  * - dev  → `orb run -m <machine> bash -c <command>`
  */
 export async function vpsExec(instance, command, options = {}) {
@@ -76,7 +76,7 @@ export function handleVpsError(instance, error) {
 export function describeInstance(instance) {
     if (instance === 'dev')
         return `OrbStack machine '${getOrbMachine()}' (dev)`;
-    return `${process.env.VPS_HOST || '178.156.247.239'} (prod)`;
+    return `${process.env.VPS_HOST || '40.160.102.182'} (prod)`;
 }
 function escapeShell(arg) {
     return `'${arg.replace(/'/g, "'\\''")}'`;

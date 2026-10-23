@@ -2,7 +2,7 @@
  * VPS operations tools — shell, health, file, and Docker operations on a chosen VPS.
  *
  * Every tool accepts an `instance` parameter:
- *   - "prod" (default) → Hetzner VPS via SSH (existing path, unchanged).
+ *   - "prod" (default) → OVHcloud VPS via SSH (existing path, unchanged).
  *   - "dev"            → OrbStack `ubuntu` machine via `orb run` (no user SSH setup required).
  *
  * Callers already use `coolify_*({instance: "dev"})` to query the dev Coolify; these tools
