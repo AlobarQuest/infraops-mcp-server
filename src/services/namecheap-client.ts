@@ -50,7 +50,7 @@ interface NamecheapConfig {
   proxyToken: string;
 }
 
-const VPS_IP = '178.156.247.239';
+const VPS_IP = '40.160.102.182';
 
 function getConfig(): NamecheapConfig {
   const apiUser = process.env.NAMECHEAP_API_USER;

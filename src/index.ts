@@ -18,7 +18,7 @@
  *   COOLIFY_DEV_BASE_URL        - Dev Coolify instance URL (optional)
  *   COOLIFY_DEV_API_TOKEN       - Dev Coolify Bearer token (optional)
  *   HETZNER_API_TOKEN           - Hetzner Cloud API token (optional, from BWS via start.sh)
- *   VPS_HOST                    - VPS IP address (default: 178.156.247.239)
+ *   VPS_HOST                    - VPS IP address (default: 40.160.102.182)
  *   VPS_USER                    - SSH user (default: root)
  *   VPS_SSH_KEY_PATH            - SSH private key path (default: ~/.ssh/hetzner_ed25519)
  *   VPS_SSH_PASSPHRASE          - SSH key passphrase (optional, from BWS via start.sh)
@@ -154,7 +154,7 @@ if (isHetznerConfigured()) {
 // ── Register VPS SSH tools ───────────────────────────────────────────
 
 registerVPSTools(server);
-console.error(`VPS SSH tools registered (host: ${process.env.VPS_HOST || '178.156.247.239'})`);
+console.error(`VPS SSH tools registered (host: ${process.env.VPS_HOST || '40.160.102.182'})`);
 
 // ── Register Namecheap tools ────────────────────────────────────────
 
@@ -203,7 +203,7 @@ async function runStdio(): Promise<void> {
     `  Coolify dev:  ${isCoolifyInstanceConfigured('dev') ? getCoolifyInstanceUrl('dev') : 'not configured'}`,
   );
   console.error(`  Hetzner: ${isHetznerConfigured() ? 'configured' : 'not configured'}`);
-  console.error(`  VPS SSH: ${process.env.VPS_HOST || '178.156.247.239'}`);
+  console.error(`  VPS SSH: ${process.env.VPS_HOST || '40.160.102.182'}`);
   console.error(
     `  Namecheap: ${isNamecheapConfigured() ? getNamecheapEnvironment() : 'not configured'}`,
   );

@@ -32,7 +32,7 @@ log() { echo "[appbrain-sync $(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 fail() { log "ERROR: $*"; exit 1; }
 
 # ── Config (all defaulted inline; overridable via the sourced drift env file) ──────
-VPS_HOST="${VPS_HOST:-178.156.247.239}"
+VPS_HOST="${VPS_HOST:-40.160.102.182}"
 VPS_USER="${VPS_USER:-root}"
 # The infraops MCP points VPS_SSH_KEY_PATH at hetzner_infraops via its .claude.json
 # env; that env isn't present under the drift launchd context, so default to it here.

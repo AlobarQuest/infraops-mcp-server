@@ -4,7 +4,7 @@ const params = {
   ApiUser: 'alobar',
   ApiKey: 'e2a987d4f2fb4e2692453f556ab48308',
   UserName: 'alobar',
-  ClientIp: '178.156.247.239',
+  ClientIp: '40.160.102.182',
   Command: 'namecheap.domains.getList',
   PageSize: 100,
 };
