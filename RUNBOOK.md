@@ -68,7 +68,7 @@ node dist/index.js
 Startup messages are written to stderr (not stdout — stdout is reserved for the MCP protocol). You should see lines like:
 
 ```
-VPS SSH tools registered (host: 178.156.247.239)
+VPS SSH tools registered (host: 40.160.102.182)
 GITHUB_TOKEN not set — GitHub tools disabled
 InfraOps MCP server v3.3.0 running via stdio
   Coolify prod: https://coolify-1.devonwatkins.com/api/v1
@@ -178,7 +178,7 @@ Every `vps_*` tool (`vps_exec`, `vps_health`, `vps_read_file`, `vps_write_file`,
 
 ```
 # Prod (SSH to Hetzner)
-VPS_HOST                    Default: 178.156.247.239
+VPS_HOST                    Default: 40.160.102.182
 VPS_USER                    Default: root
 VPS_SSH_KEY_PATH            Default: ~/.ssh/hetzner_ed25519
 VPS_SSH_PASSPHRASE          SSH key passphrase, if the key is encrypted (optional)
@@ -504,11 +504,11 @@ HETZNER_API_TOKEN not set — Hetzner Cloud tools disabled
 
 2. **Key requires passphrase:** Set `BWS_SSH_PASSPHRASE_SECRET_ID` in `.claude.json` to the BWS UUID of the passphrase secret.
 
-3. **Host unreachable:** The VPS IP defaults to `178.156.247.239`. Override with `VPS_HOST` if the IP has changed.
+3. **Host unreachable:** The VPS IP defaults to `40.160.102.182`. Override with `VPS_HOST` if the IP has changed.
 
 4. **Known hosts mismatch:** If the VPS was rebuilt and the host key changed, clear the old entry:
    ```bash
-   ssh-keygen -R 178.156.247.239
+   ssh-keygen -R 40.160.102.182
    ```
    Then manually SSH once to accept the new host key before using VPS tools.
 

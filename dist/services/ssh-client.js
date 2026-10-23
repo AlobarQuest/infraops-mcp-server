@@ -5,7 +5,7 @@
  * the local ssh config or ssh-agent being set up correctly.
  *
  * Environment variables:
- *   VPS_HOST            - VPS IP address (default: 178.156.247.239)
+ *   VPS_HOST            - VPS IP address (default: 40.160.102.182)
  *   VPS_USER            - SSH user (default: root)
  *   VPS_SSH_KEY_PATH    - Path to SSH private key (default: ~/.ssh/hetzner_ed25519)
  *   VPS_SSH_PASSPHRASE  - Key passphrase (optional, loaded from BWS)
@@ -15,7 +15,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { homedir } from 'os';
 function getSSHConfig() {
-    const host = process.env.VPS_HOST || '178.156.247.239';
+    const host = process.env.VPS_HOST || '40.160.102.182';
     const port = parseInt(process.env.VPS_PORT || '22', 10);
     const username = process.env.VPS_USER || 'root';
     const keyPath = process.env.VPS_SSH_KEY_PATH || resolve(homedir(), '.ssh', 'hetzner_ed25519');

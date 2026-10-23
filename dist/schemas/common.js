@@ -6,7 +6,7 @@ import { ResponseFormat } from '../constants.js';
 export const CoolifyInstanceSchema = z
     .enum(['prod', 'dev'])
     .default('prod')
-    .describe("Coolify instance to target: 'prod' (Hetzner VPS) or 'dev' (local OrbStack VM). Defaults to prod.");
+    .describe("Coolify instance to target: 'prod' (OVHcloud VPS) or 'dev' (local OrbStack VM). Defaults to prod.");
 /**
  * Required (no-default) instance selector for *mutating* Coolify tools.
  *
@@ -18,7 +18,7 @@ export const CoolifyInstanceSchema = z
  */
 export const CoolifyInstanceRequiredSchema = z
     .enum(['prod', 'dev'])
-    .describe("REQUIRED — which Coolify instance to mutate: 'prod' (Hetzner VPS) or 'dev' (local OrbStack VM). " +
+    .describe("REQUIRED — which Coolify instance to mutate: 'prod' (OVHcloud VPS) or 'dev' (local OrbStack VM). " +
     'No default: state the target explicitly so a write never lands on prod by accident.');
 export const ResponseFormatSchema = z
     .nativeEnum(ResponseFormat)

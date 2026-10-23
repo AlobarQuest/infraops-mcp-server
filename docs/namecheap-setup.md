@@ -12,7 +12,7 @@ The integration defaults to **sandbox mode** for safe testing, with a single env
 
 1. **Namecheap API access enabled** on your account
    - Log in → Profile → Tools → Namecheap API Access → enable
-   - Whitelist your client IP (VPS IP: `178.156.247.239`)
+   - Whitelist your client IP (VPS IP: `40.160.102.182`)
 
 2. **Sandbox account** (for testing)
    - Create at https://www.sandbox.namecheap.com

@@ -11,7 +11,7 @@
 #   BWS_COOLIFY_DEV_SECRET_ID   - BWS secret ID for the dev Coolify API token
 #   BWS_HETZNER_SECRET_ID       - BWS secret ID for the Hetzner Cloud API token
 #   BWS_SSH_PASSPHRASE_SECRET_ID - BWS secret ID for the SSH key passphrase
-#   VPS_HOST                    - VPS IP address (default: 178.156.247.239)
+#   VPS_HOST                    - VPS IP address (default: 40.160.102.182)
 #   VPS_USER                    - SSH user (default: root)
 #   VPS_SSH_KEY_PATH            - Path to SSH private key (default: ~/.ssh/hetzner_ed25519)
 #   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")

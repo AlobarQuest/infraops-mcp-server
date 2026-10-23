@@ -5,7 +5,7 @@
  * the local ssh config or ssh-agent being set up correctly.
  *
  * Environment variables:
- *   VPS_HOST            - VPS IP address (default: 178.156.247.239)
+ *   VPS_HOST            - VPS IP address (default: 40.160.102.182)
  *   VPS_USER            - SSH user (default: root)
  *   VPS_SSH_KEY_PATH    - Path to SSH private key (default: ~/.ssh/hetzner_ed25519)
  *   VPS_SSH_PASSPHRASE  - Key passphrase (optional, loaded from BWS)

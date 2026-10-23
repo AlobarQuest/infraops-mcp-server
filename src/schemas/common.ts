@@ -9,7 +9,7 @@ export const CoolifyInstanceSchema = z
   .enum(['prod', 'dev'])
   .default('prod')
   .describe(
-    "Coolify instance to target: 'prod' (Hetzner VPS) or 'dev' (local OrbStack VM). Defaults to prod.",
+    "Coolify instance to target: 'prod' (OVHcloud VPS) or 'dev' (local OrbStack VM). Defaults to prod.",
   );
 
 /**
@@ -24,7 +24,7 @@ export const CoolifyInstanceSchema = z
 export const CoolifyInstanceRequiredSchema = z
   .enum(['prod', 'dev'])
   .describe(
-    "REQUIRED — which Coolify instance to mutate: 'prod' (Hetzner VPS) or 'dev' (local OrbStack VM). " +
+    "REQUIRED — which Coolify instance to mutate: 'prod' (OVHcloud VPS) or 'dev' (local OrbStack VM). " +
       'No default: state the target explicitly so a write never lands on prod by accident.',
   );
 
