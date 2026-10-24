@@ -14,7 +14,9 @@ Hosted Healthchecks.io keeps two checks on purpose:
 - `VPS Nightly Backup`: `vps-backup/backup.sh` pings it on both instances, so the proof that
   production data left the VPS doesn't depend on the VPS.
 
-Don't add other checks to hosted.
+Don't add other checks to hosted. To manage those two checks, use the hosted read-write key,
+BWS secret `healthchecks.io_api_key` (`260cc8ad-f170-44cc-a672-b47000df3350`), against
+`https://healthchecks.io/api/v3/`. No job uses it; it's kept only for this.
 
 ## Fetch the API key
 
