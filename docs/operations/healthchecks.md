@@ -73,12 +73,12 @@ a ping URL.
 
 ## Change, pause, or delete a check
 
-| Action | Request |
-|---|---|
-| Change settings | `POST /api/v3/checks/<uuid>` with the fields to change |
-| Pause (stops alerts until the next ping) | `POST /api/v3/checks/<uuid>/pause` |
-| Delete | `DELETE /api/v3/checks/<uuid>` |
-| List integrations | `GET /api/v3/channels/` |
+| Action                                   | Request                                                |
+| ---------------------------------------- | ------------------------------------------------------ |
+| Change settings                          | `POST /api/v3/checks/<uuid>` with the fields to change |
+| Pause (stops alerts until the next ping) | `POST /api/v3/checks/<uuid>/pause`                     |
+| Delete                                   | `DELETE /api/v3/checks/<uuid>`                         |
+| List integrations                        | `GET /api/v3/channels/`                                |
 
 Get `<uuid>` from the listing. Before deleting or renaming a check, grep the portfolio's
 `.cred-consumers.toml` files for its name: the rotation executor refuses a unit whose
