@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Template for the self-hosted Healthchecks watchdog LaunchAgent. Install with
+     scripts/install-hc-watchdog-launchd.sh, which substitutes __REPO__ / __HOME__ and writes
+     ~/Library/LaunchAgents/com.devon.hc-watchdog.plist. No secrets live here: the hosted ping URL
+     is INFRADRIFT_WATCHDOG_PING_URL in ~/.config/infra-drift/env (gitignored). -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.devon.hc-watchdog</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__REPO__/scripts/hc-watchdog.sh</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>600</integer>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>__HOME__</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/hc-watchdog.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/hc-watchdog.log</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
