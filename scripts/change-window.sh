@@ -101,7 +101,7 @@ CW_MD="$REPORT_DIR/$DATE.change-window.md"
 SUBJECT="Change window $DATE"
 
 # ── Send the digest: alert-hub notice, Resend fallback (best-effort) ───────────
-send_report "report:change-window:$DATE" "$SUBJECT" "$CW_MD" "$CW_MD"
+send_report "report:change-window:$DATE" "$SUBJECT" "$CW_MD" "$REPORT_DIR"
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────
 if [ -n "$HC_URL" ]; then

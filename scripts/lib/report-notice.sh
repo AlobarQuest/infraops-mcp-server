@@ -26,7 +26,7 @@ size = lambda s: len(json.dumps(s, ensure_ascii=False).encode("utf-8"))
 if units(body) <= limit and size(body) <= byte_limit:
     sys.stdout.write(body)
     sys.exit(0)
-footer = f"\n\n… (cut at {limit:,} of {units(body):,} characters; full report: {full_path} on the Mac mini)"
+footer = f"\n\n… (cut at {limit:,} of {units(body):,} characters; full reports: {full_path} on the Mac mini)"
 room_units, room_bytes = limit - units(footer), byte_limit - size(footer)
 used_units, used_bytes, end = 0, 0, 0
 for ch in body:
@@ -81,7 +81,7 @@ PY
   rm -f "$payload_file"
 }
 
-# send_report <key> <subject> <body-file> <full-path-for-footer>
+# send_report <key> <subject> <body-file> <reports-dir-for-footer>
 # Best-effort and non-fatal: always returns 0.
 send_report() {
   [ -f "$3" ] || return 0

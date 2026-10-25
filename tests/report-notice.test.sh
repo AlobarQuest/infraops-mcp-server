@@ -52,14 +52,14 @@ eq() { [ "$1" = "$2" ]; }
 # --- hub path: a long body with emoji is cut to 12,000 characters with the footer ----------------
 reset; make_body 10000
 ALERT_HUB_REPORT_TOKEN=report-token RESEND_API_KEY=resend-key \
-  send_report "report:infra-drift:2026-10-25" "Subject" "$WORK/body.md" "/reports/2026-10-25.md"
+  send_report "report:infra-drift:2026-10-25" "Subject" "$WORK/body.md" "/reports"
 msg="$(hub_message)"
 check "long body: sent as a notice with key, info, subject" \
   eq "$(hub_field 1)|$(hub_field 3)|$(hub_field 4)|$(hub_field 5)" \
   "--notice|report:infra-drift:2026-10-25|info|Subject"
 check "long body: at most 12000 characters" test "$(printf '%s' "$msg" | units)" -le 12000
 check "long body: ends with the footer" \
-  eq "${msg##*$'\n\n'}" "… (cut at 12,000 of 30,000 characters; full report: /reports/2026-10-25.md on the Mac mini)"
+  eq "${msg##*$'\n\n'}" "… (cut at 12,000 of 30,000 characters; full reports: /reports on the Mac mini)"
 check "long body: Resend not called" absent "$WORK/curl.args"
 check "long body: token reaches the helper by environment only" \
   eq "$(cat "$WORK/hub.token")" report-token

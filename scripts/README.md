@@ -88,18 +88,24 @@ Urgent security alerts and the two daily reports go to Devon through alert-hub
 | `report-infraops` | The 03:00 drift digest and the 04:00 change-window digest (notices) | `ALERT_HUB_REPORT_TOKEN` | `BWS_ALERT_HUB_REPORT_TOKEN_ID`                    |
 
 The wrappers fetch each token from BWS by UUID when its `BWS_*_ID` variable is set, and export
-it. `drift-audit.sh` fetches both tokens, because the security-drift CLI sends the alerts.
-`change-window.sh` fetches only the report token.
+it. Both wrappers fetch both tokens through `load_alert_hub_tokens`: the security-drift CLI (3am) and
+the security executor (4am) send the urgent messages.
 
 **Fallback rule.** With a token unset (its UUID variable is unset, or the fetch returned
 nothing), the matching messages go through Resend as before. With a token set, a failed hub
 send also falls through to Resend, so a hub outage never loses an urgent alert or a digest.
 A failed send logs one line and never fails the run.
 
-**Limits.** The hub rejects an alert message over 4,000 characters and a notice message over
-12,000. The sender cuts first: an alert ends with a pointer to change-manager, and a report ends
-with a footer naming the full file on the Mac mini. Shared code: `lib/report-notice.sh`
-(`send_report`), `alert-hub-send.sh` and `src/alert-hub.ts` (vendored from alert-hub).
+**Events and states.** An urgent escalation and a security-executor refusal are one-off events, so
+they go as critical _notices_, which the hub never deduplicates. Scanner version skew is a state: it
+is an alert under the key `security-drift-version-skew`, and the next clean run resolves it.
+
+**Limits.** The hub rejects an alert message over 4,000 characters, a notice message over 12,000, and
+any request body over 16,384 bytes. The sender cuts first. An urgent notice ends with a pointer to
+change-manager. A report is cut to 12,000 characters and 15,000 JSON-encoded bytes, and ends with a
+footer naming the reports directory on the Mac mini. Shared code: `lib/report-notice.sh`
+(`send_report`, `load_alert_hub_tokens`), `alert-hub-send.sh` and `src/alert-hub.ts` (vendored from
+alert-hub).
 
 # Standalone weekly security scan (`com.devon.security-scan`)
 

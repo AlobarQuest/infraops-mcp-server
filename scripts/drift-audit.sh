@@ -191,9 +191,6 @@ else
   SUBJECT="Infra drift $DATE — audit only (remediation step failed)"
 fi
 
-# The footer of a cut report points at the primary file; the combined body below is a temp file.
-FULL_REPORT_MD="$BODY_MD"
-
 # Append the security-drift digest to the email body if present.
 SEC_MD="$REPORT_DIR/$DATE.security.md"
 if [ -f "$SEC_MD" ] && [ -f "$BODY_MD" ]; then
@@ -210,7 +207,7 @@ if [ -f "$BODY_MD" ]; then
 fi
 
 # ── Send the digest: alert-hub notice, Resend fallback (best-effort) ───────────
-send_report "report:infra-drift:$DATE" "$SUBJECT" "$BODY_MD" "$FULL_REPORT_MD"
+send_report "report:infra-drift:$DATE" "$SUBJECT" "$BODY_MD" "$REPORT_DIR"
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────
 if [ -n "$HC_URL" ]; then
