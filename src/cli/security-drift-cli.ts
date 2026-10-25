@@ -16,7 +16,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ChangeMgrClient } from '../change-manager/api-client.js';
 import { runSecurityDrift } from '../security-drift/runner.js';
-import { notifyDepsFromEnv, sendUrgentEmail } from '../security-drift/notify.js';
+import {
+  notifyDepsFromEnv,
+  resolveVersionSkew,
+  sendUrgentEmail,
+  sendVersionSkewAlert,
+} from '../security-drift/notify.js';
 import { securityPaths } from '../security-drift/paths.js';
 import { runSelfCheck } from '../security-drift/self-check.js';
 import { classify } from '../security-drift/taxonomy.js';
@@ -237,11 +242,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     }
     const { escalations } = buildEscalations(classified, now);
     const urgent = escalations.filter((e) => e.urgent);
-    const emailed = await sendUrgentEmail(
-      urgent,
-      notifyDepsFromEnv(),
-      'security-drift-version-skew',
-    );
+    const emailed = await sendVersionSkewAlert(urgent, notifyDepsFromEnv());
     const digest =
       `# Security drift ${now.slice(0, 10)} — ABORTED (scanner output-version skew)\n\n` +
       `🚨 ${skew.detail}\n\n` +
@@ -257,6 +258,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     );
     process.exit(1);
   }
+  // No skew: close any skew alert an earlier run opened (a no-op when none is open).
+  await resolveVersionSkew(notifyDepsFromEnv());
 
   // --- WS-0.7 credential-rotation registry: findings + pre-built classifications.
   // A broken registry/state is itself escalated (cred.registry-error → URGENT manual
@@ -282,7 +285,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     },
     {
       postSync: (body) => client.postSync(body),
-      sendUrgent: (items) => sendUrgentEmail(items, notifyDepsFromEnv()),
+      sendUrgent: (items) => sendUrgentEmail(items, notifyDepsFromEnv(), now),
     },
   );
 

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { SecurityEscalation } from '../src/security-drift/emit.js';
-import { sendUrgentAlert, sendUrgentEmail } from '../src/security-drift/notify.js';
+import {
+  resolveVersionSkew,
+  sendUrgentAlert,
+  sendUrgentEmail,
+  sendVersionSkewAlert,
+} from '../src/security-drift/notify.js';
 
 const HUB_TOKEN = 'hub-secret-token-do-not-log';
 const RESEND_KEY = 're_resend_secret_do_not_log';
@@ -61,6 +66,7 @@ describe('sendUrgentAlert', () => {
       key: 'k1',
       severity: 'critical',
       status: 'firing',
+      kind: 'notice',
       title: 'Title',
       message: 'Body',
     });
@@ -99,26 +105,30 @@ describe('sendUrgentAlert', () => {
     });
   });
 
-  it('cuts a 6000-character body to at most 4000 characters ending in the pointer', async () => {
+  it('cuts an alert body to 4000 characters ending in the pointer', async () => {
     const { calls, fetchImpl } = recorder({});
-    await sendUrgentAlert('k1', 'Title', 'x'.repeat(6000), {
-      ...baseDeps,
-      hubToken: HUB_TOKEN,
-      fetchImpl,
-    });
+    await sendUrgentAlert(
+      'k1',
+      'Title',
+      'x'.repeat(6000),
+      { ...baseDeps, hubToken: HUB_TOKEN, fetchImpl },
+      'alert',
+    );
     const message: string = hubBody(calls[0]).message;
+    expect(hubBody(calls[0]).kind).toBe('alert');
     expect(message.length).toBeLessThanOrEqual(4000);
     expect(message.endsWith(CUT_MARKER)).toBe(true);
   });
 
-  it('leaves a body of exactly 4000 characters whole', async () => {
+  it('lets a notice carry 12000 characters and cuts beyond that', async () => {
     const { calls, fetchImpl } = recorder({});
-    await sendUrgentAlert('k1', 'Title', 'y'.repeat(4000), {
-      ...baseDeps,
-      hubToken: HUB_TOKEN,
-      fetchImpl,
-    });
-    expect(hubBody(calls[0]).message).toBe('y'.repeat(4000));
+    const deps = { ...baseDeps, hubToken: HUB_TOKEN, fetchImpl };
+    await sendUrgentAlert('k1', 'T', 'y'.repeat(12000), deps);
+    expect(hubBody(calls[0]).message).toBe('y'.repeat(12000));
+    await sendUrgentAlert('k1', 'T', 'x'.repeat(15000), deps);
+    const message: string = hubBody(calls[1]).message;
+    expect(message.length).toBeLessThanOrEqual(12000);
+    expect(message.endsWith(CUT_MARKER)).toBe(true);
   });
 
   it('never writes either token to the console', async () => {
@@ -142,41 +152,78 @@ describe('sendUrgentAlert', () => {
   });
 });
 
-describe('sendUrgentEmail keys', () => {
-  afterEach(() => vi.useRealTimers());
+const NOW = '2026-10-25T12:00:00Z';
 
-  async function keyFor(ids: string[], key?: string): Promise<string> {
+describe('sendUrgentEmail', () => {
+  const send = async (ids: string[], now = NOW) => {
     const { calls, fetchImpl } = recorder({});
-    await sendUrgentEmail(ids.map(esc), { ...baseDeps, hubToken: HUB_TOKEN, fetchImpl }, key);
-    return hubBody(calls[0]).key;
-  }
+    await sendUrgentEmail(ids.map(esc), { ...baseDeps, hubToken: HUB_TOKEN, fetchImpl }, now);
+    return calls;
+  };
 
-  it('keys on the date and a hash of the sorted ids, independent of order', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
-    const a = await keyFor(['id-a', 'id-b']);
-    expect(a).toMatch(/^security-urgent:2026-10-25:[0-9a-f]{8}$/);
-    expect(await keyFor(['id-b', 'id-a'])).toBe(a);
-    expect(await keyFor(['id-a', 'id-c'])).not.toBe(a);
-  });
-
-  it('gives the same set a different key on a different date', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-10-25T12:00:00Z'));
-    const a = await keyFor(['id-a']);
-    vi.setSystemTime(new Date('2026-10-26T12:00:00Z'));
-    expect(await keyFor(['id-a'])).not.toBe(a);
-  });
-
-  it('uses the caller key when one is given', async () => {
-    expect(await keyFor(['id-a'], 'security-drift-version-skew')).toBe(
-      'security-drift-version-skew',
+  it('sends a critical notice keyed on the run date from now', async () => {
+    const [call] = await send(['id-a']);
+    expect(hubBody(call)).toMatchObject({
+      key: 'security-urgent:2026-10-25',
+      kind: 'notice',
+      severity: 'critical',
+    });
+    expect(hubBody((await send(['id-a'], '2026-11-02T03:00:00Z'))[0]).key).toBe(
+      'security-urgent:2026-11-02',
     );
+  });
+
+  it('delivers two events on the same date, each as its own request', async () => {
+    const first = await send(['id-a']);
+    const second = await send(['id-b']);
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(1);
+    expect(hubBody(second[0]).kind).toBe('notice');
   });
 
   it('sends nothing for an empty list', async () => {
     const { calls, fetchImpl } = recorder({});
-    expect(await sendUrgentEmail([], { ...baseDeps, hubToken: HUB_TOKEN, fetchImpl })).toBe(false);
+    expect(await sendUrgentEmail([], { ...baseDeps, hubToken: HUB_TOKEN, fetchImpl }, NOW)).toBe(
+      false,
+    );
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('version skew state', () => {
+  it('raises an alert under the fixed skew key', async () => {
+    const { calls, fetchImpl } = recorder({});
+    await sendVersionSkewAlert([esc('id-a')], { ...baseDeps, hubToken: HUB_TOKEN, fetchImpl });
+    expect(hubBody(calls[0])).toMatchObject({
+      key: 'security-drift-version-skew',
+      kind: 'alert',
+      severity: 'critical',
+      status: 'firing',
+    });
+  });
+
+  it('resolves the skew key through the hub only', async () => {
+    const { calls, fetchImpl } = recorder({});
+    await resolveVersionSkew({ ...baseDeps, hubToken: HUB_TOKEN, fetchImpl });
+    expect(calls).toHaveLength(1);
+    expect(hubBody(calls[0])).toMatchObject({
+      key: 'security-drift-version-skew',
+      status: 'resolved',
+      severity: 'critical',
+    });
+    expect(hubBody(calls[0]).kind).toBe('alert');
+  });
+
+  it('does not resolve with no hub token and never uses Resend', async () => {
+    const { calls, fetchImpl } = recorder({ hub: 500 });
+    await resolveVersionSkew({ ...baseDeps, resendApiKey: RESEND_KEY, fetchImpl });
+    expect(calls).toHaveLength(0);
+    await resolveVersionSkew({
+      ...baseDeps,
+      hubToken: HUB_TOKEN,
+      resendApiKey: RESEND_KEY,
+      fetchImpl,
+    });
+    expect(calls.map((c) => c.url)).toEqual(['https://alerts.alobar.net/v1/alerts']);
   });
 });
