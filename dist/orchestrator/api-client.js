@@ -6,7 +6,7 @@
  * for attribution in access logs, not to get past a bot check.
  *
  * Every request carries a default 20s timeout: Node/undici's own default lets a
- * hung-but-accepted connection stall for ~300s, which -- run before the Resend digest and the
+ * hung-but-accepted connection stall for ~300s, which -- run before the alert-hub digest and the
  * Healthchecks ping -- can trigger a false dead-man's-switch alarm about the whole drift job
  * while the job itself is fine. Callers may override via `init.signal`.
  */

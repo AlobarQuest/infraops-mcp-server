@@ -1,6 +1,5 @@
-// Immediate URGENT notification, reusing the Resend email path the drift pipeline
-// already uses (scripts/drift-audit.sh). Best-effort and non-fatal — a failed email
-// must never block the runner. Bodies carry the scanner's already-redacted detail
+// Immediate URGENT notification through alert-hub. Best-effort and non-fatal — a failed
+// send must never block the runner. Bodies carry the scanner's already-redacted detail
 // only; never secret values.
 
 import { sendAlert } from '../alert-hub.js';
@@ -13,21 +12,15 @@ const SKEW_KEY = 'security-drift-version-skew';
 const CUT_MARKER = '… (cut; full list at https://change-mgr.alobar.net)';
 
 export interface NotifyDeps {
-  resendApiKey?: string;
-  from: string;
-  to: string;
   hubToken?: string;
   hubUrl?: string;
   fetchImpl?: typeof fetch;
 }
 
-/** Channel config for the headless CLIs: the hub when ALERT_HUB_TOKEN is set, Resend otherwise. */
+/** Hub config for the headless CLIs: the token comes from ALERT_HUB_TOKEN. */
 export function notifyDepsFromEnv(): NotifyDeps {
   return {
     hubToken: process.env.ALERT_HUB_TOKEN,
-    resendApiKey: process.env.RESEND_API_KEY,
-    from: process.env.INFRADRIFT_EMAIL_FROM ?? 'infra@devonwatkins.com',
-    to: process.env.INFRADRIFT_EMAIL_TO ?? 'devon.watkins@gmail.com',
   };
 }
 
@@ -86,26 +79,10 @@ function fitHubMessage(text: string, kind: HubKind): string {
   return `${head}\n${CUT_MARKER}`;
 }
 
-/** Low-level Resend send. Best-effort: skips when no key, returns false on any failure. */
-async function sendResend(subject: string, text: string, deps: NotifyDeps): Promise<boolean> {
-  if (!deps.resendApiKey) return false; // no key configured → skip (non-fatal)
-  const doFetch = deps.fetchImpl ?? fetch;
-  try {
-    const res = await doFetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${deps.resendApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: deps.from, to: [deps.to], subject, text }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * Send an urgent message through alert-hub when a hub token is set; on a hub failure, or with no
- * token, send it through Resend with `title` as the subject, so an outage never loses it.
- * An event is a `notice` (the hub never dedups it); a state that later clears is an `alert`.
+ * Send an urgent message through alert-hub. A hub failure (or a missing token) logs one line, never
+ * the token, and returns false. An event is a `notice` (the hub never dedups it); a state that
+ * later clears is an `alert`.
  */
 export async function sendUrgentAlert(
   key: string,
@@ -114,21 +91,17 @@ export async function sendUrgentAlert(
   deps: NotifyDeps,
   kind: HubKind = 'notice',
 ): Promise<boolean> {
-  if (deps.hubToken) {
-    const sent = await sendAlert(
-      {
-        key,
-        severity: 'critical',
-        status: 'firing',
-        kind,
-        title,
-        message: fitHubMessage(text, kind),
-      },
-      { token: deps.hubToken, url: deps.hubUrl, fetchImpl: deps.fetchImpl },
-    );
-    if (sent) return true;
-  }
-  return sendResend(title, text, deps);
+  return sendAlert(
+    {
+      key,
+      severity: 'critical',
+      status: 'firing',
+      kind,
+      title,
+      message: fitHubMessage(text, kind),
+    },
+    { token: deps.hubToken, url: deps.hubUrl, fetchImpl: deps.fetchImpl },
+  );
 }
 
 function urgentTitle(items: SecurityEscalation[]): string {

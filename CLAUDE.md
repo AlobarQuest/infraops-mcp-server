@@ -205,7 +205,7 @@ resolves the scanner at `~/.claude/bin/security-scan.sh` (`paths.ts`, env-overri
 `SECURITY_SCAN_PATH`). CLI entry: `dist/cli/security-drift-cli.js run` (chained into
 `scripts/drift-audit.sh`). Modules: `scan-parser` → `taxonomy` (classify, deny-by-default)
 → `baseline` (0600-validated accepted baseline + diff) → `autofix` (guarded chmod) →
-`emit`/`emit-state` (CM escalations + plan-hash) → `notify` (Resend urgent) → `runner`
+`emit`/`emit-state` (CM escalations + plan-hash) → `notify` (alert-hub urgent) → `runner`
 (orchestrator). `security-scan.sh` includes Check 13: control-plane git drift (`~/.claude`
 tracked-file tamper-evidence) — critical-set changes escalate URGENT; `settings.local.json`
 churn is dropped by `taxonomy.ts`. The 4am verbatim executor is `security-executor.ts`, invoked via

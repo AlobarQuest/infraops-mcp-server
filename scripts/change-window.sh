@@ -10,7 +10,7 @@
 # #277 — no secrets in this public file; UUIDs defaulted inline, overridable via
 # BWS_*_SECRET_ID). Runs the change-mgr run-window CLI (executes approved change
 # requests, writes <date>.change-window.md digest to the report dir), sends the
-# digest to alert-hub (Resend fallback), and pings the Healthchecks.io dead-man's switch.
+# digest to alert-hub, and pings the Healthchecks.io dead-man's switch.
 set -uo pipefail
 
 # ── Config (overridable via the sourced env file) ──────────────────────────────
@@ -43,8 +43,6 @@ activate_checkout "$REPO" "$0" "$@"
 
 REPORT_DIR="${INFRADRIFT_REPORT_DIR:-$HOME/infra-drift/reports}"
 LOG_FILE="${INFRADRIFT_CW_LOG:-$HOME/Library/Logs/change-window.log}"
-EMAIL_TO="${INFRADRIFT_EMAIL_TO:-devon.watkins@gmail.com}"
-EMAIL_FROM="${INFRADRIFT_EMAIL_FROM:-infra@devonwatkins.com}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
@@ -69,8 +67,7 @@ export COOLIFY_API_TOKEN="$(get_secret_by_id "${BWS_PROD_COOLIFY_SECRET_ID:-bbd7
 export COOLIFY_DEV_BASE_URL="${COOLIFY_DEV_BASE_URL:-http://192.168.139.217:8000}"
 export COOLIFY_DEV_API_TOKEN="$(get_secret_by_id "${BWS_DEV_COOLIFY_SECRET_ID:-8a2e1e10-d67b-4382-bbf3-b4150178e2a8}")"
 
-export RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
-# alert-hub tokens (urgent alerts and the report notice); an unset ID leaves its token unset.
+# alert-hub tokens (urgent alerts and the report notice), by UUID defaulted in the loader.
 load_alert_hub_tokens
 # Anthropic key for change execution plan generation — fetched by stable UUID,
 # overridable via BWS_ANTHROPIC_SECRET_ID.
@@ -100,7 +97,7 @@ fi
 CW_MD="$REPORT_DIR/$DATE.change-window.md"
 SUBJECT="Change window $DATE"
 
-# ── Send the digest: alert-hub notice, Resend fallback (best-effort) ───────────
+# ── Send the digest: alert-hub notice (best-effort) ───────────
 send_report "report:change-window:$DATE" "$SUBJECT" "$CW_MD" "$REPORT_DIR"
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────

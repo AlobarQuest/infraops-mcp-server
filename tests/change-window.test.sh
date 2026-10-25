@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2317  # the stubs below are called indirectly by the wrapper under test
 # Runs scripts/change-window.sh against stubs (bws, node, curl on PATH; a temporary HOME) and checks
 # what the CLI it launches sees in its environment. Nothing live is contacted.
 # Run: bash tests/change-window.test.sh
@@ -39,14 +40,14 @@ run_wrapper() {
 # env_of <command>: the environment lines recorded for one CLI command.
 env_of() { sed -n "/^== $1\$/,/^==/p" "$WORK/node.env" | grep -v '^=='; }
 
-run_wrapper BWS_RESEND_SECRET_ID=resend-id
-check "run-window sees RESEND_API_KEY for its Resend fallback" \
-  grep -qx 'RESEND_API_KEY=value-of-resend-id' < <(env_of run-window)
-check "run-security-window sees RESEND_API_KEY for its Resend fallback" \
-  grep -qx 'RESEND_API_KEY=value-of-resend-id' < <(env_of run-security-window)
+run_wrapper
+check "run-security-window sees the default ALERT_HUB_TOKEN for the integrity-refusal notice" \
+  grep -qx 'ALERT_HUB_TOKEN=value-of-7a36a369-c649-4893-a768-b4ee00feb92a' < <(env_of run-security-window)
+no_resend() { ! grep -q RESEND_API_KEY "$WORK/node.env"; }
+check "the CLIs get no RESEND_API_KEY" no_resend
 
 run_wrapper BWS_ALERT_HUB_TOKEN_ID=hub-id BWS_ALERT_HUB_REPORT_TOKEN_ID=rep-id
-check "run-security-window sees ALERT_HUB_TOKEN for the integrity-refusal notice" \
+check "run-security-window sees a token from an overriding ID" \
   grep -qx 'ALERT_HUB_TOKEN=value-of-hub-id' < <(env_of run-security-window)
 
 exit "$FAILED"
