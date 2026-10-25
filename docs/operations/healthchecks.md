@@ -45,7 +45,7 @@ the existing check (HTTP 200) instead of a duplicate (HTTP 201 means it was crea
 curl -fsS -X POST https://healthcheck.alobar.net/api/v3/checks/ \
   -H "X-Api-Key: $HC_KEY" -H "Content-Type: application/json" \
   -d '{"name": "<kebab-case-job-name>", "schedule": "30 3 * * *", "tz": "America/New_York",
-       "grace": 3600, "channels": "*", "unique": ["name"], "desc": "<repo and launcher>"}'
+       "grace": 3600, "channels": "alert-hub", "unique": ["name"], "desc": "<repo and launcher>"}'
 ```
 
 - **Name:** kebab-case, matching the launchd label or lane (`sds-<lane>`). Pingers find the check
@@ -55,8 +55,10 @@ curl -fsS -X POST https://healthcheck.alobar.net/api/v3/checks/ \
   `timeout` in seconds instead.
 - **Grace:** how late a run may be before the check goes down. Existing jobs use 3,600 seconds for
   hourly jobs and 14,400 for the nightly SDS lanes.
-- **`channels: "*"`:** attaches every integration (Devon's email). It attaches only integrations
-  that exist at creation time.
+- **`channels: "alert-hub"`:** attaches the `alert-hub` webhook, which sends the check's down and up
+  events to alert-hub (`https://alerts.alobar.net`). Don't use `"*"`: it would also attach the
+  email integration and deliver every failure twice. Only the hub's own `alert-hub` check uses
+  email, because the hub can't report its own outage.
 
 A new check stays in `new` status, which never alerts, until its first ping.
 
