@@ -56,11 +56,31 @@ function e0(items: SecurityEscalation[]): string {
   return items[0]?.plan.blind_spots ?? '';
 }
 
-/** Cut to the hub's limit for `kind`, ending with a pointer to the full list. */
+/** The hub rejects a request body over 16,384 bytes; the message is JSON-encoded inside it. */
+const HUB_MESSAGE_BYTE_LIMIT = 15000;
+
+function fitsHub(text: string, limit: number): boolean {
+  return (
+    text.length <= limit &&
+    Buffer.byteLength(JSON.stringify(text), 'utf8') <= HUB_MESSAGE_BYTE_LIMIT
+  );
+}
+
+/**
+ * Cut to the hub's limits for `kind` (characters and JSON-encoded bytes), ending with a pointer to
+ * the full list. Finds the longest head that still fits with the pointer appended.
+ */
 function fitHubMessage(text: string, kind: HubKind): string {
   const limit = HUB_MESSAGE_LIMIT[kind];
-  if (text.length <= limit) return text;
-  let head = text.slice(0, limit - CUT_MARKER.length - 1);
+  if (fitsHub(text, limit)) return text;
+  let lo = 0;
+  let hi = Math.min(text.length, limit);
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (fitsHub(`${text.slice(0, mid)}\n${CUT_MARKER}`, limit)) lo = mid;
+    else hi = mid - 1;
+  }
+  let head = text.slice(0, lo);
   const last = head.charCodeAt(head.length - 1);
   if (last >= 0xd800 && last <= 0xdbff) head = head.slice(0, -1); // don't split a surrogate pair
   return `${head}\n${CUT_MARKER}`;

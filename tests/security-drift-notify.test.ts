@@ -131,6 +131,21 @@ describe('sendUrgentAlert', () => {
     expect(message.endsWith(CUT_MARKER)).toBe(true);
   });
 
+  it.each([
+    ['quotes, newlines and backslashes', '"\n\\'],
+    ['bullets', '•'],
+    ['emoji', '😀'],
+  ])('cuts a 12000-character notice of %s to 15000 encoded bytes', async (_name, unit) => {
+    const { calls, fetchImpl } = recorder({});
+    const body = unit.repeat(Math.ceil(12000 / unit.length)).slice(0, 12000);
+    await sendUrgentAlert('k1', 'T', body, { ...baseDeps, hubToken: HUB_TOKEN, fetchImpl });
+    const message: string = hubBody(calls[0]).message;
+    expect(message.length).toBeLessThanOrEqual(12000);
+    expect(Buffer.byteLength(JSON.stringify(message), 'utf8')).toBeLessThanOrEqual(15000);
+    expect(message.endsWith(CUT_MARKER)).toBe(true);
+    expect(message).not.toMatch(/[\ud800-\udbff]\n/); // no split surrogate pair before the marker
+  });
+
   it('never writes either token to the console', async () => {
     const { fetchImpl } = recorder({ hub: 500, resend: 500 });
     await sendUrgentAlert('k1', 'Title', 'Body', {
