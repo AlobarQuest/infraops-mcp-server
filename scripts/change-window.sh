@@ -9,8 +9,8 @@
 # Every other secret is fetched from BWS *by stable UUID* (per infra-brain lesson
 # #277 — no secrets in this public file; UUIDs defaulted inline, overridable via
 # BWS_*_SECRET_ID). Runs the change-mgr run-window CLI (executes approved change
-# requests, writes <date>.change-window.md digest to the report dir), emails the
-# digest via Resend, and pings the Healthchecks.io dead-man's switch.
+# requests, writes <date>.change-window.md digest to the report dir), sends the
+# digest to alert-hub (Resend fallback), and pings the Healthchecks.io dead-man's switch.
 set -uo pipefail
 
 # ── Config (overridable via the sourced env file) ──────────────────────────────
@@ -19,6 +19,7 @@ if [ -f "$CONFIG" ]; then set -a; . "$CONFIG"; set +a; fi
 
 # Bootstrap BWS token from the login Keychain (not the env file). Idempotent.
 source "$(dirname "${BASH_SOURCE[0]}")/bws-token.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/report-notice.sh"
 
 REPO="${INFRADRIFT_REPO:-$HOME/Projects/infraops-mcp-server}"
 # ACTIVATION — a merged change is not live on this machine until the code is pulled. The estate's
@@ -68,7 +69,9 @@ export COOLIFY_API_TOKEN="$(get_secret_by_id "${BWS_PROD_COOLIFY_SECRET_ID:-bbd7
 export COOLIFY_DEV_BASE_URL="${COOLIFY_DEV_BASE_URL:-http://192.168.139.217:8000}"
 export COOLIFY_DEV_API_TOKEN="$(get_secret_by_id "${BWS_DEV_COOLIFY_SECRET_ID:-8a2e1e10-d67b-4382-bbf3-b4150178e2a8}")"
 
-RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
+export RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
+# alert-hub tokens (urgent alerts and the report notice); an unset ID leaves its token unset.
+load_alert_hub_tokens
 # Anthropic key for change execution plan generation — fetched by stable UUID,
 # overridable via BWS_ANTHROPIC_SECRET_ID.
 export ANTHROPIC_API_KEY="$(get_secret_by_id "${BWS_ANTHROPIC_SECRET_ID:-b74bf8b3-938b-45c0-bc25-b415013cb563}")"
@@ -97,25 +100,8 @@ fi
 CW_MD="$REPORT_DIR/$DATE.change-window.md"
 SUBJECT="Change window $DATE"
 
-# ── Email digest via Resend (best-effort) ──────────────────────────────────────
-if [ -n "$RESEND_API_KEY" ] && [ -f "$CW_MD" ]; then
-  # Build the JSON payload with python (safe escaping of the markdown body), send with
-  # curl (the path proven to work against the Resend API).
-  PAYLOAD_FILE="$(mktemp -t change-window-mail)"
-  EMAIL_FROM="$EMAIL_FROM" EMAIL_TO="$EMAIL_TO" SUBJECT="$SUBJECT" MD="$CW_MD" python3 - > "$PAYLOAD_FILE" <<'PY'
-import os, json
-print(json.dumps({"from": os.environ['EMAIL_FROM'], "to": [os.environ['EMAIL_TO']],
-                  "subject": os.environ['SUBJECT'], "text": open(os.environ['MD']).read()}))
-PY
-  if curl -fsS --max-time 20 -X POST https://api.resend.com/emails \
-       -H "Authorization: Bearer $RESEND_API_KEY" -H "Content-Type: application/json" \
-       --data @"$PAYLOAD_FILE" >/dev/null 2>&1; then
-    log "digest emailed to $EMAIL_TO"
-  else
-    log "WARN: digest email failed"
-  fi
-  rm -f "$PAYLOAD_FILE"
-fi
+# ── Send the digest: alert-hub notice, Resend fallback (best-effort) ───────────
+send_report "report:change-window:$DATE" "$SUBJECT" "$CW_MD" "$REPORT_DIR"
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────
 if [ -n "$HC_URL" ]; then

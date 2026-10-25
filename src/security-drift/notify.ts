@@ -3,13 +3,32 @@
 // must never block the runner. Bodies carry the scanner's already-redacted detail
 // only; never secret values.
 
+import { sendAlert } from '../alert-hub.js';
 import type { SecurityEscalation } from './emit.js';
+
+type HubKind = 'alert' | 'notice';
+/** The hub's message limits: an alert holds 4,000 characters, a notice 12,000. */
+const HUB_MESSAGE_LIMIT: Record<HubKind, number> = { alert: 4000, notice: 12000 };
+const SKEW_KEY = 'security-drift-version-skew';
+const CUT_MARKER = '… (cut; full list at https://change-mgr.alobar.net)';
 
 export interface NotifyDeps {
   resendApiKey?: string;
   from: string;
   to: string;
+  hubToken?: string;
+  hubUrl?: string;
   fetchImpl?: typeof fetch;
+}
+
+/** Channel config for the headless CLIs: the hub when ALERT_HUB_TOKEN is set, Resend otherwise. */
+export function notifyDepsFromEnv(): NotifyDeps {
+  return {
+    hubToken: process.env.ALERT_HUB_TOKEN,
+    resendApiKey: process.env.RESEND_API_KEY,
+    from: process.env.INFRADRIFT_EMAIL_FROM ?? 'infra@devonwatkins.com',
+    to: process.env.INFRADRIFT_EMAIL_TO ?? 'devon.watkins@gmail.com',
+  };
 }
 
 function renderBody(items: SecurityEscalation[]): string {
@@ -37,12 +56,38 @@ function e0(items: SecurityEscalation[]): string {
   return items[0]?.plan.blind_spots ?? '';
 }
 
+/** The hub rejects a request body over 16,384 bytes; the message is JSON-encoded inside it. */
+const HUB_MESSAGE_BYTE_LIMIT = 15000;
+
+function fitsHub(text: string, limit: number): boolean {
+  return (
+    text.length <= limit &&
+    Buffer.byteLength(JSON.stringify(text), 'utf8') <= HUB_MESSAGE_BYTE_LIMIT
+  );
+}
+
+/**
+ * Cut to the hub's limits for `kind` (characters and JSON-encoded bytes), ending with a pointer to
+ * the full list. Finds the longest head that still fits with the pointer appended.
+ */
+function fitHubMessage(text: string, kind: HubKind): string {
+  const limit = HUB_MESSAGE_LIMIT[kind];
+  if (fitsHub(text, limit)) return text;
+  let lo = 0;
+  let hi = Math.min(text.length, limit);
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (fitsHub(`${text.slice(0, mid)}\n${CUT_MARKER}`, limit)) lo = mid;
+    else hi = mid - 1;
+  }
+  let head = text.slice(0, lo);
+  const last = head.charCodeAt(head.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) head = head.slice(0, -1); // don't split a surrogate pair
+  return `${head}\n${CUT_MARKER}`;
+}
+
 /** Low-level Resend send. Best-effort: skips when no key, returns false on any failure. */
-export async function sendAlertEmail(
-  subject: string,
-  text: string,
-  deps: NotifyDeps,
-): Promise<boolean> {
+async function sendResend(subject: string, text: string, deps: NotifyDeps): Promise<boolean> {
   if (!deps.resendApiKey) return false; // no key configured → skip (non-fatal)
   const doFetch = deps.fetchImpl ?? fetch;
   try {
@@ -57,15 +102,70 @@ export async function sendAlertEmail(
   }
 }
 
-/** Send the immediate URGENT email. Returns true on a 2xx, false if skipped or failed. */
+/**
+ * Send an urgent message through alert-hub when a hub token is set; on a hub failure, or with no
+ * token, send it through Resend with `title` as the subject, so an outage never loses it.
+ * An event is a `notice` (the hub never dedups it); a state that later clears is an `alert`.
+ */
+export async function sendUrgentAlert(
+  key: string,
+  title: string,
+  text: string,
+  deps: NotifyDeps,
+  kind: HubKind = 'notice',
+): Promise<boolean> {
+  if (deps.hubToken) {
+    const sent = await sendAlert(
+      {
+        key,
+        severity: 'critical',
+        status: 'firing',
+        kind,
+        title,
+        message: fitHubMessage(text, kind),
+      },
+      { token: deps.hubToken, url: deps.hubUrl, fetchImpl: deps.fetchImpl },
+    );
+    if (sent) return true;
+  }
+  return sendResend(title, text, deps);
+}
+
+function urgentTitle(items: SecurityEscalation[]): string {
+  return `🚨 URGENT security drift — ${items.length} item(s) need approval now`;
+}
+
+/** Send the immediate URGENT notice for this run's new items. True on delivery. */
 export async function sendUrgentEmail(
+  items: SecurityEscalation[],
+  deps: NotifyDeps,
+  now: string,
+): Promise<boolean> {
+  if (!items.length) return false;
+  const key = `security-urgent:${now.slice(0, 10)}`;
+  return sendUrgentAlert(key, urgentTitle(items), renderBody(items), deps);
+}
+
+/** Scanner version skew is a state: an alert that stays open until a clean run resolves it. */
+export async function sendVersionSkewAlert(
   items: SecurityEscalation[],
   deps: NotifyDeps,
 ): Promise<boolean> {
   if (!items.length) return false;
-  return sendAlertEmail(
-    `🚨 URGENT security drift — ${items.length} item(s) need approval now`,
-    renderBody(items),
-    deps,
+  return sendUrgentAlert(SKEW_KEY, urgentTitle(items), renderBody(items), deps, 'alert');
+}
+
+/** Close the skew alert after a run with no skew. Hub only: a resolve is never emailed. */
+export async function resolveVersionSkew(deps: NotifyDeps): Promise<boolean> {
+  if (!deps.hubToken) return false;
+  return sendAlert(
+    {
+      key: SKEW_KEY,
+      severity: 'critical',
+      status: 'resolved',
+      kind: 'alert',
+      title: 'Scanner output version matches again',
+    },
+    { token: deps.hubToken, url: deps.hubUrl, fetchImpl: deps.fetchImpl },
   );
 }
