@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2317  # the stubs below are called indirectly by the sourced report-notice.sh
 # Tests for scripts/lib/report-notice.sh. Stubs curl (on PATH) and alert-hub-send.sh.
 # Run: bash tests/report-notice.test.sh
 # shellcheck disable=SC2329 # helpers run indirectly through check(), and log() from the sourced lib
