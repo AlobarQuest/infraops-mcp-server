@@ -72,7 +72,11 @@ export COOLIFY_DEV_API_TOKEN="$(get_secret_by_id "${BWS_DEV_COOLIFY_SECRET_ID:-8
 RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
 # alert-hub report token, by UUID from the env file. An unset ID leaves the token unset, so the
 # Resend path runs. Never echoed.
-unset ALERT_HUB_REPORT_TOKEN
+# ALERT_HUB_TOKEN carries the security executor's integrity-refusal alert (change-mgr-cli).
+unset ALERT_HUB_TOKEN ALERT_HUB_REPORT_TOKEN
+if [ -n "${BWS_ALERT_HUB_TOKEN_ID:-}" ]; then
+  export ALERT_HUB_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_TOKEN_ID")"
+fi
 if [ -n "${BWS_ALERT_HUB_REPORT_TOKEN_ID:-}" ]; then
   export ALERT_HUB_REPORT_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_REPORT_TOKEN_ID")"
 fi
