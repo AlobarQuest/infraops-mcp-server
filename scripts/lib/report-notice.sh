@@ -1,7 +1,6 @@
 #!/bin/bash
-# Shared by drift-audit.sh and change-window.sh: send a daily report to alert-hub as a notice,
-# falling back to Resend. Sourced, not executed. The caller defines log() and EMAIL_FROM/EMAIL_TO,
-# and exports RESEND_API_KEY and (optionally) ALERT_HUB_REPORT_TOKEN.
+# Shared by drift-audit.sh and change-window.sh: send a daily report to alert-hub as a notice.
+# Sourced, not executed. The caller defines log() and get_secret_by_id().
 
 _REPORT_NOTICE_DIR="$(dirname "${BASH_SOURCE[0]}")"
 # Overridable so the test can stub the helper.
@@ -38,17 +37,13 @@ sys.stdout.write(body[:end] + footer)
 PY
 }
 
-# Export the alert-hub tokens from BWS by the UUIDs in BWS_ALERT_HUB_TOKEN_ID (urgent alerts, read
-# by the CLIs) and BWS_ALERT_HUB_REPORT_TOKEN_ID (the report notice). A token whose ID is unset is
-# left unset, so its messages go through Resend. Needs the caller's get_secret_by_id; never echoes.
+# Export the alert-hub tokens from BWS by UUID: ALERT_HUB_TOKEN (urgent alerts, read by the CLIs)
+# and ALERT_HUB_REPORT_TOKEN (the report notice). The UUIDs default inline and are overridable via
+# BWS_ALERT_HUB_TOKEN_ID / BWS_ALERT_HUB_REPORT_TOKEN_ID. Needs the caller's get_secret_by_id;
+# never echoes a token.
 load_alert_hub_tokens() {
-  unset ALERT_HUB_TOKEN ALERT_HUB_REPORT_TOKEN
-  if [ -n "${BWS_ALERT_HUB_TOKEN_ID:-}" ]; then
-    export ALERT_HUB_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_TOKEN_ID")"
-  fi
-  if [ -n "${BWS_ALERT_HUB_REPORT_TOKEN_ID:-}" ]; then
-    export ALERT_HUB_REPORT_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_REPORT_TOKEN_ID")"
-  fi
+  export ALERT_HUB_TOKEN="$(get_secret_by_id "${BWS_ALERT_HUB_TOKEN_ID:-7a36a369-c649-4893-a768-b4ee00feb92a}")"
+  export ALERT_HUB_REPORT_TOKEN="$(get_secret_by_id "${BWS_ALERT_HUB_REPORT_TOKEN_ID:-4ed74de3-09d4-408f-917a-b4ee00feba75}")"
 }
 
 # Succeeds only when the hub accepted the notice. The token reaches the helper through its
@@ -60,37 +55,16 @@ _send_report_notice() { # _send_report_notice <key> <subject> <body-file> <full-
     "$ALERT_HUB_SEND" --notice -- "$1" info "$2" "$message"
 }
 
-_send_report_resend() { # _send_report_resend <subject> <body-file>
-  [ -n "${RESEND_API_KEY:-}" ] && [ -f "$2" ] || return 0
-  # Build the JSON payload with python (safe escaping of the markdown body), send with
-  # curl (the path proven to work against the Resend API).
-  local payload_file
-  payload_file="$(mktemp -t report-mail)"
-  EMAIL_FROM="$EMAIL_FROM" EMAIL_TO="$EMAIL_TO" SUBJECT="$1" MD="$2" python3 - > "$payload_file" <<'PY'
-import os, json
-print(json.dumps({"from": os.environ['EMAIL_FROM'], "to": [os.environ['EMAIL_TO']],
-                  "subject": os.environ['SUBJECT'], "text": open(os.environ['MD']).read()}))
-PY
-  if curl -fsS --max-time 20 -X POST https://api.resend.com/emails \
-       -H "Authorization: Bearer $RESEND_API_KEY" -H "Content-Type: application/json" \
-       --data @"$payload_file" >/dev/null 2>&1; then
-    log "digest emailed to $EMAIL_TO"
-  else
-    log "WARN: digest email failed"
-  fi
-  rm -f "$payload_file"
-}
-
 # send_report <key> <subject> <body-file> <reports-dir-for-footer>
-# Best-effort and non-fatal: always returns 0.
+# Best-effort and non-fatal: logs one WARN line on failure and always returns 0.
 send_report() {
   [ -f "$3" ] || return 0
-  if [ -n "${ALERT_HUB_REPORT_TOKEN:-}" ]; then
-    if _send_report_notice "$@"; then
-      log "digest sent to alert-hub ($1)"
-      return 0
-    fi
-    log "WARN: alert-hub notice failed; falling back to Resend"
+  if [ -z "${ALERT_HUB_REPORT_TOKEN:-}" ]; then
+    log "WARN: no alert-hub report token; digest not sent"
+  elif _send_report_notice "$@"; then
+    log "digest sent to alert-hub ($1)"
+  else
+    log "WARN: alert-hub notice failed; digest not sent"
   fi
-  _send_report_resend "$2" "$3"
+  return 0
 }

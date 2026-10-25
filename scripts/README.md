@@ -21,7 +21,7 @@ BWS + Healthchecks.io).
    - dev Coolify token (`local-coolify-api`) — `BWS_DEV_COOLIFY_SECRET_ID`
    - infra-brain key (`INFRABRAIN_ACCESS_KEY`) — `BWS_INFRABRAIN_SECRET_ID`
    - app-brain key (`APPBRAIN_ACCESS_KEY`) — `BWS_APPBRAIN_SECRET_ID` (app-brain's own distinct key); base URL `APPBRAIN_BASE_URL`
-   - Resend key (`resend-api-key`) — `BWS_RESEND_SECRET_ID`
+   - alert-hub sender tokens (project `Alert Hub Senders`) — `BWS_ALERT_HUB_TOKEN_ID`, `BWS_ALERT_HUB_REPORT_TOKEN_ID`
    - Anthropic key (`anthropic-api-key`) — `BWS_ANTHROPIC_SECRET_ID`
 
    The Anthropic key is used only for plan generation; the deterministic
@@ -80,21 +80,21 @@ a daily run is missed (e.g. mini offline), so a skipped run never goes unnoticed
 ## Alerts and reports through alert-hub
 
 Urgent security alerts and the two daily reports go to Devon through alert-hub
-(`https://alerts.alobar.net`). Resend stays as the fallback.
+(`https://alerts.alobar.net`). There is no other path: Resend is gone.
 
 | Sender            | Sends                                                               | Token variable           | BWS UUID variable (in `~/.config/infra-drift/env`) |
 | ----------------- | ------------------------------------------------------------------- | ------------------------ | -------------------------------------------------- |
 | `infraops`        | Urgent security alerts (critical)                                   | `ALERT_HUB_TOKEN`        | `BWS_ALERT_HUB_TOKEN_ID`                           |
 | `report-infraops` | The 03:00 drift digest and the 04:00 change-window digest (notices) | `ALERT_HUB_REPORT_TOKEN` | `BWS_ALERT_HUB_REPORT_TOKEN_ID`                    |
 
-The wrappers fetch each token from BWS by UUID when its `BWS_*_ID` variable is set, and export
-it. Both wrappers fetch both tokens through `load_alert_hub_tokens`: the security-drift CLI (3am) and
-the security executor (4am) send the urgent messages.
+Both wrappers fetch both tokens through `load_alert_hub_tokens`, by UUID from the BWS project
+`Alert Hub Senders`. The UUIDs default inline, like the other secrets, and `BWS_ALERT_HUB_TOKEN_ID` /
+`BWS_ALERT_HUB_REPORT_TOKEN_ID` (in `~/.config/infra-drift/env`) override them. The security-drift
+CLI (3am) and the security executor (4am) send the urgent messages.
 
-**Fallback rule.** With a token unset (its UUID variable is unset, or the fetch returned
-nothing), the matching messages go through Resend as before. With a token set, a failed hub
-send also falls through to Resend, so a hub outage never loses an urgent alert or a digest.
-A failed send logs one line and never fails the run.
+**Failure rule.** A failed send, or a missing token, logs one line and never fails the run. A
+digest or alert that the hub refuses is not retried or emailed, so watch the hub's History and the
+wrapper logs.
 
 **Events and states.** An urgent escalation and a security-executor refusal are one-off events, so
 they go as critical _notices_, which the hub never deduplicates. Scanner version skew is a state: it

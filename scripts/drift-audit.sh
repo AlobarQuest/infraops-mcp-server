@@ -11,7 +11,7 @@
 # audit CLI (writes <date>.json + delta + <date>.md to the report dir), then the
 # remediation CLI (auto-applies safe fixes, plans caution/destructive/question items,
 # writes <date>.remediation.json + <date>.remediation.md), emails the consolidated
-# digest to alert-hub (Resend fallback), and pings the Healthchecks.io dead-man's switch.
+# digest to alert-hub, and pings the Healthchecks.io dead-man's switch.
 set -uo pipefail
 
 # ── Config (overridable via the sourced env file) ──────────────────────────────
@@ -44,8 +44,6 @@ activate_checkout "$REPO" "$0" "$@"
 
 REPORT_DIR="${INFRADRIFT_REPORT_DIR:-$HOME/infra-drift/reports}"
 LOG_FILE="${INFRADRIFT_LOG:-$HOME/Library/Logs/infra-drift.log}"
-EMAIL_TO="${INFRADRIFT_EMAIL_TO:-devon.watkins@gmail.com}"
-EMAIL_FROM="${INFRADRIFT_EMAIL_FROM:-infra@devonwatkins.com}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
@@ -81,8 +79,7 @@ export INFRABRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_INFRABRAIN_SECRET_ID:-45
 export APPBRAIN_BASE_URL="${APPBRAIN_BASE_URL:-https://app-brain.devonwatkins.com}"
 export APPBRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_APPBRAIN_SECRET_ID:-68733abe-682a-4597-b88f-b4750189a56a}")"
 
-RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
-# alert-hub tokens (urgent alerts and the report notice); an unset ID leaves its token unset.
+# alert-hub tokens (urgent alerts and the report notice), by UUID defaulted in the loader.
 load_alert_hub_tokens
 # Anthropic key for remediation plan generation — fetched by stable UUID (BWS key
 # name "anthropic-api-key"), overridable via BWS_ANTHROPIC_SECRET_ID.
@@ -171,10 +168,9 @@ fi
 
 # ── Best-effort: machine security-posture drift → change manager (non-fatal) ─────
 # Runs security-scan.sh, auto-fixes the narrow set (guarded chmod), posts the rest
-# to the CM (source=security), and emails NEW urgent items immediately. Reuses the
-# CM token exported above; passes the Resend creds for the urgent-email path.
-if RESEND_API_KEY="$RESEND_API_KEY" INFRADRIFT_EMAIL_TO="$EMAIL_TO" INFRADRIFT_EMAIL_FROM="$EMAIL_FROM" \
-  node "$REPO/dist/cli/security-drift-cli.js" run --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1; then
+# to the CM (source=security), and sends NEW urgent items to alert-hub immediately. Reuses the
+# CM token exported above; ALERT_HUB_TOKEN is already exported.
+if node "$REPO/dist/cli/security-drift-cli.js" run --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1; then
   log "security-drift run ok"
 else
   log "WARN: security-drift run failed (non-fatal)"
@@ -206,7 +202,7 @@ if [ -f "$BODY_MD" ]; then
   { printf '👉 Review & approve pending items: %s/?status=pending\n\n' "$CHANGE_MGR_API_BASE"; cat "$BODY_MD"; } > "$LINKED_BODY" 2>/dev/null && BODY_MD="$LINKED_BODY"
 fi
 
-# ── Send the digest: alert-hub notice, Resend fallback (best-effort) ───────────
+# ── Send the digest: alert-hub notice (best-effort) ───────────
 send_report "report:infra-drift:$DATE" "$SUBJECT" "$BODY_MD" "$REPORT_DIR"
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────
