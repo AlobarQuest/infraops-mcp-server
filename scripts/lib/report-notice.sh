@@ -38,6 +38,19 @@ sys.stdout.write(body[:end] + footer)
 PY
 }
 
+# Export the alert-hub tokens from BWS by the UUIDs in BWS_ALERT_HUB_TOKEN_ID (urgent alerts, read
+# by the CLIs) and BWS_ALERT_HUB_REPORT_TOKEN_ID (the report notice). A token whose ID is unset is
+# left unset, so its messages go through Resend. Needs the caller's get_secret_by_id; never echoes.
+load_alert_hub_tokens() {
+  unset ALERT_HUB_TOKEN ALERT_HUB_REPORT_TOKEN
+  if [ -n "${BWS_ALERT_HUB_TOKEN_ID:-}" ]; then
+    export ALERT_HUB_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_TOKEN_ID")"
+  fi
+  if [ -n "${BWS_ALERT_HUB_REPORT_TOKEN_ID:-}" ]; then
+    export ALERT_HUB_REPORT_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_REPORT_TOKEN_ID")"
+  fi
+}
+
 # Succeeds only when the hub accepted the notice. The token reaches the helper through its
 # environment, never argv.
 _send_report_notice() { # _send_report_notice <key> <subject> <body-file> <full-path>

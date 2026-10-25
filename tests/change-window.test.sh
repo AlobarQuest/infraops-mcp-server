@@ -45,4 +45,8 @@ check "run-window sees RESEND_API_KEY for its Resend fallback" \
 check "run-security-window sees RESEND_API_KEY for its Resend fallback" \
   grep -qx 'RESEND_API_KEY=value-of-resend-id' < <(env_of run-security-window)
 
+run_wrapper BWS_ALERT_HUB_TOKEN_ID=hub-id BWS_ALERT_HUB_REPORT_TOKEN_ID=rep-id
+check "run-security-window sees ALERT_HUB_TOKEN for the integrity-refusal notice" \
+  grep -qx 'ALERT_HUB_TOKEN=value-of-hub-id' < <(env_of run-security-window)
+
 exit "$FAILED"

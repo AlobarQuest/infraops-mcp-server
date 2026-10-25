@@ -70,16 +70,8 @@ export COOLIFY_DEV_BASE_URL="${COOLIFY_DEV_BASE_URL:-http://192.168.139.217:8000
 export COOLIFY_DEV_API_TOKEN="$(get_secret_by_id "${BWS_DEV_COOLIFY_SECRET_ID:-8a2e1e10-d67b-4382-bbf3-b4150178e2a8}")"
 
 export RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
-# alert-hub report token, by UUID from the env file. An unset ID leaves the token unset, so the
-# Resend path runs. Never echoed.
-# ALERT_HUB_TOKEN carries the security executor's integrity-refusal alert (change-mgr-cli).
-unset ALERT_HUB_TOKEN ALERT_HUB_REPORT_TOKEN
-if [ -n "${BWS_ALERT_HUB_TOKEN_ID:-}" ]; then
-  export ALERT_HUB_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_TOKEN_ID")"
-fi
-if [ -n "${BWS_ALERT_HUB_REPORT_TOKEN_ID:-}" ]; then
-  export ALERT_HUB_REPORT_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_REPORT_TOKEN_ID")"
-fi
+# alert-hub tokens (urgent alerts and the report notice); an unset ID leaves its token unset.
+load_alert_hub_tokens
 # Anthropic key for change execution plan generation — fetched by stable UUID,
 # overridable via BWS_ANTHROPIC_SECRET_ID.
 export ANTHROPIC_API_KEY="$(get_secret_by_id "${BWS_ANTHROPIC_SECRET_ID:-b74bf8b3-938b-45c0-bc25-b415013cb563}")"

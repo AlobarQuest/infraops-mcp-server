@@ -82,16 +82,8 @@ export APPBRAIN_BASE_URL="${APPBRAIN_BASE_URL:-https://app-brain.devonwatkins.co
 export APPBRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_APPBRAIN_SECRET_ID:-68733abe-682a-4597-b88f-b4750189a56a}")"
 
 RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
-# alert-hub tokens, by UUID from the env file. An unset ID leaves the token unset, so the Resend
-# path runs. ALERT_HUB_TOKEN (urgent alerts, read by the security-drift CLI) and
-# ALERT_HUB_REPORT_TOKEN (the daily report notice) are never echoed.
-unset ALERT_HUB_TOKEN ALERT_HUB_REPORT_TOKEN
-if [ -n "${BWS_ALERT_HUB_TOKEN_ID:-}" ]; then
-  export ALERT_HUB_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_TOKEN_ID")"
-fi
-if [ -n "${BWS_ALERT_HUB_REPORT_TOKEN_ID:-}" ]; then
-  export ALERT_HUB_REPORT_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_REPORT_TOKEN_ID")"
-fi
+# alert-hub tokens (urgent alerts and the report notice); an unset ID leaves its token unset.
+load_alert_hub_tokens
 # Anthropic key for remediation plan generation — fetched by stable UUID (BWS key
 # name "anthropic-api-key"), overridable via BWS_ANTHROPIC_SECRET_ID.
 export ANTHROPIC_API_KEY="$(get_secret_by_id "${BWS_ANTHROPIC_SECRET_ID:-b74bf8b3-938b-45c0-bc25-b415013cb563}")"

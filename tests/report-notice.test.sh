@@ -112,4 +112,15 @@ ALERT_HUB_REPORT_TOKEN=report-token RESEND_API_KEY=resend-key send_report "k" "S
 check "missing body: hub not called" absent "$WORK/hub.args"
 check "missing body: Resend not called" absent "$WORK/curl.args"
 
+# --- load_alert_hub_tokens: fetch each token by its BWS_*_ID, otherwise leave it unset -------------
+get_secret_by_id() { printf 'value-of-%s' "$1"; }
+export_state() { env | grep -E '^ALERT_HUB_(REPORT_)?TOKEN=' | sort | tr '\n' ' '; }
+check "tokens: both fetched when both IDs are set" eq \
+  "$(BWS_ALERT_HUB_TOKEN_ID=hub-id BWS_ALERT_HUB_REPORT_TOKEN_ID=rep-id bash -c \
+    "$(declare -f get_secret_by_id export_state); . '$ROOT/scripts/lib/report-notice.sh'; load_alert_hub_tokens; export_state")" \
+  "ALERT_HUB_REPORT_TOKEN=value-of-rep-id ALERT_HUB_TOKEN=value-of-hub-id "
+check "tokens: unset when no ID is set, even if inherited" eq \
+  "$(ALERT_HUB_TOKEN=stale ALERT_HUB_REPORT_TOKEN=stale bash -c \
+    "$(declare -f get_secret_by_id export_state); . '$ROOT/scripts/lib/report-notice.sh'; load_alert_hub_tokens; export_state")" ""
+
 exit "$FAILED"
