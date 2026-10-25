@@ -8,7 +8,7 @@ import { runWindow } from '../change-manager/run-window.js';
 import { renderWindowMarkdown } from '../change-manager/window-report.js';
 import { runSecurityWindow } from '../security-drift/security-executor.js';
 import { securityPaths } from '../security-drift/paths.js';
-import { sendAlertEmail } from '../security-drift/notify.js';
+import { notifyDepsFromEnv, sendUrgentAlert } from '../security-drift/notify.js';
 import { execFileSync } from 'child_process';
 import { defaultRotationDeps } from '../security-drift/rotation-executor.js';
 import { loadRotationState, saveRotationState } from '../security-drift/cred-rotation.js';
@@ -127,11 +127,7 @@ async function doRunSecurityWindow(reportDir: string | undefined, now: string): 
   const c = client('security-executor');
   const p = securityPaths();
   const rotationToken = credRotationBwsToken();
-  const notifyDeps = {
-    resendApiKey: process.env.RESEND_API_KEY,
-    from: process.env.INFRADRIFT_EMAIL_FROM ?? 'infra@devonwatkins.com',
-    to: process.env.INFRADRIFT_EMAIL_TO ?? 'devon.watkins@gmail.com',
-  };
+  const notifyDeps = notifyDepsFromEnv();
   const refusesRotation = rotationRefusals(p.credConsumersList);
   const summary = await runSecurityWindow({
     refusesRotation,
@@ -143,7 +139,8 @@ async function doRunSecurityWindow(reportDir: string | undefined, now: string): 
       await c.postOutcome(id, body);
     },
     onIntegrityFailure: async (item, reason) => {
-      await sendAlertEmail(
+      await sendUrgentAlert(
+        `security-executor-refused:${item.id}`,
         '🚨 Security executor REFUSED a plan (integrity)',
         `${item.resource_name} (item ${item.id}): ${reason}`,
         notifyDeps,
