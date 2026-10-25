@@ -11,7 +11,7 @@
 # audit CLI (writes <date>.json + delta + <date>.md to the report dir), then the
 # remediation CLI (auto-applies safe fixes, plans caution/destructive/question items,
 # writes <date>.remediation.json + <date>.remediation.md), emails the consolidated
-# digest via Resend, and pings the Healthchecks.io dead-man's switch.
+# digest to alert-hub (Resend fallback), and pings the Healthchecks.io dead-man's switch.
 set -uo pipefail
 
 # ── Config (overridable via the sourced env file) ──────────────────────────────
@@ -20,6 +20,7 @@ if [ -f "$CONFIG" ]; then set -a; . "$CONFIG"; set +a; fi
 
 # Bootstrap BWS token from the login Keychain (not the env file). Idempotent.
 source "$(dirname "${BASH_SOURCE[0]}")/bws-token.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/report-notice.sh"
 
 REPO="${INFRADRIFT_REPO:-$HOME/Projects/infraops-mcp-server}"
 # ACTIVATION — a merged change is not live on this machine until the code is pulled. The estate's
@@ -81,6 +82,16 @@ export APPBRAIN_BASE_URL="${APPBRAIN_BASE_URL:-https://app-brain.devonwatkins.co
 export APPBRAIN_ACCESS_KEY="$(get_secret_by_id "${BWS_APPBRAIN_SECRET_ID:-68733abe-682a-4597-b88f-b4750189a56a}")"
 
 RESEND_API_KEY="$(get_secret_by_id "${BWS_RESEND_SECRET_ID:-56f06eba-925a-4d8e-bfe8-b415015ab8ef}")"
+# alert-hub tokens, by UUID from the env file. An unset ID leaves the token unset, so the Resend
+# path runs. ALERT_HUB_TOKEN (urgent alerts, read by the security-drift CLI) and
+# ALERT_HUB_REPORT_TOKEN (the daily report notice) are never echoed.
+unset ALERT_HUB_TOKEN ALERT_HUB_REPORT_TOKEN
+if [ -n "${BWS_ALERT_HUB_TOKEN_ID:-}" ]; then
+  export ALERT_HUB_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_TOKEN_ID")"
+fi
+if [ -n "${BWS_ALERT_HUB_REPORT_TOKEN_ID:-}" ]; then
+  export ALERT_HUB_REPORT_TOKEN="$(get_secret_by_id "$BWS_ALERT_HUB_REPORT_TOKEN_ID")"
+fi
 # Anthropic key for remediation plan generation — fetched by stable UUID (BWS key
 # name "anthropic-api-key"), overridable via BWS_ANTHROPIC_SECRET_ID.
 export ANTHROPIC_API_KEY="$(get_secret_by_id "${BWS_ANTHROPIC_SECRET_ID:-b74bf8b3-938b-45c0-bc25-b415013cb563}")"
@@ -188,6 +199,9 @@ else
   SUBJECT="Infra drift $DATE — audit only (remediation step failed)"
 fi
 
+# The footer of a cut report points at the primary file; the combined body below is a temp file.
+FULL_REPORT_MD="$BODY_MD"
+
 # Append the security-drift digest to the email body if present.
 SEC_MD="$REPORT_DIR/$DATE.security.md"
 if [ -f "$SEC_MD" ] && [ -f "$BODY_MD" ]; then
@@ -203,25 +217,8 @@ if [ -f "$BODY_MD" ]; then
   { printf '👉 Review & approve pending items: %s/?status=pending\n\n' "$CHANGE_MGR_API_BASE"; cat "$BODY_MD"; } > "$LINKED_BODY" 2>/dev/null && BODY_MD="$LINKED_BODY"
 fi
 
-# ── Email digest via Resend (best-effort) ──────────────────────────────────────
-if [ -n "$RESEND_API_KEY" ] && [ -f "$BODY_MD" ]; then
-  # Build the JSON payload with python (safe escaping of the markdown body), send with
-  # curl (the path proven to work against the Resend API).
-  PAYLOAD_FILE="$(mktemp -t infra-drift-mail)"
-  EMAIL_FROM="$EMAIL_FROM" EMAIL_TO="$EMAIL_TO" SUBJECT="$SUBJECT" MD="$BODY_MD" python3 - > "$PAYLOAD_FILE" <<'PY'
-import os, json
-print(json.dumps({"from": os.environ['EMAIL_FROM'], "to": [os.environ['EMAIL_TO']],
-                  "subject": os.environ['SUBJECT'], "text": open(os.environ['MD']).read()}))
-PY
-  if curl -fsS --max-time 20 -X POST https://api.resend.com/emails \
-       -H "Authorization: Bearer $RESEND_API_KEY" -H "Content-Type: application/json" \
-       --data @"$PAYLOAD_FILE" >/dev/null 2>&1; then
-    log "digest emailed to $EMAIL_TO"
-  else
-    log "WARN: digest email failed"
-  fi
-  rm -f "$PAYLOAD_FILE"
-fi
+# ── Send the digest: alert-hub notice, Resend fallback (best-effort) ───────────
+send_report "report:infra-drift:$DATE" "$SUBJECT" "$BODY_MD" "$FULL_REPORT_MD"
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────
 if [ -n "$HC_URL" ]; then

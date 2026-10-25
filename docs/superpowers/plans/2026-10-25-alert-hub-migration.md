@@ -8,7 +8,7 @@ Resend kept as the fallback until the hub path is proven live.
 
 **Architecture:** Vendor alert-hub's dependency-free helpers: `src/alert-hub.ts` (TypeScript) and
 `scripts/alert-hub-send.sh` (shell). `notify.ts` sends through the hub when `ALERT_HUB_TOKEN` is
-set and through Resend otherwise. The two wrappers send their report as an alert-hub *notice* when
+set and through Resend otherwise. The two wrappers send their report as an alert-hub _notice_ when
 `ALERT_HUB_REPORT_TOKEN` is set and through Resend otherwise. A follow-up plan removes Resend once
 both paths are verified live.
 
@@ -61,15 +61,17 @@ both paths are verified live.
 notify test file).
 
 **Interfaces:**
+
 - `NotifyDeps` gains `hubToken?: string` and `hubUrl?: string`.
 - `sendUrgentAlert(key: string, title: string, text: string, deps: NotifyDeps): Promise<boolean>`
   replaces `sendAlertEmail`. It sends `{ key, severity: 'critical', status: 'firing', title,
-  message }` through `sendAlert` when `deps.hubToken` is set. When the hub send returns false, or
+message }` through `sendAlert` when `deps.hubToken` is set. When the hub send returns false, or
   no token is set, it falls back to the existing Resend send with `title` as the subject.
 - `sendUrgentEmail(items, deps)` keeps its name and behavior but calls `sendUrgentAlert` with the
   key `security-urgent:<YYYY-MM-DD>:<sha256 of the sorted escalation ids, first 8 hex>`.
 
 Call sites:
+
 - Version skew (`security-drift-cli.ts` about line 240): key `security-drift-version-skew`.
 - Urgent escalations (about line 285): through `sendUrgentEmail`.
 - Integrity refusal (`change-mgr-cli.ts` about line 146): key
@@ -98,6 +100,7 @@ wired into `make check`.
 
 **Interface:** `send_report <key> <subject> <body-file> <full-path-for-footer>`, sourced by both
 scripts:
+
 - With `ALERT_HUB_REPORT_TOKEN` set: cut the body to 12,000 characters, ending with
   `\n\n… (cut at 12,000 of N characters; full report: <full-path-for-footer> on the Mac mini)`.
   Then run `alert-hub-send.sh --notice -- <key> info <subject> <body>`. On failure, fall through

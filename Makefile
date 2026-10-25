@@ -81,3 +81,9 @@ fix:
 	@if [ -f pyproject.toml ]; then $(call need,ruff,install it with: uv sync); ruff format .; fi
 	@if [ -f .prettierrc ]; then $(call need,prettier,install it with: npm ci); prettier --write .; fi
 # code-standards:managed:end — content OUTSIDE these markers is yours and is preserved. Delete both markers to own the whole file: sync then writes nothing here and says so every run.
+
+# Shell tests: vitest only collects tests/**/*.test.ts, so run the shell ones as a prerequisite of check.
+.PHONY: shell-tests
+check: shell-tests
+shell-tests:
+	@for t in tests/*.test.sh; do bash "$$t" || exit 1; done
