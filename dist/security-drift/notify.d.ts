@@ -1,19 +1,16 @@
 import type { SecurityEscalation } from './emit.js';
 type HubKind = 'alert' | 'notice';
 export interface NotifyDeps {
-    resendApiKey?: string;
-    from: string;
-    to: string;
     hubToken?: string;
     hubUrl?: string;
     fetchImpl?: typeof fetch;
 }
-/** Channel config for the headless CLIs: the hub when ALERT_HUB_TOKEN is set, Resend otherwise. */
+/** Hub config for the headless CLIs: the token comes from ALERT_HUB_TOKEN. */
 export declare function notifyDepsFromEnv(): NotifyDeps;
 /**
- * Send an urgent message through alert-hub when a hub token is set; on a hub failure, or with no
- * token, send it through Resend with `title` as the subject, so an outage never loses it.
- * An event is a `notice` (the hub never dedups it); a state that later clears is an `alert`.
+ * Send an urgent message through alert-hub. A hub failure (or a missing token) logs one line, never
+ * the token, and returns false. An event is a `notice` (the hub never dedups it); a state that
+ * later clears is an `alert`.
  */
 export declare function sendUrgentAlert(key: string, title: string, text: string, deps: NotifyDeps, kind?: HubKind): Promise<boolean>;
 /** Send the immediate URGENT notice for this run's new items. True on delivery. */

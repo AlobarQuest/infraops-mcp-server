@@ -8,7 +8,6 @@ import {
 } from '../src/security-drift/notify.js';
 
 const HUB_TOKEN = 'hub-secret-token-do-not-log';
-const RESEND_KEY = 're_resend_secret_do_not_log';
 const CUT_MARKER = '… (cut; full list at https://change-mgr.alobar.net)';
 
 const esc = (id: string): SecurityEscalation =>
@@ -29,13 +28,13 @@ function recorder(statuses: Record<string, number>) {
   const calls: Call[] = [];
   const fetchImpl = (async (url: string, init: RequestInit) => {
     calls.push({ url, init });
-    const status = url.includes('alobar.net') ? (statuses.hub ?? 202) : (statuses.resend ?? 200);
+    const status = statuses.hub ?? 202;
     return new Response(null, { status });
   }) as unknown as typeof fetch;
   return { calls, fetchImpl };
 }
 
-const baseDeps = { from: 'a@b.c', to: 'd@e.f' };
+const baseDeps = {};
 const hubBody = (c: Call) => JSON.parse(c.init.body as string);
 
 describe('sendUrgentAlert', () => {
@@ -51,12 +50,11 @@ describe('sendUrgentAlert', () => {
     vi.useRealTimers();
   });
 
-  it('sends one critical alert to the hub and no Resend call when a hub token is set', async () => {
+  it('sends one critical notice to the hub when a hub token is set', async () => {
     const { calls, fetchImpl } = recorder({});
     const ok = await sendUrgentAlert('k1', 'Title', 'Body', {
       ...baseDeps,
       hubToken: HUB_TOKEN,
-      resendApiKey: RESEND_KEY,
       fetchImpl,
     });
     expect(ok).toBe(true);
@@ -72,37 +70,16 @@ describe('sendUrgentAlert', () => {
     });
   });
 
-  it('falls back to Resend when the hub answers 500', async () => {
+  it('makes one hub request, logs one line and returns false when the hub answers 500', async () => {
     const { calls, fetchImpl } = recorder({ hub: 500 });
     const ok = await sendUrgentAlert('k1', 'Title', 'Body', {
       ...baseDeps,
       hubToken: HUB_TOKEN,
-      resendApiKey: RESEND_KEY,
       fetchImpl,
     });
-    expect(ok).toBe(true);
-    expect(calls.map((c) => c.url)).toEqual([
-      'https://alerts.alobar.net/v1/alerts',
-      'https://api.resend.com/emails',
-    ]);
-    expect(JSON.parse(calls[1].init.body as string).subject).toBe('Title');
-  });
-
-  it('uses only Resend when there is no hub token', async () => {
-    const { calls, fetchImpl } = recorder({});
-    const ok = await sendUrgentAlert('k1', 'Title', 'Body', {
-      ...baseDeps,
-      resendApiKey: RESEND_KEY,
-      fetchImpl,
-    });
-    expect(ok).toBe(true);
-    expect(calls.map((c) => c.url)).toEqual(['https://api.resend.com/emails']);
-    expect(JSON.parse(calls[0].init.body as string)).toEqual({
-      from: 'a@b.c',
-      to: ['d@e.f'],
-      subject: 'Title',
-      text: 'Body',
-    });
+    expect(ok).toBe(false);
+    expect(calls.map((c) => c.url)).toEqual(['https://alerts.alobar.net/v1/alerts']);
+    expect(logs).toHaveLength(1);
   });
 
   it('cuts an alert body to 4000 characters ending in the pointer', async () => {
@@ -147,23 +124,25 @@ describe('sendUrgentAlert', () => {
   });
 
   it('never writes either token to the console', async () => {
-    const { fetchImpl } = recorder({ hub: 500, resend: 500 });
+    const { fetchImpl } = recorder({ hub: 500 });
     await sendUrgentAlert('k1', 'Title', 'Body', {
       ...baseDeps,
       hubToken: HUB_TOKEN,
-      resendApiKey: RESEND_KEY,
       fetchImpl,
     });
     expect(logs.length).toBeGreaterThan(0);
     const all = logs.join('\n');
     expect(all).not.toContain(HUB_TOKEN);
-    expect(all).not.toContain(RESEND_KEY);
   });
 
-  it('sends nothing and returns false with neither token', async () => {
+  it('sends nothing, logs one line and returns false with no hub token', async () => {
+    const saved = process.env.ALERT_HUB_TOKEN;
+    delete process.env.ALERT_HUB_TOKEN;
     const { calls, fetchImpl } = recorder({});
     expect(await sendUrgentAlert('k', 'T', 'B', { ...baseDeps, fetchImpl })).toBe(false);
     expect(calls).toHaveLength(0);
+    expect(logs).toHaveLength(1);
+    if (saved !== undefined) process.env.ALERT_HUB_TOKEN = saved;
   });
 });
 
@@ -229,16 +208,9 @@ describe('version skew state', () => {
     expect(hubBody(calls[0]).kind).toBe('alert');
   });
 
-  it('does not resolve with no hub token and never uses Resend', async () => {
-    const { calls, fetchImpl } = recorder({ hub: 500 });
-    await resolveVersionSkew({ ...baseDeps, resendApiKey: RESEND_KEY, fetchImpl });
+  it('does not resolve with no hub token', async () => {
+    const { calls, fetchImpl } = recorder({});
+    expect(await resolveVersionSkew({ ...baseDeps, fetchImpl })).toBe(false);
     expect(calls).toHaveLength(0);
-    await resolveVersionSkew({
-      ...baseDeps,
-      hubToken: HUB_TOKEN,
-      resendApiKey: RESEND_KEY,
-      fetchImpl,
-    });
-    expect(calls.map((c) => c.url)).toEqual(['https://alerts.alobar.net/v1/alerts']);
   });
 });
