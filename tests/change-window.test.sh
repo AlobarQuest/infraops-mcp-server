@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2317  # the stubs below are called indirectly by the wrapper under test
 # Runs scripts/change-window.sh against stubs (bws, node, curl on PATH; a temporary HOME) and checks
 # what the CLI it launches sees in its environment. Nothing live is contacted.
 # Run: bash tests/change-window.test.sh
