@@ -65,15 +65,33 @@ check "long body: token reaches the helper by environment only" \
   eq "$(cat "$WORK/hub.token")" report-token
 check "long body: token is not in argv" not_in_argv report-token
 
+# --- hub path: a cut message fits the hub's 12,000-character AND 16 KB request-body limits ----
+# Reads the recorded message from a file, so trailing newlines survive.
+sent_within_limits() { # <=12000 UTF-16 units and <=15000 JSON-encoded UTF-8 bytes
+  python3 - "$WORK/hub.args" <<'PY'
+import json, sys
+msg = open(sys.argv[1], "rb").read().split(b"\0")[5].decode()
+units = len(msg.encode("utf-16-le")) // 2
+size = len(json.dumps(msg, ensure_ascii=False).encode("utf-8"))
+sys.exit(0 if units <= 12000 and size <= 15000 else 1)
+PY
+}
+reset; python3 -c "import sys; sys.stdout.write('\n' * 12000 + 'tail')" > "$WORK/body.md"
+ALERT_HUB_REPORT_TOKEN=report-token send_report "k" "S" "$WORK/body.md" "/reports"
+check "12000 newlines: cut within both limits" sent_within_limits
+reset; make_body 4000
+ALERT_HUB_REPORT_TOKEN=report-token send_report "k" "S" "$WORK/body.md" "/reports"
+check "emoji body of 12000 units: cut within both limits" sent_within_limits
+
 # --- hub path: a short body goes whole ------------------------------------------------------------
 reset; printf 'short report 😀\n' > "$WORK/body.md"
 ALERT_HUB_REPORT_TOKEN=report-token send_report "k" "S" "$WORK/body.md" "/x.md"
 check "short body: sent whole" eq "$(hub_message)" "$(cat "$WORK/body.md")"
 
 # --- hub path: a body of exactly 12000 characters goes whole ----------------------------------
-reset; make_body 4000
+reset; python3 -c "import sys; sys.stdout.write('a' * 12000)" > "$WORK/body.md"
 ALERT_HUB_REPORT_TOKEN=report-token send_report "k" "S" "$WORK/body.md" "/x.md"
-check "boundary body: sent whole" test "$(hub_message | units)" -eq 12000
+check "boundary body: sent whole" eq "$(hub_message)" "$(cat "$WORK/body.md")"
 
 # --- no hub token: the Resend branch runs ----------------------------------------------------------
 reset; printf 'short\n' > "$WORK/body.md"

@@ -6,24 +6,35 @@
 _REPORT_NOTICE_DIR="$(dirname "${BASH_SOURCE[0]}")"
 # Overridable so the test can stub the helper.
 ALERT_HUB_SEND="${ALERT_HUB_SEND:-$_REPORT_NOTICE_DIR/../alert-hub-send.sh}"
-# The hub rejects a notice message over this many characters (UTF-16 code units, as the hub counts).
+# The hub rejects a notice message over this many characters (UTF-16 code units, as the hub
+# counts), and a request body over 16,384 bytes. The message is JSON-encoded in the body, where a
+# newline costs 2 bytes and an emoji 4, so it is also held to this many encoded bytes.
 REPORT_NOTICE_LIMIT=12000
+REPORT_NOTICE_BYTE_LIMIT=15000
 
-# Print <body-file> cut to REPORT_NOTICE_LIMIT characters, ending with a footer that names
-# <full-path>. A body within the limit is printed whole. Counts characters, not bytes.
+# Print <body-file> cut to fit both limits, ending with a footer that names <full-path>. A body
+# within both limits is printed whole. Never splits a character.
 _cut_report() {
-  python3 - "$1" "$2" "$REPORT_NOTICE_LIMIT" <<'PY'
-import sys
-body_file, full_path, limit = sys.argv[1], sys.argv[2], int(sys.argv[3])
+  python3 - "$1" "$2" "$REPORT_NOTICE_LIMIT" "$REPORT_NOTICE_BYTE_LIMIT" <<'PY'
+import json, sys
+body_file, full_path = sys.argv[1], sys.argv[2]
+limit, byte_limit = int(sys.argv[3]), int(sys.argv[4])
 body = open(body_file, encoding="utf-8").read()
 units = lambda s: len(s.encode("utf-16-le")) // 2
-total = units(body)
-if total <= limit:
+# Encoded size of the string literal, quotes included: the two quote bytes count against the cap.
+size = lambda s: len(json.dumps(s, ensure_ascii=False).encode("utf-8"))
+if units(body) <= limit and size(body) <= byte_limit:
     sys.stdout.write(body)
     sys.exit(0)
-footer = f"\n\n… (cut at {limit:,} of {total:,} characters; full report: {full_path} on the Mac mini)"
-raw = body.encode("utf-16-le")[: (limit - units(footer)) * 2]
-sys.stdout.write(raw.decode("utf-16-le", errors="ignore") + footer)
+footer = f"\n\n… (cut at {limit:,} of {units(body):,} characters; full report: {full_path} on the Mac mini)"
+room_units, room_bytes = limit - units(footer), byte_limit - size(footer)
+used_units, used_bytes, end = 0, 0, 0
+for ch in body:
+    cost_units, cost_bytes = units(ch), size(ch) - 2
+    if used_units + cost_units > room_units or used_bytes + cost_bytes > room_bytes:
+        break
+    used_units, used_bytes, end = used_units + cost_units, used_bytes + cost_bytes, end + 1
+sys.stdout.write(body[:end] + footer)
 PY
 }
 
