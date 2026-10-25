@@ -41,8 +41,9 @@ BWS + Healthchecks.io).
    (`claude-sonnet-4-6`) to write a remediation plan.
    Writes `~/infra-drift/reports/<date>.remediation.json` (machine record + the
    `escalations` change-manager contract) and `<date>.remediation.md`.
-5. Emails the **consolidated** digest (`<date>.remediation.md`) via Resend, falling
-   back to the raw audit `<date>.md` if the remediation step hard-failed.
+5. Sends the **consolidated** digest (`<date>.remediation.md`) to alert-hub as a
+   notice (see [Alerts and reports through alert-hub](#alerts-and-reports-through-alert-hub)),
+   falling back to the raw audit `<date>.md` if the remediation step hard-failed.
 6. Pings the Healthchecks.io dead-man's switch (`/start`, success, `/fail`).
    The heartbeat is healthy only if BOTH the audit and remediate steps succeed.
 
@@ -75,6 +76,30 @@ The BWS token lives only in the login Keychain (account `BWS_ACCESS_TOKEN_INFRA_
 `~/.config/infra-drift/env` (chmod 600) holds only the Healthchecks ping URL(s) — never
 the token, and never anything in this repo or the plist. The dead-man's switch alerts if
 a daily run is missed (e.g. mini offline), so a skipped run never goes unnoticed.
+
+## Alerts and reports through alert-hub
+
+Urgent security alerts and the two daily reports go to Devon through alert-hub
+(`https://alerts.alobar.net`). Resend stays as the fallback.
+
+| Sender            | Sends                                                               | Token variable           | BWS UUID variable (in `~/.config/infra-drift/env`) |
+| ----------------- | ------------------------------------------------------------------- | ------------------------ | -------------------------------------------------- |
+| `infraops`        | Urgent security alerts (critical)                                   | `ALERT_HUB_TOKEN`        | `BWS_ALERT_HUB_TOKEN_ID`                           |
+| `report-infraops` | The 03:00 drift digest and the 04:00 change-window digest (notices) | `ALERT_HUB_REPORT_TOKEN` | `BWS_ALERT_HUB_REPORT_TOKEN_ID`                    |
+
+The wrappers fetch each token from BWS by UUID when its `BWS_*_ID` variable is set, and export
+it. `drift-audit.sh` fetches both tokens, because the security-drift CLI sends the alerts.
+`change-window.sh` fetches only the report token.
+
+**Fallback rule.** With a token unset (its UUID variable is unset, or the fetch returned
+nothing), the matching messages go through Resend as before. With a token set, a failed hub
+send also falls through to Resend, so a hub outage never loses an urgent alert or a digest.
+A failed send logs one line and never fails the run.
+
+**Limits.** The hub rejects an alert message over 4,000 characters and a notice message over
+12,000. The sender cuts first: an alert ends with a pointer to change-manager, and a report ends
+with a footer naming the full file on the Mac mini. Shared code: `lib/report-notice.sh`
+(`send_report`), `alert-hub-send.sh` and `src/alert-hub.ts` (vendored from alert-hub).
 
 # Standalone weekly security scan (`com.devon.security-scan`)
 
