@@ -439,6 +439,10 @@ disposition = "reissue"
 # A machine token has no BWS copy of itself, so its keeper is its one Keychain item.
 keeper_service = "Claude"
 keeper_account = "BWS_ACCESS_TOKEN_VIDEOCREATOR"
+# Handed to the rotation executor 2026-10-26 (intent-packages rotation-bws-tok-content-mini
+# rev 1, approved by Devon 2026-10-23).
+rotated_by_sds = true
+rotate_requested = "2026-10-26"
 
   [[credential.consumer]]
   kind = "keychain"
