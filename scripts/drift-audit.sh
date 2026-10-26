@@ -116,6 +116,19 @@ log "remediate CLI exited rc=$RC_REMEDIATE"
 # ── Best-effort: push the day's escalations to the change manager (non-fatal) ────
 export CHANGE_MGR_API_BASE="${CHANGE_MGR_API_BASE:-https://change-mgr.alobar.net}"
 export CHANGE_MGR_M2M_TOKEN="$(get_secret_by_id "${BWS_CHANGE_MGR_M2M_SECRET_ID:-af0e4192-edc6-46ae-9e4f-b469011dbb8d}")"
+# The one change-manager failure that IS fatal to the heartbeat: the bearer itself refused (or
+# empty). The orchestrator's rotation executor verifies this script switched to a rotated full
+# bearer by its Healthchecks check (`healthchecks_check` in change-manager's .cred-consumers.toml),
+# which proves nothing while a dead bearer still pings success. Probed once, on the route the
+# rotation adapter probes; the bearer goes to curl on stdin, never in its arguments. Anything but
+# 401 or 403 (an outage, a timeout) stays non-fatal, like the calls below.
+CM_BEARER_REFUSED=0
+CM_PROBE="$(printf 'header = "Authorization: Bearer %s"\n' "$CHANGE_MGR_M2M_TOKEN" \
+  | curl -sS -o /dev/null -w '%{http_code}' --max-time 15 -K - \
+      "$CHANGE_MGR_API_BASE/api/landing-policy" 2>/dev/null || true)"
+case "$CM_PROBE" in
+  401|403) CM_BEARER_REFUSED=1; log "ERROR: change manager refused the full bearer ($CM_PROBE)" ;;
+esac
 if node "$REPO/dist/cli/change-mgr-cli.js" sync --report-dir "$REPORT_DIR" --now "$NOW" >>"$LOG_FILE" 2>&1; then
   log "change-mgr sync ok"
 else
@@ -207,13 +220,13 @@ send_report "report:infra-drift:$DATE" "$SUBJECT" "$BODY_MD" "$REPORT_DIR"
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────
 if [ -n "$HC_URL" ]; then
-  if [ "$RC" -eq 0 ] && [ "$RC_REMEDIATE" -eq 0 ]; then
+  if [ "$RC" -eq 0 ] && [ "$RC_REMEDIATE" -eq 0 ] && [ "$CM_BEARER_REFUSED" -eq 0 ]; then
     curl -fsS --max-time 10 "$HC_URL" >/dev/null 2>&1 || log "WARN: HC success ping failed"
   else
     curl -fsS --max-time 10 "$HC_URL/fail" >/dev/null 2>&1 || true
-    log "pinged HC /fail (audit rc=$RC remediate rc=$RC_REMEDIATE)"
+    log "pinged HC /fail (audit rc=$RC remediate rc=$RC_REMEDIATE bearer refused=$CM_BEARER_REFUSED)"
   fi
 fi
 
 log "──────── drift audit + remediate done (audit rc=$RC remediate rc=$RC_REMEDIATE) ────────"
-[ "$RC" -eq 0 ] && [ "$RC_REMEDIATE" -eq 0 ] && exit 0 || exit 1
+[ "$RC" -eq 0 ] && [ "$RC_REMEDIATE" -eq 0 ] && [ "$CM_BEARER_REFUSED" -eq 0 ] && exit 0 || exit 1
