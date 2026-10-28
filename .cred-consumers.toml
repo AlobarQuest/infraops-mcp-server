@@ -274,6 +274,10 @@ disposition = "reissue"
 # A machine token has no BWS copy of itself, so its keeper is one of its Keychain items.
 keeper_service = "Claude"
 keeper_account = "BWS_ACCESS_TOKEN_VPS_BACKUP"
+# Handed to the rotation executor 2026-10-28 (Devon), the proof of orchestrator ADR-0055
+# amendment 15 increment 4: this row is its whole onboarding. Its package
+# rotation-bws-tok-ops-mini-20260730 rev 1 is approved and lists exactly these destinations.
+rotated_by_sds = true
 
   [[credential.consumer]]
   kind = "keychain"
