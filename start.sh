@@ -140,10 +140,14 @@ fi
 # ── Porkbun API (optional) ─────────────────────────────────────────
 # `-` (no colon): a variable set to empty disables Porkbun; only an unset one takes the default.
 # A failed fetch leaves the variable empty and never exits — the tools just do not register.
-export PORKBUN_API_KEY=$(fetch_bws_secret "${BWS_PORKBUN_API_KEY_SECRET_ID-27e165db-5d54-4176-94df-b4f201476bed}")
-export PORKBUN_SECRET_API_KEY=$(fetch_bws_secret "${BWS_PORKBUN_SECRET_KEY_SECRET_ID-28acc253-51e3-4ee1-8a04-b4f2014782fe}")
+PB_KEY_ID="${BWS_PORKBUN_API_KEY_SECRET_ID-27e165db-5d54-4176-94df-b4f201476bed}"
+PB_SECRET_ID="${BWS_PORKBUN_SECRET_KEY_SECRET_ID-28acc253-51e3-4ee1-8a04-b4f2014782fe}"
+export PORKBUN_API_KEY=$(fetch_bws_secret "$PB_KEY_ID")
+export PORKBUN_SECRET_API_KEY=$(fetch_bws_secret "$PB_SECRET_ID")
 if [ -n "$PORKBUN_API_KEY" ] && [ -n "$PORKBUN_SECRET_API_KEY" ]; then
   echo "Porkbun tools enabled" >&2
+elif [ -n "$PB_KEY_ID" ] || [ -n "$PB_SECRET_ID" ]; then
+  echo "WARN: failed to fetch Porkbun API key and/or secret key from BWS — Porkbun tools disabled" >&2
 fi
 
 # ── Cloudflare API (optional) ────────────────────────────────────

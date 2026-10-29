@@ -48,9 +48,12 @@ check "default UUIDs" bash -c "$(declare -f recorded); WORK='$WORK'; \
 run_start BWS_PORKBUN_API_KEY_SECRET_ID="" BWS_PORKBUN_SECRET_KEY_SECRET_ID=""
 check "empty disables" bash -c "$(declare -f recorded); WORK='$WORK'; \
   recorded 'PORKBUN_API_KEY=' && recorded 'PORKBUN_SECRET_API_KEY=' && recorded exec"
+no_warn() { ! grep -q 'WARN: failed to fetch Porkbun' "$WORK/out.log"; }
+check "empty disables: no WARN" no_warn
 
 run_start STUB_BWS_FAIL=1
 check "fetch failure does not exit" bash -c "$(declare -f recorded); WORK='$WORK'; \
-  recorded exec && recorded 'PORKBUN_API_KEY='"
+  recorded exec && recorded 'PORKBUN_API_KEY=' && recorded 'PORKBUN_SECRET_API_KEY='"
+check "fetch failure: WARN logged" grep -q 'WARN: failed to fetch Porkbun' "$WORK/out.log"
 
 exit "$FAILED"
