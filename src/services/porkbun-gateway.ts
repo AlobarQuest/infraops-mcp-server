@@ -206,7 +206,7 @@ export function getPorkbunGateway(): PorkbunGateway {
     gateway = gw;
     // A live child keeps the event loop alive, so without this infraops would no
     // longer exit when its client closes stdin.
-    process.stdin.once('end', () => void gw.close());
+    process.stdin.once('end', () => void gw.close().catch(() => {}));
     process.once('exit', () => gw.kill());
     for (const signal of ['SIGTERM', 'SIGINT'] as const) {
       // once() has already removed this listener, so re-raising gets Node's default exit.
