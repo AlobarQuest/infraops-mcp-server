@@ -17,6 +17,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import {
   PORKBUN_AREAS,
@@ -124,14 +125,15 @@ export function registerPorkbunTools(
       tool: string;
       arguments: Record<string, unknown>;
     }) => {
+      const unavailable = errorResponse(
+        `Porkbun tool '${tool}' is not available through this server. ` +
+          'Use porkbun_list_tools to see what is.',
+      );
+      // Checked before listTools() so a refusal never starts the child.
+      if (!isExposed(tool, groups)) return unavailable;
       try {
         const info = (await gateway.listTools()).find((t) => t.name === tool);
-        if (!info || !isExposed(tool, groups)) {
-          return errorResponse(
-            `Porkbun tool '${tool}' is not available through this server. ` +
-              'Use porkbun_list_tools to see what is.',
-          );
-        }
+        if (!info) return unavailable;
         if ((info.readOnly ? 'read' : 'write') !== access) {
           return errorResponse(
             `'${tool}' is a ${access === 'read' ? 'write' : 'read'} tool; call it through ${other}.`,
@@ -185,6 +187,13 @@ export function registerPorkbunTools(
 
 function failureMessage(tool: string, error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
+  if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) {
+    return (
+      `Porkbun call to '${tool}' timed out: ${message}. ` +
+      "A write that timed out may still have completed on Porkbun's side; " +
+      'check its current state before retrying.'
+    );
+  }
   return (
     `Porkbun call to '${tool}' failed: ${message}. ` +
     'If the Porkbun process exited, the next call starts a fresh one.'

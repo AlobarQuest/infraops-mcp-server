@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { z } from 'zod';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { CHARACTER_LIMIT } from '../src/constants.js';
 import { TOOL_AREAS } from '../src/services/porkbun-catalog.js';
 import { installRedaction } from '../src/utils/register-sanitized.js';
@@ -41,7 +42,9 @@ function setup() {
     calls: [] as [string, unknown][],
     result: childText({ status: 'SUCCESS' }) as any,
     failWith: undefined as Error | undefined,
+    listToolsCalls: 0,
     async listTools() {
+      stub.listToolsCalls++;
       return TOOLS;
     },
     async callTool(name: string, args: Record<string, unknown>) {
@@ -114,6 +117,7 @@ describe('porkbun tools', () => {
       expect(r.isError).toBe(true);
     }
     expect(stub.calls).toEqual([]);
+    expect(stub.listToolsCalls).toBe(0); // refused without starting the child
     const list = await s.handlers.porkbun_list_tools({}, {});
     expect(list.content[0].text).not.toContain('register_domain');
   });
@@ -123,6 +127,7 @@ describe('porkbun tools', () => {
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toMatch(/porkbun_list_tools/);
     expect(stub.calls).toEqual([]);
+    expect(stub.listToolsCalls).toBe(0);
   });
 
   it('lists compact rows by default: access and area, no description or schema', async () => {
@@ -182,9 +187,11 @@ describe('porkbun tools', () => {
     expect(JSON.parse(list.content[0].text).tools.map((t: any) => t.name)).toEqual([
       'create_dns_record',
     ]);
+    stub.listToolsCalls = 0;
     const r = await s.handlers.porkbun_read({ tool: 'list_domains', arguments: {} }, {});
     expect(r.isError).toBe(true);
     expect(stub.calls).toEqual([]);
+    expect(stub.listToolsCalls).toBe(0);
   });
 
   it('masks the SSL private key by default', async () => {
@@ -285,6 +292,24 @@ describe('porkbun tools', () => {
     expect(text).toContain('Connection closed');
     expect(text).toMatch(/Porkbun/);
     expect(text).toMatch(/fresh|next call/i);
+  });
+
+  it('warns that a timed-out write may have completed', async () => {
+    stub.failWith = new McpError(ErrorCode.RequestTimeout, 'Request timed out', { timeout: 30000 });
+    const r = await s.handlers.porkbun_write({ tool: 'create_dns_record', arguments: {} }, {});
+    expect(r.isError).toBe(true);
+    const text = r.content[0].text;
+    expect(text).toContain('create_dns_record');
+    expect(text).toContain('Request timed out');
+    expect(text).toMatch(/may still have completed/);
+    expect(text).toMatch(/before retrying/);
+  });
+
+  it('keeps the restart context, not the timeout warning, for other MCP errors', async () => {
+    stub.failWith = new McpError(ErrorCode.ConnectionClosed, 'Connection closed');
+    const r = await s.handlers.porkbun_read({ tool: 'list_domains', arguments: {} }, {});
+    expect(r.content[0].text).toMatch(/next call starts a fresh one/);
+    expect(r.content[0].text).not.toMatch(/may still have completed/);
   });
 });
 
