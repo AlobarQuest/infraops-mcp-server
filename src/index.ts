@@ -9,6 +9,7 @@
  *   - Hetzner Cloud: Server lifecycle, firewalls, SSH keys, volumes, snapshots, networks
  *   - VPS (SSH): Direct shell access, health monitoring, file ops, Docker inspection
  *   - Namecheap: Domain lifecycle + DNS record management (sandbox/production)
+ *   - Porkbun: Gateway to the pinned official Porkbun MCP server (list/read/write tools)
  *   - Cloudflare: DNS, Pages, Workers, R2, Tunnels, Security (WAF/rate limiting)
  *   - Supabase: Project management, database, edge functions, configuration
  *
@@ -26,6 +27,9 @@
  *   NAMECHEAP_API_KEY           - Namecheap API key (optional, from BWS via start.sh)
  *   NAMECHEAP_PROXY_TOKEN       - Bearer token for namecheap-proxy (from BWS via start.sh)
  *   NAMECHEAP_USE_SANDBOX       - "true" for sandbox, "false" for production (default: "true")
+ *   PORKBUN_API_KEY             - Porkbun API key (optional, from BWS via start.sh)
+ *   PORKBUN_SECRET_API_KEY      - Porkbun secret API key (optional, from BWS via start.sh)
+ *   PORKBUN_TOOL_GROUPS         - Comma-separated Porkbun tool groups to expose (optional)
  *   CLOUDFLARE_API_TOKEN        - Cloudflare API token (optional, from BWS via start.sh)
  *   CLOUDFLARE_ACCOUNT_ID       - Cloudflare account ID (plain env var in .mcp.json, not a secret)
  *   SUPABASE_ACCESS_TOKEN       - Supabase management API token (optional, from BWS via start.sh)
@@ -75,6 +79,9 @@ import { registerVPSTools } from './tools/vps.js';
 import { registerNamecheapDNSTools } from './tools/namecheap-dns.js';
 import { registerNamecheapDomainTools } from './tools/namecheap-domains.js';
 import { isNamecheapConfigured, getNamecheapEnvironment } from './services/namecheap-client.js';
+// Porkbun gateway tools
+import { registerPorkbunTools } from './tools/porkbun.js';
+import { isPorkbunConfigured } from './services/porkbun-gateway.js';
 
 // Cloudflare tools
 import { registerCloudflareDNSTools } from './tools/cloudflare-dns.js';
@@ -166,6 +173,19 @@ if (isNamecheapConfigured()) {
   console.error('NAMECHEAP_API_USER/KEY/PROXY_TOKEN not set — Namecheap tools disabled');
 }
 
+// ── Register Porkbun tools ─────────────────────────────────────────
+// Registration never starts the child process, and a failure here must not stop startup.
+if (isPorkbunConfigured()) {
+  try {
+    registerPorkbunTools(server);
+    console.error('Porkbun gateway tools registered');
+  } catch (err) {
+    console.error('Porkbun tools disabled:', err);
+  }
+} else {
+  console.error('PORKBUN_API_KEY/SECRET_API_KEY not set — Porkbun tools disabled');
+}
+
 // ── Register Cloudflare tools ──────────────────────────────────────
 if (isCloudflareConfigured()) {
   registerCloudflareDNSTools(server);
@@ -207,6 +227,7 @@ async function runStdio(): Promise<void> {
   console.error(
     `  Namecheap: ${isNamecheapConfigured() ? getNamecheapEnvironment() : 'not configured'}`,
   );
+  console.error(`  Porkbun: ${isPorkbunConfigured() ? 'configured' : 'not configured'}`);
   console.error(`  Cloudflare: ${isCloudflareConfigured() ? 'configured' : 'not configured'}`);
   console.error(`  Supabase: ${isSupabaseConfigured() ? 'configured' : 'not configured'}`);
   console.error(`  GitHub: ${isGithubConfigured() ? 'configured' : 'not configured'}`);
