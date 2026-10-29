@@ -9,8 +9,9 @@ const MASK = '***';
 // Deliberate omission: `api_key` / `key` field NAMES are NOT listed here — their
 // secret VALUES (JWTs, PEMs, prefixed tokens) are caught by VALUE_SHAPES instead,
 // avoiding over-masking of benign `*_key` fields (e.g. cache_key, sort_key).
+// `privatekey` is the Porkbun SSL bundle field; masked by name even if not PEM-shaped.
 const SECRET_NAME =
-  /(password|secret|token|credentials|authorization|private_key|service_role|jwt_secret|tunnel_secret)/i;
+  /(password|secret|token|credentials|authorization|private_key|privatekey|service_role|jwt_secret|tunnel_secret)/i;
 
 // Names that look secret-ish but are not — never redact by name (value-shape may still apply).
 const GUARD_NAME =

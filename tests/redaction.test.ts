@@ -8,6 +8,8 @@ describe('isSecretName', () => {
   it('flags secret-bearing names', () => {
     for (const k of [
       'private_key',
+      'privatekey',
+      'privateKey',
       'postgres_password',
       'redis_password',
       'root_password',
@@ -26,6 +28,7 @@ describe('isSecretName', () => {
   it('preserves guarded / non-secret names', () => {
     for (const k of [
       'public_key',
+      'publickey',
       'key_name',
       'private_key_id',
       'private_key_uuid',
@@ -85,6 +88,18 @@ describe('redactText (value-shape)', () => {
 });
 
 describe('deepRedact', () => {
+  it('masks the Porkbun SSL bundle privatekey by name, not publickey', () => {
+    const out: any = deepRedact({
+      status: 'SUCCESS',
+      certificatechain: 'chain',
+      privatekey: 'MIIEvQIBADANBgkqhkiG9w0BAQEFAASC', // base64 body without PEM armour
+      publickey: 'MIIBIjANBgkqhkiG9w0BAQEFAAOC',
+    });
+    expect(out.privatekey).toBe('***');
+    expect(out.publickey).toBe('MIIBIjANBgkqhkiG9w0BAQEFAAOC');
+    expect(out.certificatechain).toBe('chain');
+  });
+
   it('masks authorization at any depth without touching unrelated fields', () => {
     const out: any = deepRedact({
       authorization: 'Basic dXNlcjpwdw==',
