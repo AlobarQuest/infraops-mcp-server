@@ -92,7 +92,8 @@ describe('PorkbunGateway', () => {
   it('backs off after three failed starts', async () => {
     let t = 0;
     const bad = gateway({ entryPath: MISSING, now: () => t });
-    for (let i = 0; i < 3; i++) await expect(bad.listTools()).rejects.toThrow(/run `npm ci` in the infraops checkout/);
+    for (let i = 0; i < 3; i++)
+      await expect(bad.listTools()).rejects.toThrow(/run `npm ci` in the infraops checkout/);
     await expect(bad.listTools()).rejects.toThrow(/retry after 1970-01-01T00:05:00.000Z/i);
     t = 299_999;
     await expect(bad.listTools()).rejects.toThrow(/retry after/i);
