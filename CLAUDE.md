@@ -75,7 +75,7 @@ remaining step is reloading the runtime: the MCP runs as a subprocess
 (`start.sh` → `node dist/index.js`) launched at session start, so a session that
 was already open is still executing the OLD `dist/`. Re-spawn it in place with
 `/mcp reconnect infraops` (lighter than a full session restart); the session-sync
-hook emits this reminder automatically when a fast-forward changed `dist/`.
+hook emits this reminder automatically when a fast-forward changed `dist/` or `package-lock.json`.
 
 ## Provider agent — escalation when the MCP isn't enough
 
