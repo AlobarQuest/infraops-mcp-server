@@ -38,11 +38,13 @@
 ### Task 1: Pin the package and commit the tool catalog
 
 **Files:**
+
 - Modify: `package.json`, `package-lock.json`
 - Create: `src/services/porkbun-catalog.ts`
 - Test: `tests/porkbun-catalog.test.ts`
 
 **Interfaces:**
+
 - Produces (in `src/services/porkbun-catalog.ts`):
   - `export const PORKBUN_PACKAGE_VERSION = '0.54.0'`
   - `export type PorkbunArea = 'account' | 'cloudflare' | 'dns' | 'docs' | 'domains' | 'email' | 'hosting' | 'marketplace' | 'ssl' | 'webhooks'`
@@ -72,11 +74,26 @@ it('never both denies and allows a tool', () => {
   expect(Object.keys(TOOL_AREAS).filter((n) => DENIED_TOOLS.has(n))).toEqual([]);
 });
 it('denies every spend and sandbox tool', () => {
-  for (const n of ['register_domain', 'renew_domain', 'transfer_domain', 'buy_closeout',
-    'create_hosting', 'create_mailbox', 'renew_mailbox', 'top_up_account_credit',
-    'configure_auto_topup', 'top_up_with_usdc', 'get_usdc_topup_status', 'top_up_with_card_mpp',
-    'create_sandbox_key', 'sandbox_topup', 'sandbox_reset', 'sandbox_trigger_webhook',
-    'request_api_key', 'retrieve_api_key'])
+  for (const n of [
+    'register_domain',
+    'renew_domain',
+    'transfer_domain',
+    'buy_closeout',
+    'create_hosting',
+    'create_mailbox',
+    'renew_mailbox',
+    'top_up_account_credit',
+    'configure_auto_topup',
+    'top_up_with_usdc',
+    'get_usdc_topup_status',
+    'top_up_with_card_mpp',
+    'create_sandbox_key',
+    'sandbox_topup',
+    'sandbox_reset',
+    'sandbox_trigger_webhook',
+    'request_api_key',
+    'retrieve_api_key',
+  ])
     expect(DENIED_TOOLS.has(n)).toBe(true);
 });
 it('keeps update_auto_renew and cancel_transfer allowed', () => {
@@ -94,7 +111,7 @@ it('exposes by group', () => {
   expect(isExposed('list_domains', null)).toBe(true);
   expect(isExposed('register_domain', null)).toBe(false);
   expect(isExposed('no_such_tool', null)).toBe(false);
-  expect(isExposed(dnsToolName, dns)).toBe(true);      // any tool you mapped to 'dns'
+  expect(isExposed(dnsToolName, dns)).toBe(true); // any tool you mapped to 'dns'
   expect(isExposed('list_domains', dns)).toBe(false);
 });
 ```
@@ -124,11 +141,13 @@ git commit -m "feat(porkbun): pin the official server and classify its tools"
 ### Task 2: The lazy child-process gateway
 
 **Files:**
+
 - Create: `src/services/porkbun-gateway.ts`
 - Create: `tests/fixtures/fake-porkbun-server.mjs`
 - Test: `tests/porkbun-gateway.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from Task 1.
 - Produces (in `src/services/porkbun-gateway.ts`):
   - `export interface PorkbunToolInfo { name: string; description: string; readOnly: boolean; inputSchema: unknown }`. `readOnly` is `annotations?.readOnlyHint === true`.
@@ -211,20 +230,22 @@ git commit -m "feat(porkbun): lazy gateway to the Porkbun MCP child process"
 ### Task 3: The three tools, routing, and redaction
 
 **Files:**
+
 - Create: `src/tools/porkbun.ts`
 - Test: `tests/porkbun-tools.test.ts`
 
 **Interfaces:**
+
 - Consumes: `DENIED_TOOLS`, `isExposed`, `parseToolGroups` (Task 1); `PorkbunToolInfo`, `getPorkbunGateway` (Task 2).
 - Produces: `export function registerPorkbunTools(server: McpServer, gateway?: Pick<PorkbunGateway, 'listTools' | 'callTool'>): void`. The `gateway` parameter defaults to `getPorkbunGateway()` and exists for tests. Groups come from `parseToolGroups(process.env.PORKBUN_TOOL_GROUPS)`, read once at registration.
 
 Tool definitions:
 
-| Tool | Input | Annotations |
-|---|---|---|
-| `porkbun_list_tools` | `name?: string` (substring filter), `include_schema?: boolean` (default false; true when `name` matches exactly one tool) | `readOnlyHint: true, openWorldHint: true` |
-| `porkbun_read` | `tool: string`, `arguments: Record<string, unknown>` (default `{}`) | `readOnlyHint: true, openWorldHint: true` |
-| `porkbun_write` | same | `readOnlyHint: false, destructiveHint: true, openWorldHint: true` |
+| Tool                 | Input                                                                                                                     | Annotations                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `porkbun_list_tools` | `name?: string` (substring filter), `include_schema?: boolean` (default false; true when `name` matches exactly one tool) | `readOnlyHint: true, openWorldHint: true`                         |
+| `porkbun_read`       | `tool: string`, `arguments: Record<string, unknown>` (default `{}`)                                                       | `readOnlyHint: true, openWorldHint: true`                         |
+| `porkbun_write`      | same                                                                                                                      | `readOnlyHint: false, destructiveHint: true, openWorldHint: true` |
 
 `porkbun_list_tools` returns `jsonResponse` of `{ tools: [{ name, description, access: 'read' | 'write', area, inputSchema? }] }`, filtered by `isExposed`.
 
@@ -283,6 +304,7 @@ git commit -m "feat(porkbun): porkbun_list_tools, porkbun_read, porkbun_write"
 ### Task 4: Wire it in, fetch the secrets, register the credential, document it
 
 **Files:**
+
 - Modify: `src/index.ts` (header comment, imports, a Porkbun block after Namecheap's)
 - Modify: `start.sh` (a Porkbun block after Namecheap's; header comment)
 - Modify: `.bws-secrets.toml`, `.cred-consumers.toml`
@@ -291,6 +313,7 @@ git commit -m "feat(porkbun): porkbun_list_tools, porkbun_read, porkbun_write"
 - Test: `tests/cred-rotation.test.ts`, `tests/start-porkbun.test.sh`
 
 **Interfaces:**
+
 - Consumes: `registerPorkbunTools` (Task 3), `isPorkbunConfigured` (Task 2).
 
 - [ ] **Step 1: Write the failing tests**
@@ -304,6 +327,7 @@ it('treats porkbun-api-key as a manual-lane 365-day class', () => {
 ```
 
 `tests/start-porkbun.test.sh`, in the style of `tests/change-window.test.sh` (stub `bws` and `node` on `PATH`, temporary `HOME`, stub `security` returning a placeholder token, nothing live). Checks:
+
 - `ok   default UUIDs`: with no `BWS_PORKBUN_*` variables, the stub `node` sees `PORKBUN_API_KEY=value-of-27e165db-5d54-4176-94df-b4f201476bed` and `PORKBUN_SECRET_API_KEY=value-of-28acc253-51e3-4ee1-8a04-b4f2014782fe`.
 - `ok   empty disables`: with both `BWS_PORKBUN_*_SECRET_ID=""`, `node` sees both variables empty and the script still execs `node`.
 - `ok   fetch failure does not exit`: with `bws` exiting 1, the script still execs `node`.
@@ -339,12 +363,14 @@ git commit -m "feat(porkbun): register the gateway, fetch keys from BWS, add rot
 ### Task 5: Session-sync hook runs `npm ci` on lockfile changes
 
 **Files:**
+
 - Modify: `.claude/hooks/session-sync.sh`
 - Test: `tests/session-sync.test.sh`
 
 - [ ] **Step 1: Write the failing test**
 
 `tests/session-sync.test.sh` builds a scratch origin and clone under `mktemp -d`, copies the hook into the clone's `.claude/hooks/`, puts a stub `npm` on `PATH` that records its arguments (or exits 1 when `NPM_FAIL=1`), and runs the hook. Checks:
+
 - `ok   lockfile change runs npm ci`: a pushed commit changing `package-lock.json` ⇒ stub saw `ci --omit=dev`; output JSON mentions `npm ci` and `/mcp reconnect infraops`.
 - `ok   no lockfile change skips npm`: a commit changing only `README.md` ⇒ stub never called.
 - `ok   npm failure still exits 0`: `NPM_FAIL=1` ⇒ hook exits 0 and the output names the failure and the manual command.
@@ -375,12 +401,14 @@ git commit -m "feat(session-sync): run npm ci when package-lock.json changes"
 This task commits in `/Users/devon/.claude`, a different repo. Commit directly there (that repo's convention). Stage only the two hook files; leave the untracked `skills/synced/` alone.
 
 **Files:**
+
 - Modify: `/Users/devon/.claude/hooks/high-power-audit-log.sh`
 - Modify: `/Users/devon/.claude/hooks/high-power-gate.sh`
 
 - [ ] **Step 1: Write the failing checks**
 
 Pipe hook input JSON into each hook with a temporary `HOME` (so the audit log lands in scratch), for example `{"tool_name":"mcp__infraops__porkbun_write","tool_input":{"tool":"create_dns_record","arguments":{}}}`. Expected after the change:
+
 - Audit hook: logs `porkbun_write`; logs `porkbun_read` when `tool_input.reveal` is `true`; does not log `porkbun_read` without it; does not log `porkbun_list_tools`.
 - Gate hook: `porkbun_write` ⇒ `permissionDecision: "ask"` (parity with Namecheap mutators); `porkbun_read` and `porkbun_list_tools` ⇒ no output.
 

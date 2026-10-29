@@ -69,11 +69,11 @@ retired. Writing native per-operation tools was rejected because of maintenance 
 All three tools register only when `PORKBUN_API_KEY` and `PORKBUN_SECRET_API_KEY` are set
 (the same conditional-registration pattern as the other optional providers).
 
-| Tool | `readOnlyHint` | Purpose |
-|---|---|---|
-| `porkbun_list_tools` | true | Lists the allowed child tools: name, description, read or write, and input schema. Takes an optional name filter so an agent can fetch one schema without the whole list. |
-| `porkbun_read` | true | Calls a child tool whose `readOnlyHint` is true. Input: `tool` (name), `arguments` (object). |
-| `porkbun_write` | false | Calls a child tool whose `readOnlyHint` is not true. Same input. |
+| Tool                 | `readOnlyHint` | Purpose                                                                                                                                                                   |
+| -------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `porkbun_list_tools` | true           | Lists the allowed child tools: name, description, read or write, and input schema. Takes an optional name filter so an agent can fetch one schema without the whole list. |
+| `porkbun_read`       | true           | Calls a child tool whose `readOnlyHint` is true. Input: `tool` (name), `arguments` (object).                                                                              |
+| `porkbun_write`      | false          | Calls a child tool whose `readOnlyHint` is not true. Same input.                                                                                                          |
 
 The gateway refuses a call when the named tool is in the wrong tool (a write through
 `porkbun_read`, or the reverse), is on the denylist, or doesn't exist. Each refusal names
@@ -227,7 +227,7 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
   6. Killing the child mid-session recovers on the next call.
   7. With both Porkbun secret ID variables set to empty strings, infraops starts normally
      with Porkbun disabled.
-  Then remove the temporary server.
+     Then remove the temporary server.
 - **Installed packages.** This is the first runtime dependency that git doesn't deliver:
   `dist/` is tracked, `node_modules` isn't. Extend `.claude/hooks/session-sync.sh` so that
   when a fast-forward changes `package-lock.json`, it runs `npm ci --omit=dev` in the main

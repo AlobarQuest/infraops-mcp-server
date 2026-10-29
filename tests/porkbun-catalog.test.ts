@@ -37,11 +37,26 @@ describe('porkbun catalog', () => {
   });
 
   it('denies every spend and sandbox tool', () => {
-    for (const n of ['register_domain', 'renew_domain', 'transfer_domain', 'buy_closeout',
-      'create_hosting', 'create_mailbox', 'renew_mailbox', 'top_up_account_credit',
-      'configure_auto_topup', 'top_up_with_usdc', 'get_usdc_topup_status', 'top_up_with_card_mpp',
-      'create_sandbox_key', 'sandbox_topup', 'sandbox_reset', 'sandbox_trigger_webhook',
-      'request_api_key', 'retrieve_api_key']) {
+    for (const n of [
+      'register_domain',
+      'renew_domain',
+      'transfer_domain',
+      'buy_closeout',
+      'create_hosting',
+      'create_mailbox',
+      'renew_mailbox',
+      'top_up_account_credit',
+      'configure_auto_topup',
+      'top_up_with_usdc',
+      'get_usdc_topup_status',
+      'top_up_with_card_mpp',
+      'create_sandbox_key',
+      'sandbox_topup',
+      'sandbox_reset',
+      'sandbox_trigger_webhook',
+      'request_api_key',
+      'retrieve_api_key',
+    ]) {
       expect(DENIED_TOOLS.has(n)).toBe(true);
     }
     expect(DENIED_TOOLS.size).toBe(18);
