@@ -27,7 +27,7 @@ type Access = 'read' | 'write';
 const ToolNameSchema = z.string().min(1).describe('Porkbun tool name (see porkbun_list_tools)');
 
 const ArgumentsSchema = z
-  .record(z.unknown())
+  .record(z.string(), z.unknown())
   .default({})
   .describe('Arguments for the Porkbun tool, per its inputSchema from porkbun_list_tools');
 
