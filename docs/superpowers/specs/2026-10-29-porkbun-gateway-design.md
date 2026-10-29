@@ -196,9 +196,9 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
   checks against Devon's real key:
   1. `porkbun_list_tools` lists tools and starts exactly one child process.
   2. `ping` succeeds, and its `scopes` include neither `purchase` nor `funding`.
-  3. One reversible write on a domain Devon names, with API Access turned on for that domain
-     in Porkbun (otherwise it fails with `API_ACCESS_DISABLED`): add a TXT record, read it
-     back, delete it.
+  3. One reversible write on the account's only domain (as of 2026-10-29 the account holds
+     one domain, with API Access on; `list_domains` returns its name): add a TXT record, read
+     it back, delete it.
   4. `get_ssl_bundle` comes back masked, and with `reveal: true` unmasked.
   5. A purchase tool is refused by the gateway.
   6. Killing the child mid-session recovers on the next call.
