@@ -9,6 +9,8 @@ const TOOLS: PorkbunToolInfo[] = [
   { name: 'get_ssl_bundle', description: 'SSL bundle', readOnly: true, inputSchema: { a: 1 } },
   { name: 'list_domains', description: 'List domains', readOnly: true, inputSchema: { b: 2 } },
   { name: 'create_dns_record', description: 'Create DNS', readOnly: false, inputSchema: {} },
+  { name: 'create_wp_credentials', description: 'WP creds', readOnly: false, inputSchema: {} },
+  { name: 'setup_mailbox', description: 'Mailbox', readOnly: false, inputSchema: {} },
   { name: 'register_domain', description: 'Register', readOnly: false, inputSchema: {} },
 ];
 
@@ -126,6 +128,8 @@ describe('porkbun tools', () => {
       'get_ssl_bundle',
       'list_domains',
       'create_dns_record',
+      'create_wp_credentials',
+      'setup_mailbox',
     ]);
     expect(tools[2]).toMatchObject({ access: 'write', area: 'dns' });
     expect(tools[0]).toMatchObject({ access: 'read', area: 'ssl' });
@@ -176,6 +180,51 @@ describe('porkbun tools', () => {
     stub.result = childText({ webhook: { id: 1, secret: 'whsec_abc' } });
     const r = await s.handlers.porkbun_read({ tool: 'list_domains', arguments: {} }, {});
     expect(r.content[0].text).not.toContain('whsec_abc');
+  });
+
+  it('reveals a webhook secret with reveal:true', async () => {
+    stub.result = childText({ webhook: { id: 1, secret: 'whsec_abc' } });
+    const r = await s.handlers.porkbun_read(
+      { tool: 'list_domains', arguments: {}, reveal: true },
+      {},
+    );
+    expect(r.content[0].text).toContain('whsec_abc');
+  });
+
+  it('masks a WordPress application password by default', async () => {
+    stub.result = childText({
+      status: 'SUCCESS',
+      username: 'porkbun-agent',
+      applicationPassword: 'abcd EFGH 1234 ijkl',
+    });
+    const r = await s.handlers.porkbun_write({ tool: 'create_wp_credentials', arguments: {} }, {});
+    expect(r.content[0].text).not.toContain('abcd EFGH 1234 ijkl');
+    expect(r.content[0].text).toContain('porkbun-agent');
+  });
+
+  it('reveals a WordPress application password with reveal:true', async () => {
+    stub.result = childText({ status: 'SUCCESS', applicationPassword: 'abcd EFGH 1234 ijkl' });
+    const r = await s.handlers.porkbun_write(
+      { tool: 'create_wp_credentials', arguments: {}, reveal: true },
+      {},
+    );
+    expect(r.content[0].text).toContain('abcd EFGH 1234 ijkl');
+  });
+
+  it('masks a mailbox password by default', async () => {
+    stub.result = childText({ status: 'SUCCESS', address: 'a@d.com', password: 'Zq9!mailboxPw' });
+    const r = await s.handlers.porkbun_write({ tool: 'setup_mailbox', arguments: {} }, {});
+    expect(r.content[0].text).not.toContain('Zq9!mailboxPw');
+    expect(r.content[0].text).toContain('a@d.com');
+  });
+
+  it('reveals a mailbox password with reveal:true', async () => {
+    stub.result = childText({ status: 'SUCCESS', password: 'Zq9!mailboxPw' });
+    const r = await s.handlers.porkbun_write(
+      { tool: 'setup_mailbox', arguments: {}, reveal: true },
+      {},
+    );
+    expect(r.content[0].text).toContain('Zq9!mailboxPw');
   });
 
   it('passes isError from the child through', async () => {
