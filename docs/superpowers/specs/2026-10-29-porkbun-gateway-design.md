@@ -191,7 +191,7 @@ changes no tool names, because the three gateway tools always register.
   - `porkbun-secret-key`: `28acc253-51e3-4ee1-8a04-b4f2014782fe` → `PORKBUN_SECRET_API_KEY`
 - `start.sh` fetches both by UUID with these defaults inline, the same as Namecheap's
   production secrets, overridable with `BWS_PORKBUN_API_KEY_SECRET_ID` and
-  `BWS_PORKBUN_SECRET_API_KEY_SECRET_ID`. Use the no-colon form `${VAR-uuid}`, so setting a
+  `BWS_PORKBUN_SECRET_KEY_SECRET_ID`. Use the no-colon form `${VAR-uuid}`, so setting a
   variable to an empty string disables Porkbun (an unset variable still gets the default).
   A failed fetch leaves Porkbun disabled and logs a warning; it never exits.
 - Add both UUIDs to `.bws-secrets.toml`.
