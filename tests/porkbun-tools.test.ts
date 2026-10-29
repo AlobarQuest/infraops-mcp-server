@@ -191,24 +191,37 @@ describe('porkbun tools', () => {
     expect(r.content[0].text).toContain('whsec_abc');
   });
 
-  it('masks a WordPress application password by default', async () => {
-    stub.result = childText({
-      status: 'SUCCESS',
+  // Real response shape from Porkbun's OpenAPI spec for createWpCredentials.
+  const wpCredentials = () => ({
+    status: 'SUCCESS',
+    credentials: {
       username: 'porkbun-agent',
       applicationPassword: 'abcd EFGH 1234 ijkl',
-    });
-    const r = await s.handlers.porkbun_write({ tool: 'create_wp_credentials', arguments: {} }, {});
-    expect(r.content[0].text).not.toContain('abcd EFGH 1234 ijkl');
-    expect(r.content[0].text).toContain('porkbun-agent');
+      role: 'editor',
+      name: 'Acme-Agent',
+      restUrl: 'https://d.com/wp-json/',
+      authorization: 'Basic cG9ya2J1bi1hZ2VudDphYmNk',
+    },
+    message: 'Save this now',
   });
 
-  it('reveals a WordPress application password with reveal:true', async () => {
-    stub.result = childText({ status: 'SUCCESS', applicationPassword: 'abcd EFGH 1234 ijkl' });
+  it('masks a WordPress application password and auth header by default', async () => {
+    stub.result = childText(wpCredentials());
+    const r = await s.handlers.porkbun_write({ tool: 'create_wp_credentials', arguments: {} }, {});
+    const text = r.content[0].text;
+    expect(text).not.toContain('abcd EFGH 1234 ijkl');
+    expect(text).not.toContain('cG9ya2J1bi1hZ2VudDphYmNk');
+    expect(text).toContain('SUCCESS');
+  });
+
+  it('reveals a WordPress application password and auth header with reveal:true', async () => {
+    stub.result = childText(wpCredentials());
     const r = await s.handlers.porkbun_write(
       { tool: 'create_wp_credentials', arguments: {}, reveal: true },
       {},
     );
     expect(r.content[0].text).toContain('abcd EFGH 1234 ijkl');
+    expect(r.content[0].text).toContain('cG9ya2J1bi1hZ2VudDphYmNk');
   });
 
   it('masks a mailbox password by default', async () => {

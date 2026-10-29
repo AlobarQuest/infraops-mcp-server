@@ -10,7 +10,7 @@ const MASK = '***';
 // secret VALUES (JWTs, PEMs, prefixed tokens) are caught by VALUE_SHAPES instead,
 // avoiding over-masking of benign `*_key` fields (e.g. cache_key, sort_key).
 const SECRET_NAME =
-  /(password|secret|token|credentials|private_key|service_role|jwt_secret|tunnel_secret)/i;
+  /(password|secret|token|credentials|authorization|private_key|service_role|jwt_secret|tunnel_secret)/i;
 
 // Names that look secret-ish but are not — never redact by name (value-shape may still apply).
 const GUARD_NAME =

@@ -17,6 +17,7 @@ describe('isSecretName', () => {
       'tunnel_secret',
       'jwt_secret',
       'credentials',
+      'authorization',
       'access_token',
     ]) {
       expect(isSecretName(k)).toBe(true);
@@ -84,6 +85,18 @@ describe('redactText (value-shape)', () => {
 });
 
 describe('deepRedact', () => {
+  it('masks authorization at any depth without touching unrelated fields', () => {
+    const out: any = deepRedact({
+      authorization: 'Basic dXNlcjpwdw==',
+      wp: { authorization: 'Basic dXNlcjpwdw==', restUrl: 'https://d.com/wp-json/' },
+      role: 'editor',
+    });
+    expect(out.authorization).toBe('***');
+    expect(out.wp.authorization).toBe('***');
+    expect(out.wp.restUrl).toBe('https://d.com/wp-json/');
+    expect(out.role).toBe('editor');
+  });
+
   it('masks secret-named fields, preserves null and guarded fields', () => {
     const out: any = deepRedact({
       private_key: PEM,
