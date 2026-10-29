@@ -95,9 +95,13 @@ tools. The lists mirror the `SANDBOX`, `TOPUPS`, and `PURCHASES` sets in the pac
   `create_hosting`, `create_mailbox`, `renew_mailbox`.
 - API-key requests: `request_api_key`, `retrieve_api_key`.
 
-The test suite pins the denylist against the installed package. If a package upgrade adds a
-tool whose name or description matches a spend pattern (`buy`, `purchase`, `renew`,
-`register`, `top_up`, `topup`, `transfer_domain`), the test fails until someone classifies it.
+The child's stdio entry point serves the sandbox tools too; the denylist is what hides them.
+
+Commit a reviewed classification of every tool the pinned package serves (allowed or denied,
+120 tools in 0.54.0). A test lists the installed package's tools and fails if any tool is
+missing from the classification, so a package upgrade can't add a tool that nobody reviewed.
+A keyword test doesn't work here: spend words such as `renew` and `register` appear in 26
+allowed tools' names or descriptions, including `ping` and `list_domains`.
 
 ### Child process lifecycle
 
@@ -107,9 +111,13 @@ tool whose name or description matches a spend pattern (`buy`, `purchase`, `rene
 - **Lazy start.** The first call to any of the three tools starts the child through the MCP
   SDK's `Client` and `StdioClientTransport` (infraops already depends on
   `@modelcontextprotocol/sdk` ^1.32.1). Concurrent first calls share one start-up promise.
-- **Minimal environment.** The child receives only `PATH`, `HOME`, `PORKBUN_API_KEY`, and
-  `PORKBUN_SECRET_API_KEY`. In particular it never receives `PORKBUN_X402_PRIVATE_KEY` or
-  any other provider's token.
+- **Minimal environment.** Pass the child only `PORKBUN_API_KEY` and
+  `PORKBUN_SECRET_API_KEY`. The SDK's `StdioClientTransport` also merges in its default
+  environment (`HOME`, `LOGNAME`, `PATH`, `SHELL`, `TERM`, `USER`), none of which hold
+  credentials. The child never receives `PORKBUN_X402_PRIVATE_KEY` or any other provider's
+  token.
+- **Entry point.** The package has no `main` or `exports` field, only `bin`. Resolve
+  `@porkbunllc/mcp-server/dist/index.js` from `node_modules` directly.
 - **Tool cache.** Fetch the child's tool list once per child start and cache it.
 - **Crash recovery.** If the child exits, the in-flight call fails with a clear error, and the
   next call starts a fresh child. If the child fails to start three times in a row within
@@ -125,9 +133,18 @@ tool whose name or description matches a spend pattern (`buy`, `purchase`, `rene
 
 The high-power audit hook (`~/.claude/hooks/high-power-audit-log.sh`) logs only tool names
 that match its `GATED` regex. `porkbun_` isn't in it, so as of 2026-10-29 `porkbun_write`
-calls would go unlogged. Add `porkbun_write` to `GATED`. That hook lives in the `~/.claude`
-control-plane git repo, not in infraops or security-standards, so the change is a separate
-commit there. The logged arguments include `tool`, which records the Porkbun operation.
+calls would go unlogged. This build fixes that in the hook:
+
+- Log every `porkbun_write` call.
+- Log `porkbun_read` calls whose input has `reveal: true`, because those return unmasked
+  secrets such as the SSL private key. Other `porkbun_read` calls stay unlogged, like every
+  other read tool.
+
+That hook lives in the `~/.claude` control-plane git repo, not in infraops or
+security-standards (`make install` doesn't deploy it), so the change is a separate commit
+there. Check 13 raises one URGENT control-plane drift finding for that commit, which Devon
+acknowledges as intentional. The logged arguments include `tool`, which records the Porkbun
+operation.
 
 ### Redaction
 
@@ -148,8 +165,11 @@ Add tests that run representative responses for each of these through the redact
 assert the secret is masked by default and visible only with `reveal: true`. The test input
 must use the child's real format: a text block whose text is a pretty-printed JSON string,
 with the PEM newlines escaped inside it. A test that redacts a plain object proves nothing
-about the gateway path. Where the existing name and value-shape rules miss a field (for
-example a webhook `secret`, or a mailbox password), extend `src/utils/redaction.ts`. Tests
+about the gateway path. The existing rules already cover the known fields: the name rule
+matches `secret` (webhooks) and `password` (mailbox, WordPress), and the PEM value-shape rule
+catches the SSL bundle's `privatekey`, a field name the name rule misses. Name-based masking
+only works because the gateway passes the child's JSON through unchanged, which is why that
+requirement matters. Extend `src/utils/redaction.ts` only if a test exposes a miss. Tests
 never call the live API.
 
 `porkbun_read` and `porkbun_write` are not added to `ALWAYS_BYPASS`.
@@ -171,12 +191,15 @@ changes no tool names, because the three gateway tools always register.
   - `porkbun-secret-key`: `28acc253-51e3-4ee1-8a04-b4f2014782fe` → `PORKBUN_SECRET_API_KEY`
 - `start.sh` fetches both by UUID with these defaults inline, the same as Namecheap's
   production secrets, overridable with `BWS_PORKBUN_API_KEY_SECRET_ID` and
-  `BWS_PORKBUN_SECRET_API_KEY_SECRET_ID`. A failed fetch leaves Porkbun disabled and logs a
-  warning; it never exits.
+  `BWS_PORKBUN_SECRET_API_KEY_SECRET_ID`. Use the no-colon form `${VAR-uuid}`, so setting a
+  variable to an empty string disables Porkbun (an unset variable still gets the default).
+  A failed fetch leaves Porkbun disabled and logs a warning; it never exits.
 - Add both UUIDs to `.bws-secrets.toml`.
-- Add an entry for the Porkbun key pair to this repo's `.cred-consumers.toml` so the
-  credential-rotation lane knows it exists. The builder follows the file's existing entries
-  for class and consumer fields.
+- Add one `.cred-consumers.toml` entry for the key pair, because the two halves are issued
+  and rotated together. No existing class fits, so add a `porkbun-api-key` class to
+  `CLASS_POLICY` in `src/security-drift/cred-rotation.ts` with `maxAgeDays: 365` (matching
+  the other provider API keys) and `executor: false` (manual lane). Without a class, the
+  nightly scan raises `cred.unknown-class`.
 
 ### Documentation
 
@@ -202,7 +225,8 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
   4. `get_ssl_bundle` comes back masked, and with `reveal: true` unmasked.
   5. A purchase tool is refused by the gateway.
   6. Killing the child mid-session recovers on the next call.
-  7. With the Porkbun secret IDs unset, infraops starts normally with Porkbun disabled.
+  7. With both Porkbun secret ID variables set to empty strings, infraops starts normally
+     with Porkbun disabled.
   Then remove the temporary server.
 - **Go-live.** Merge, `git sync` in the main checkout, `/mcp reconnect infraops`.
 
@@ -224,6 +248,9 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
 - Exact-version pin instead of `npx` or a caret range.
 - Minimal child environment.
 - Crash back-off of three failures in 60 seconds, then 5 minutes.
+- The audit-hook change ships as part of this build, and covers `porkbun_read` only when
+  `reveal` is true.
+- One rotation entry for the key pair, class `porkbun-api-key`, 365 days, manual lane.
 - Porkbun-specific gateway rather than a general one.
 
 ## Left to the builder
