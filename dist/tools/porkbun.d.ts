@@ -3,7 +3,8 @@
  *
  * Three fixed tools front the child's catalog, so the tool list stays small and
  * an upgrade of the pinned package cannot add a tool that is callable unreviewed:
- *   1. porkbun_list_tools → what the child offers (read/write, area, schema)
+ *   1. porkbun_list_tools → what the child offers (read/write, area; description and
+ *      schema behind a name filter, to stay under CHARACTER_LIMIT)
  *   2. porkbun_read       → call a read-only child tool
  *   3. porkbun_write      → call a mutating child tool
  * Purchase, top-up, sandbox and API-key tools are never exposed (DENIED_TOOLS).

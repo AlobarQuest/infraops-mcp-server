@@ -1,6 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { z } from 'zod';
+import { CHARACTER_LIMIT } from '../src/constants.js';
+import { TOOL_AREAS } from '../src/services/porkbun-catalog.js';
 import { installRedaction } from '../src/utils/register-sanitized.js';
 import { registerPorkbunTools } from '../src/tools/porkbun.js';
+import { PorkbunGateway } from '../src/services/porkbun-gateway.js';
 import type { PorkbunToolInfo } from '../src/services/porkbun-gateway.js';
 
 const PEM = '-----BEGIN PRIVATE KEY-----\nMIIabc\n-----END PRIVATE KEY-----';
@@ -121,7 +125,7 @@ describe('porkbun tools', () => {
     expect(stub.calls).toEqual([]);
   });
 
-  it('lists tools with access and area, and no schema by default', async () => {
+  it('lists compact rows by default: access and area, no description or schema', async () => {
     const list = await s.handlers.porkbun_list_tools({}, {});
     const { tools } = JSON.parse(list.content[0].text);
     expect(tools.map((t: any) => t.name)).toEqual([
@@ -131,19 +135,44 @@ describe('porkbun tools', () => {
       'create_wp_credentials',
       'setup_mailbox',
     ]);
-    expect(tools[2]).toMatchObject({ access: 'write', area: 'dns' });
-    expect(tools[0]).toMatchObject({ access: 'read', area: 'ssl' });
-    expect(tools[0].inputSchema).toBeUndefined();
+    expect(tools[2]).toEqual({ name: 'create_dns_record', access: 'write', area: 'dns' });
+    expect(tools[0]).toEqual({ name: 'get_ssl_bundle', access: 'read', area: 'ssl' });
   });
 
-  it('includes the schema when name matches exactly one tool, or when asked', async () => {
+  it('adds descriptions when name filters, and the schema when name matches one tool', async () => {
     const one = await s.handlers.porkbun_list_tools({ name: 'domains' }, {});
     const t1 = JSON.parse(one.content[0].text).tools;
     expect(t1).toHaveLength(1);
-    expect(t1[0].inputSchema).toEqual({ b: 2 });
+    expect(t1[0]).toMatchObject({ description: 'List domains', inputSchema: { b: 2 } });
+
+    const several = await s.handlers.porkbun_list_tools({ name: 'e' }, {});
+    const t2 = JSON.parse(several.content[0].text).tools;
+    expect(t2.length).toBeGreaterThan(1);
+    for (const t of t2) {
+      expect(t.description).toBeDefined();
+      expect(t.inputSchema).toBeUndefined();
+    }
 
     const many = await s.handlers.porkbun_list_tools({ name: 'e', include_schema: true }, {});
     for (const t of JSON.parse(many.content[0].text).tools) expect(t.inputSchema).toBeDefined();
+  });
+
+  it('ignores include_schema without a name filter', async () => {
+    const list = await s.handlers.porkbun_list_tools({ include_schema: true }, {});
+    for (const t of JSON.parse(list.content[0].text).tools) {
+      expect(t.inputSchema).toBeUndefined();
+      expect(t.description).toBeUndefined();
+    }
+  });
+
+  it('filters by area, and rejects an unknown area', async () => {
+    const list = await s.handlers.porkbun_list_tools({ area: 'hosting' }, {});
+    expect(JSON.parse(list.content[0].text).tools).toEqual([
+      { name: 'create_wp_credentials', access: 'write', area: 'hosting' },
+    ]);
+    const schema = z.object(s.configs.porkbun_list_tools.inputSchema);
+    expect(schema.safeParse({ area: 'dns' }).success).toBe(true);
+    expect(schema.safeParse({ area: 'bogus' }).success).toBe(false);
   });
 
   it('honours PORKBUN_TOOL_GROUPS', async () => {
@@ -257,4 +286,26 @@ describe('porkbun tools', () => {
     expect(text).toMatch(/Porkbun/);
     expect(text).toMatch(/fresh|next call/i);
   });
+});
+
+// Lists the REAL pinned package's tools (tools/list needs no credentials and makes no API call).
+describe('porkbun_list_tools against the installed package', () => {
+  it('lists every allowed tool within CHARACTER_LIMIT by default', async () => {
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const gw = new PorkbunGateway({ env: {} });
+    try {
+      const s = fakeServer();
+      installRedaction(s as any);
+      registerPorkbunTools(s as any, gw);
+      const text: string = (await s.handlers.porkbun_list_tools({}, {})).content[0].text;
+      expect(text.length).toBeLessThanOrEqual(CHARACTER_LIMIT);
+      expect(text).not.toContain('[truncated');
+      const listed = JSON.parse(text).tools.map((t: any) => t.name);
+      expect(listed.sort()).toEqual(Object.keys(TOOL_AREAS).sort());
+      expect(listed).toHaveLength(102);
+    } finally {
+      await gw.close();
+      vi.restoreAllMocks();
+    }
+  }, 30_000);
 });

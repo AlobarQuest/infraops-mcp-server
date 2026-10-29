@@ -3,7 +3,8 @@
  *
  * Three fixed tools front the child's catalog, so the tool list stays small and
  * an upgrade of the pinned package cannot add a tool that is callable unreviewed:
- *   1. porkbun_list_tools → what the child offers (read/write, area, schema)
+ *   1. porkbun_list_tools → what the child offers (read/write, area; description and
+ *      schema behind a name filter, to stay under CHARACTER_LIMIT)
  *   2. porkbun_read       → call a read-only child tool
  *   3. porkbun_write      → call a mutating child tool
  * Purchase, top-up, sandbox and API-key tools are never exposed (DENIED_TOOLS).
@@ -17,7 +18,13 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { TOOL_AREAS, isExposed, parseToolGroups } from '../services/porkbun-catalog.js';
+import {
+  PORKBUN_AREAS,
+  TOOL_AREAS,
+  isExposed,
+  parseToolGroups,
+} from '../services/porkbun-catalog.js';
+import type { PorkbunArea } from '../services/porkbun-catalog.js';
 import { getPorkbunGateway } from '../services/porkbun-gateway.js';
 import type { PorkbunGateway } from '../services/porkbun-gateway.js';
 import { jsonResponse } from '../utils/response.js';
@@ -48,16 +55,23 @@ export function registerPorkbunTools(
     {
       title: 'List Porkbun Tools',
       description:
-        "List the Porkbun tools reachable through this server, with each tool's access " +
-        "('read' → call via porkbun_read, 'write' → porkbun_write) and area. " +
-        'Pass name to filter by substring; the input schema is included when name matches ' +
-        'exactly one tool, or when include_schema is true.',
+        'List the Porkbun tools reachable through this server. With no name, returns one compact ' +
+        "row per tool: name, access ('read' → call via porkbun_read, 'write' → porkbun_write) " +
+        'and area. Pass area to list one area (dns, domains, ssl, ...). Pass name to filter by ' +
+        'substring and get descriptions too; the input schema is included when name matches ' +
+        'exactly one tool, or when include_schema is true (ignored without name).',
       inputSchema: {
-        name: z.string().optional().describe('Substring filter on tool name'),
+        name: z
+          .string()
+          .optional()
+          .describe('Substring filter on tool name; adds descriptions (and schemas, see below)'),
+        area: z.enum(PORKBUN_AREAS).optional().describe('Only list tools in this area'),
         include_schema: z
           .boolean()
           .optional()
-          .describe('Include each tool inputSchema (default: only when one tool matches)'),
+          .describe(
+            'With name: include every match inputSchema (default: only when one tool matches)',
+          ),
       },
       annotations: {
         readOnlyHint: true,
@@ -66,18 +80,30 @@ export function registerPorkbunTools(
         openWorldHint: true,
       },
     },
-    async ({ name, include_schema }: { name?: string; include_schema?: boolean }) => {
+    async ({
+      name,
+      area,
+      include_schema,
+    }: {
+      name?: string;
+      area?: PorkbunArea;
+      include_schema?: boolean;
+    }) => {
       try {
         const matches = (await gateway.listTools()).filter(
-          (t) => isExposed(t.name, groups) && (!name || t.name.includes(name)),
+          (t) =>
+            isExposed(t.name, groups) &&
+            (!area || TOOL_AREAS[t.name] === area) &&
+            (!name || t.name.includes(name)),
         );
-        const withSchema = include_schema ?? matches.length === 1;
+        // The full catalog with descriptions is ~67K characters, so they need a name filter.
+        const withSchema = !!name && (include_schema ?? matches.length === 1);
         return jsonResponse({
           tools: matches.map((t) => ({
             name: t.name,
-            description: t.description,
             access: t.readOnly ? 'read' : 'write',
             area: TOOL_AREAS[t.name],
+            ...(name ? { description: t.description } : {}),
             ...(withSchema ? { inputSchema: t.inputSchema } : {}),
           })),
         });
