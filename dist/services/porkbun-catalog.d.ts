@@ -9,7 +9,8 @@
  *   PORKBUN_TOOL_GROUPS - Comma-separated areas to expose (default: all allowed tools)
  */
 export declare const PORKBUN_PACKAGE_VERSION = "0.54.0";
-export type PorkbunArea = 'account' | 'cloudflare' | 'dns' | 'docs' | 'domains' | 'email' | 'hosting' | 'marketplace' | 'ssl' | 'webhooks';
+export declare const PORKBUN_AREAS: readonly ["account", "cloudflare", "dns", "docs", "domains", "email", "hosting", "marketplace", "ssl", "webhooks"];
+export type PorkbunArea = (typeof PORKBUN_AREAS)[number];
 export declare const DENIED_TOOLS: ReadonlySet<string>;
 export declare const TOOL_AREAS: Readonly<Record<string, PorkbunArea>>;
 /** Parse PORKBUN_TOOL_GROUPS: null (unset or blank) means every allowed tool. */

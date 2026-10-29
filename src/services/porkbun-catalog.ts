@@ -11,17 +11,20 @@
 
 export const PORKBUN_PACKAGE_VERSION = '0.54.0';
 
-export type PorkbunArea =
-  | 'account'
-  | 'cloudflare'
-  | 'dns'
-  | 'docs'
-  | 'domains'
-  | 'email'
-  | 'hosting'
-  | 'marketplace'
-  | 'ssl'
-  | 'webhooks';
+export const PORKBUN_AREAS = [
+  'account',
+  'cloudflare',
+  'dns',
+  'docs',
+  'domains',
+  'email',
+  'hosting',
+  'marketplace',
+  'ssl',
+  'webhooks',
+] as const;
+
+export type PorkbunArea = (typeof PORKBUN_AREAS)[number];
 
 // profiles.js SANDBOX, TOPUPS, PURCHASES in 0.54.0, plus the API-key-request tools.
 export const DENIED_TOOLS: ReadonlySet<string> = new Set([
@@ -169,7 +172,7 @@ export const TOOL_AREAS: Readonly<Record<string, PorkbunArea>> = Object.fromEntr
   ),
 );
 
-const AREAS: ReadonlySet<string> = new Set(Object.keys(AREA_TOOLS));
+const AREAS: ReadonlySet<string> = new Set(PORKBUN_AREAS);
 
 /** Parse PORKBUN_TOOL_GROUPS: null (unset or blank) means every allowed tool. */
 export function parseToolGroups(raw: string | undefined): ReadonlySet<PorkbunArea> | null {
@@ -189,7 +192,6 @@ export function parseToolGroups(raw: string | undefined): ReadonlySet<PorkbunAre
 
 export function isExposed(name: string, groups: ReadonlySet<PorkbunArea> | null): boolean {
   if (DENIED_TOOLS.has(name)) return false;
-  const area = TOOL_AREAS[name];
-  if (area === undefined) return false;
-  return groups === null || groups.has(area);
+  if (!Object.hasOwn(TOOL_AREAS, name)) return false;
+  return groups === null || groups.has(TOOL_AREAS[name]);
 }

@@ -9,6 +9,18 @@
  *   PORKBUN_TOOL_GROUPS - Comma-separated areas to expose (default: all allowed tools)
  */
 export const PORKBUN_PACKAGE_VERSION = '0.54.0';
+export const PORKBUN_AREAS = [
+    'account',
+    'cloudflare',
+    'dns',
+    'docs',
+    'domains',
+    'email',
+    'hosting',
+    'marketplace',
+    'ssl',
+    'webhooks',
+];
 // profiles.js SANDBOX, TOPUPS, PURCHASES in 0.54.0, plus the API-key-request tools.
 export const DENIED_TOOLS = new Set([
     // Sandbox
@@ -148,7 +160,7 @@ const AREA_TOOLS = {
     ],
 };
 export const TOOL_AREAS = Object.fromEntries(Object.entries(AREA_TOOLS).flatMap(([area, names]) => names.map((name) => [name, area])));
-const AREAS = new Set(Object.keys(AREA_TOOLS));
+const AREAS = new Set(PORKBUN_AREAS);
 /** Parse PORKBUN_TOOL_GROUPS: null (unset or blank) means every allowed tool. */
 export function parseToolGroups(raw) {
     if (raw === undefined || raw.trim() === '')
@@ -166,9 +178,8 @@ export function parseToolGroups(raw) {
 export function isExposed(name, groups) {
     if (DENIED_TOOLS.has(name))
         return false;
-    const area = TOOL_AREAS[name];
-    if (area === undefined)
+    if (!Object.hasOwn(TOOL_AREAS, name))
         return false;
-    return groups === null || groups.has(area);
+    return groups === null || groups.has(TOOL_AREAS[name]);
 }
 //# sourceMappingURL=porkbun-catalog.js.map

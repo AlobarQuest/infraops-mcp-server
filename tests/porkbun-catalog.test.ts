@@ -4,6 +4,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { createRequire } from 'module';
 import {
   DENIED_TOOLS,
+  PORKBUN_PACKAGE_VERSION,
   TOOL_AREAS,
   parseToolGroups,
   isExposed,
@@ -31,6 +32,14 @@ describe('porkbun catalog', () => {
     expect([...classified].filter((n) => !names.includes(n))).toEqual([]); // stale entries
     expect(names).toHaveLength(120);
   }, 30_000);
+
+  it('names the installed and pinned package version', () => {
+    const require = createRequire(import.meta.url);
+    const installed = require('@porkbunllc/mcp-server/package.json').version;
+    const pinned = require('../package.json').dependencies['@porkbunllc/mcp-server'];
+    expect(installed).toBe(PORKBUN_PACKAGE_VERSION);
+    expect(pinned).toBe(PORKBUN_PACKAGE_VERSION); // exact pin, no range
+  });
 
   it('never both denies and allows a tool', () => {
     expect(Object.keys(TOOL_AREAS).filter((n) => DENIED_TOOLS.has(n))).toEqual([]);
@@ -79,6 +88,7 @@ describe('porkbun catalog', () => {
     expect(isExposed('list_domains', null)).toBe(true);
     expect(isExposed('register_domain', null)).toBe(false);
     expect(isExposed('no_such_tool', null)).toBe(false);
+    expect(isExposed('toString', null)).toBe(false); // inherited, not a catalog entry
     expect(isExposed('list_dns_records', dns)).toBe(true);
     expect(isExposed('list_domains', dns)).toBe(false);
   });
