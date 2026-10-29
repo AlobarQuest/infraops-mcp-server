@@ -228,7 +228,15 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
   7. With both Porkbun secret ID variables set to empty strings, infraops starts normally
      with Porkbun disabled.
   Then remove the temporary server.
-- **Go-live.** Merge, `git sync` in the main checkout, `/mcp reconnect infraops`.
+- **Installed packages.** This is the first runtime dependency that git doesn't deliver:
+  `dist/` is tracked, `node_modules` isn't. Extend `.claude/hooks/session-sync.sh` so that
+  when a fast-forward changes `package-lock.json`, it runs `npm ci --omit=dev` in the main
+  checkout and then emits the `/mcp reconnect infraops` reminder. If `npm ci` fails, the hook
+  reports the failure and still never blocks startup. Update the CLAUDE.md section on keeping
+  `main` current, which says a merged change arrives through git alone.
+- **Go-live.** Merge, `git sync` in the main checkout, `npm ci --omit=dev` (the hook covers
+  later syncs, but not this first one if the sync happens outside a session start),
+  `/mcp reconnect infraops`.
 
 ## Decided by Devon
 
@@ -237,14 +245,16 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
 - The key can't spend money.
 - Disruption to live infraops use and per-session weight both matter.
 - The secrets go into BWS project Ops / Platform.
+- Agents may turn auto-renew on and off (`update_auto_renew` stays allowed), even though
+  auto-renew charges account credit at expiry.
+- The session-sync hook runs `npm ci` when `package-lock.json` changes.
 
 ## Claude's calls (Devon can overrule)
 
 - Three gateway tools with a read/write split, rather than two tools.
-- Gateway-level denylist for spend tools, on top of the key's scopes. `cancel_transfer`
-  and `update_auto_renew`, which the package calls money-adjacent, stay allowed on purpose:
-  auto-renew is ordinary domain management, and the key's lack of `purchase` scope governs
-  the rest.
+- Gateway-level denylist for spend tools, on top of the key's scopes. `cancel_transfer`,
+  which the package calls money-adjacent, stays allowed: it refunds an order rather than
+  charging one.
 - Exact-version pin instead of `npx` or a caret range.
 - Minimal child environment.
 - Crash back-off of three failures in 60 seconds, then 5 minutes.
