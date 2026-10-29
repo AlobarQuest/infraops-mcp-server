@@ -16,8 +16,9 @@ FAILED=0
 mkdir -p "$WORK/bin" "$WORK/home"
 cat > "$WORK/bin/bws" <<'STUB'
 #!/bin/bash
-# bws secret get <id> ...: answer with a value derived from the id; fail the Porkbun ids on request.
-case "$3" in 27e165db-*|28acc253-*) [ -n "${STUB_BWS_FAIL:-}" ] && exit 1 ;; esac
+# bws secret get <id> ...: answer with a value derived from the id; fail Porkbun ids on request
+# (STUB_BWS_FAIL=api, secret or both).
+case "$3:${STUB_BWS_FAIL:-}" in 27e165db-*:api|28acc253-*:secret|27e165db-*:both|28acc253-*:both) exit 1 ;; esac
 printf '{"value":"value-of-%s"}\n' "$3"
 STUB
 cat > "$WORK/bin/node" <<'STUB'
@@ -51,9 +52,17 @@ check "empty disables" bash -c "$(declare -f recorded); WORK='$WORK'; \
 no_warn() { ! grep -q 'WARN: failed to fetch Porkbun' "$WORK/out.log"; }
 check "empty disables: no WARN" no_warn
 
-run_start STUB_BWS_FAIL=1
+warned() { grep -qx "WARN: failed to fetch Porkbun $1 from BWS — Porkbun tools disabled" "$WORK/out.log"; }
+
+run_start STUB_BWS_FAIL=both
 check "fetch failure does not exit" bash -c "$(declare -f recorded); WORK='$WORK'; \
   recorded exec && recorded 'PORKBUN_API_KEY=' && recorded 'PORKBUN_SECRET_API_KEY='"
-check "fetch failure: WARN logged" grep -q 'WARN: failed to fetch Porkbun' "$WORK/out.log"
+check "both failed: WARN names both" warned "API key and secret key"
+
+run_start STUB_BWS_FAIL=api
+check "API key failed: WARN names it" warned "API key"
+
+run_start STUB_BWS_FAIL=secret
+check "secret key failed: WARN names it" warned "secret key"
 
 exit "$FAILED"

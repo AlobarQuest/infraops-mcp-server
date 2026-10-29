@@ -146,8 +146,15 @@ export PORKBUN_API_KEY=$(fetch_bws_secret "$PB_KEY_ID")
 export PORKBUN_SECRET_API_KEY=$(fetch_bws_secret "$PB_SECRET_ID")
 if [ -n "$PORKBUN_API_KEY" ] && [ -n "$PORKBUN_SECRET_API_KEY" ]; then
   echo "Porkbun tools enabled" >&2
-elif [ -n "$PB_KEY_ID" ] || [ -n "$PB_SECRET_ID" ]; then
-  echo "WARN: failed to fetch Porkbun API key and/or secret key from BWS — Porkbun tools disabled" >&2
+else
+  pb_failed=""
+  if [ -n "$PB_KEY_ID" ] && [ -z "$PORKBUN_API_KEY" ]; then pb_failed="API key"; fi
+  if [ -n "$PB_SECRET_ID" ] && [ -z "$PORKBUN_SECRET_API_KEY" ]; then
+    pb_failed="${pb_failed:+$pb_failed and }secret key"
+  fi
+  if [ -n "$pb_failed" ]; then
+    echo "WARN: failed to fetch Porkbun $pb_failed from BWS — Porkbun tools disabled" >&2
+  fi
 fi
 
 # ── Cloudflare API (optional) ────────────────────────────────────
