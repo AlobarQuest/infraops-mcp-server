@@ -230,11 +230,11 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
      Then remove the temporary server.
 - **Installed packages.** This is the first runtime dependency that git doesn't deliver:
   `dist/` is tracked, `node_modules` isn't. Extend `.claude/hooks/session-sync.sh` so that
-  when a fast-forward changes `package-lock.json`, it runs `npm ci --omit=dev` in the main
+  when a fast-forward changes `package-lock.json`, it runs `npm ci` in the main
   checkout and then emits the `/mcp reconnect infraops` reminder. If `npm ci` fails, the hook
   reports the failure and still never blocks startup. Update the CLAUDE.md section on keeping
   `main` current, which says a merged change arrives through git alone.
-- **Go-live.** Merge, `git sync` in the main checkout, `npm ci --omit=dev` (the hook covers
+- **Go-live.** Merge, `git sync` in the main checkout, `npm ci` (the hook covers
   later syncs, but not this first one if the sync happens outside a session start),
   `/mcp reconnect infraops`.
 

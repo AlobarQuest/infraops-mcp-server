@@ -8,9 +8,10 @@
 # start *only when it's safe* — on `main`, clean tree, behind origin. Otherwise it
 # just informs and does nothing. It NEVER blocks session start and NEVER switches
 # branches or deletes anything. dist/ is tracked, so the fast-forward alone updates it; when
-# the fast-forward changes package-lock.json the hook also runs `npm ci --omit=dev` (the
+# the fast-forward changes package-lock.json the hook also runs `npm ci` (the
 # Porkbun gateway starts from node_modules, which git does not deliver) and reminds the
-# agent to `/mcp reconnect infraops`.
+# agent to `/mcp reconnect infraops`. A lockfile-changing sync can make session start take
+# noticeably longer (npm ci); the hook timeout in .claude/settings.json allows for it.
 #
 # Output: a SessionStart JSON object whose additionalContext is injected into the
 # agent's context, so the agent starts knowing the repo is current (or why it isn't).
@@ -44,10 +45,10 @@ if [ "$branch" = "main" ] && [ -z "$dirty" ]; then
     # own output is dropped so nothing in it can break the printf-built JSON.
     if ! git diff --quiet "$before" HEAD -- package-lock.json 2>/dev/null; then
       reload=1
-      if npm ci --omit=dev --no-audit --no-fund >/dev/null 2>&1; then
-        head="${head} package-lock.json changed — ran 'npm ci --omit=dev'."
+      if npm ci --no-audit --no-fund >/dev/null 2>&1; then
+        head="${head} package-lock.json changed — ran 'npm ci'."
       else
-        head="${head} package-lock.json changed but 'npm ci --omit=dev' FAILED — run 'npm ci --omit=dev' by hand before relying on the Porkbun tools."
+        head="${head} package-lock.json changed but 'npm ci' FAILED — run 'npm ci' by hand before relying on the Porkbun tools."
       fi
     fi
     # dist/ IS the runtime (start.sh -> node dist/index.js). If the fast-forward moved dist/,

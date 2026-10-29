@@ -554,7 +554,7 @@ HETZNER_API_TOKEN not set — Hetzner Cloud tools disabled
 - **`API_ACCESS_DISABLED`:** API Access is off for the domain. Turn it on in the Porkbun dashboard (Domain Management, the domain's Details, API Access).
 - **`INSUFFICIENT_SCOPE`:** the API key lacks the scope the operation needs. Adjust the key's scopes at porkbun.com/account/api, or accept that the operation is out of reach.
 - **`DOMAIN_NOT_ALLOWED`:** the key is restricted to specific domains and the target is not among them. Add the domain to the key's allowed list.
-- **Missing `node_modules`:** the gateway resolves `@porkbunllc/mcp-server` from `node_modules`, so a checkout that never ran `npm ci --omit=dev` fails the first Porkbun call with a module-not-found error. Run `npm ci --omit=dev` in the checkout, then `/mcp reconnect infraops`.
+- **Missing `node_modules`:** the gateway resolves `@porkbunllc/mcp-server` from `node_modules`, so a checkout that never ran `npm ci` fails the first Porkbun call with a module-not-found error. Run `npm ci` in the checkout, then `/mcp reconnect infraops`.
 
 ### Server does not start (no output)
 

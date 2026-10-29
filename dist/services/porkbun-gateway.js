@@ -120,7 +120,7 @@ export class PorkbunGateway {
             const entry = this.entryPath ?? defaultEntryPath();
             if (!entry || !existsSync(entry)) {
                 throw new Error(`Porkbun MCP server not found at ${entry ?? ENTRY_SPECIFIER}; ` +
-                    'run `npm ci --omit=dev` in the infraops checkout');
+                    'run `npm ci` in the infraops checkout');
             }
             // StdioClientTransport merges only HOME, LOGNAME, PATH, SHELL, TERM and USER under env.
             transport = new StdioClientTransport({

@@ -29,7 +29,7 @@
 
 1. **Concurrent first calls** (two agents' calls arriving before the child is up) must start exactly one child. Pinned in Task 2 (`starts one child for concurrent first calls`).
 2. **Child dies between calls** (Porkbun process killed or crashes): the next call must start a fresh child, not hang on a dead transport. Pinned in Task 2 (`restarts after the child exits`).
-3. **Child never comes up** (missing `node_modules` after a sync without `npm ci`): the error must name the fix (`npm ci --omit=dev`), and repeated calls must not spawn in a tight loop. Pinned in Task 2 (`names npm ci when the entry point is missing`, `backs off after three failed starts`).
+3. **Child never comes up** (missing `node_modules` after a sync without `npm ci`): the error must name the fix (`npm ci`), and repeated calls must not spawn in a tight loop. Pinned in Task 2 (`names npm ci when the entry point is missing`, `backs off after three failed starts`).
 4. **Wrong tool for the operation** (a write sent through `porkbun_read`, or an unknown or denied name): refusal names the right tool or the reason, and never reaches the child. Pinned in Task 3.
 5. **Secret in a forwarded response** (SSL private key with escaped newlines, webhook `secret`): masked by default, visible with `reveal: true`. Pinned in Task 3 using the child's real text format.
 
@@ -192,7 +192,7 @@ it('restarts after the child exits', async () => {
 });
 it('names npm ci when the entry point is missing', async () => {
   const bad = new PorkbunGateway({ entryPath: '/nonexistent/index.js', env: {...} });
-  await expect(bad.listTools()).rejects.toThrow(/npm ci --omit=dev/);
+  await expect(bad.listTools()).rejects.toThrow(/npm ci/);
 });
 it('backs off after three failed starts', async () => {
   let t = 0;
@@ -212,7 +212,7 @@ Expected: FAIL, module not found.
 
 - [ ] **Step 4: Implement `src/services/porkbun-gateway.ts`**
 
-Keep one `Promise<Client> | null`. Clear it in the transport's `onclose` and on a failed start. Check the entry path exists before spawning; when it doesn't, throw an error that says to run `npm ci --omit=dev` in the infraops checkout. Use `stderr: 'pipe'` and prefix each line with `[porkbun] ` on `process.stderr`. Record failure timestamps; when three fall within 60 000 ms, refuse with a message containing `retry after <ISO time>` until 300 000 ms have passed. Cache `listTools()` per child start. Pass `{ timeout: timeoutMs }` to `client.callTool`.
+Keep one `Promise<Client> | null`. Clear it in the transport's `onclose` and on a failed start. Check the entry path exists before spawning; when it doesn't, throw an error that says to run `npm ci` in the infraops checkout. Use `stderr: 'pipe'` and prefix each line with `[porkbun] ` on `process.stderr`. Record failure timestamps; when three fall within 60 000 ms, refuse with a message containing `retry after <ISO time>` until 300 000 ms have passed. Cache `listTools()` per child start. Pass `{ timeout: timeoutMs }` to `client.callTool`.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
@@ -371,7 +371,7 @@ git commit -m "feat(porkbun): register the gateway, fetch keys from BWS, add rot
 
 `tests/session-sync.test.sh` builds a scratch origin and clone under `mktemp -d`, copies the hook into the clone's `.claude/hooks/`, puts a stub `npm` on `PATH` that records its arguments (or exits 1 when `NPM_FAIL=1`), and runs the hook. Checks:
 
-- `ok   lockfile change runs npm ci`: a pushed commit changing `package-lock.json` ⇒ stub saw `ci --omit=dev`; output JSON mentions `npm ci` and `/mcp reconnect infraops`.
+- `ok   lockfile change runs npm ci`: a pushed commit changing `package-lock.json` ⇒ stub saw `ci`; output JSON mentions `npm ci` and `/mcp reconnect infraops`.
 - `ok   no lockfile change skips npm`: a commit changing only `README.md` ⇒ stub never called.
 - `ok   npm failure still exits 0`: `NPM_FAIL=1` ⇒ hook exits 0 and the output names the failure and the manual command.
 
@@ -382,7 +382,7 @@ Expected: `FAIL   lockfile change runs npm ci`.
 
 - [ ] **Step 3: Implement**
 
-After a successful fast-forward, if `git diff --quiet "$before" HEAD -- package-lock.json` fails, run `npm ci --omit=dev --no-audit --no-fund >/dev/null 2>&1`. Fold the result into the emitted message, together with the existing `dist/` reminder. Update the header comment, which says to run `npm run build` after a sync, to describe the `npm ci` step.
+After a successful fast-forward, if `git diff --quiet "$before" HEAD -- package-lock.json` fails, run `npm ci --no-audit --no-fund >/dev/null 2>&1`. Fold the result into the emitted message, together with the existing `dist/` reminder. Update the header comment, which says to run `npm run build` after a sync, to describe the `npm ci` step.
 
 - [ ] **Step 4: Run it to verify it passes**
 
@@ -459,4 +459,4 @@ Push `feat/porkbun-gateway` and open a PR whose body lists the seven live result
 
 - [ ] **Step 5: Go live in the main checkout**
 
-`git sync`, then `npm ci --omit=dev`, then `/mcp reconnect infraops`. Confirm `porkbun_read` `ping` works through `mcp__infraops__porkbun_read`. Remove the worktree with `git worktree remove ../infraops-mcp-server-porkbun`.
+`git sync`, then `npm ci`, then `/mcp reconnect infraops`. Confirm `porkbun_read` `ping` works through `mcp__infraops__porkbun_read`. Remove the worktree with `git worktree remove ../infraops-mcp-server-porkbun`.

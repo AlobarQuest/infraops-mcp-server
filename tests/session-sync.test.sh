@@ -46,7 +46,7 @@ scenario() {
 
 lockfile_runs_npm() {
   scenario lock package-lock.json
-  grep -qx 'ci --omit=dev --no-audit --no-fund' "$WORK/lock/npm.calls" \
+  grep -qx 'ci --no-audit --no-fund' "$WORK/lock/npm.calls" \
     && jq -e '.hookSpecificOutput.additionalContext | contains("npm ci") and contains("/mcp reconnect infraops")' "$WORK/lock/out.json" >/dev/null
 }
 readme_skips_npm() {
@@ -56,7 +56,7 @@ readme_skips_npm() {
 npm_failure_exits_zero() {
   NPM_FAIL=1 scenario fail package-lock.json
   [ "$(cat "$WORK/fail/rc")" = 0 ] \
-    && jq -e '.hookSpecificOutput.additionalContext | contains("npm ci") and contains("FAILED") and contains("--omit=dev")' "$WORK/fail/out.json" >/dev/null
+    && jq -e '.hookSpecificOutput.additionalContext | contains("npm ci") and contains("FAILED") and contains("by hand")' "$WORK/fail/out.json" >/dev/null
 }
 
 check "lockfile change runs npm ci" lockfile_runs_npm

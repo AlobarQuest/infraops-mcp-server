@@ -69,7 +69,7 @@ reconnect infraops`.** You do **not** need a local `npm run build`: `dist/` is
 tracked and the CI `Build` workflow fails any PR whose committed `dist/` does not
 match a fresh build (`git status --porcelain dist/`), so a merged `main` always
 carries current compiled output — `git sync` brings it down via git (the session-sync hook also runs
-`npm ci --omit=dev` when a fast-forward changes `package-lock.json`, so the pinned Porkbun
+`npm ci` when a fast-forward changes `package-lock.json`, so the pinned Porkbun
 package is installed). The one
 remaining step is reloading the runtime: the MCP runs as a subprocess
 (`start.sh` → `node dist/index.js`) launched at session start, so a session that

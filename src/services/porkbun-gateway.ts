@@ -153,7 +153,7 @@ export class PorkbunGateway {
       if (!entry || !existsSync(entry)) {
         throw new Error(
           `Porkbun MCP server not found at ${entry ?? ENTRY_SPECIFIER}; ` +
-            'run `npm ci --omit=dev` in the infraops checkout',
+            'run `npm ci` in the infraops checkout',
         );
       }
 
