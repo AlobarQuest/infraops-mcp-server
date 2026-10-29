@@ -121,6 +121,14 @@ tool whose name or description matches a spend pattern (`buy`, `purchase`, `rene
 - **Child stderr.** Forward it to infraops' stderr with a `[porkbun]` prefix. The child must
   never write to infraops' stdout, which carries the MCP protocol.
 
+### Audit log
+
+The high-power audit hook (`~/.claude/hooks/high-power-audit-log.sh`) logs only tool names
+that match its `GATED` regex. `porkbun_` isn't in it, so as of 2026-10-29 `porkbun_write`
+calls would go unlogged. Add `porkbun_write` to `GATED`. That hook lives in the `~/.claude`
+control-plane git repo, not in infraops or security-standards, so the change is a separate
+commit there. The logged arguments include `tool`, which records the Porkbun operation.
+
 ### Redaction
 
 The child's response passes through infraops' central `installRedaction` wrapper like every
@@ -130,11 +138,19 @@ flags (`SECRETS` in `profiles.js`) are `get_ssl_bundle` (certificate private key
 `rotate_webhook_secret` (signing secret), and `setup_mailbox`. Webhook reads also carry a
 `secret` field.
 
+The gateway must return the child's `content` blocks (and `isError`) as-is, without
+re-serializing them. The child returns one text block holding `JSON.stringify(result, null,
+2)` (`dist/server.js`), and the wrapper's `redactTextContent` parses that JSON and
+deep-redacts it. Wrapping the child's result in `jsonResponse` again would double-escape it,
+so PEM and token value-shapes would no longer match.
+
 Add tests that run representative responses for each of these through the redaction path and
-assert the secret is masked by default and visible only with `reveal: true`. Where the
-existing name and value-shape rules miss a field (for example a webhook `secret`, or a
-mailbox password), extend `src/utils/redaction.ts`. A mock response built from the package's
-own documented response shapes is enough; tests never call the live API.
+assert the secret is masked by default and visible only with `reveal: true`. The test input
+must use the child's real format: a text block whose text is a pretty-printed JSON string,
+with the PEM newlines escaped inside it. A test that redacts a plain object proves nothing
+about the gateway path. Where the existing name and value-shape rules miss a field (for
+example a webhook `secret`, or a mailbox password), extend `src/utils/redaction.ts`. Tests
+never call the live API.
 
 `porkbun_read` and `porkbun_write` are not added to `ALWAYS_BYPASS`.
 
@@ -148,11 +164,13 @@ changes no tool names, because the three gateway tools always register.
 
 ### Secrets and configuration
 
-- Devon is moving the two Porkbun secrets into the BWS project **Ops / Platform**
-  (`26ff7e3e-8769-45ff-885c-b415013b4bbf`), next to the Namecheap secrets. The infraops
-  machine account already reads that project.
-- `start.sh` fetches both by UUID with defaults inline, the same as Namecheap's production
-  secrets, overridable with `BWS_PORKBUN_API_KEY_SECRET_ID` and
+- Both Porkbun secrets are in the BWS project **Ops / Platform**
+  (`26ff7e3e-8769-45ff-885c-b415013b4bbf`), next to the Namecheap secrets, and the infraops
+  machine account reads them:
+  - `porkbun-api-key`: `27e165db-5d54-4176-94df-b4f201476bed` → `PORKBUN_API_KEY`
+  - `porkbun-secret-key`: `28acc253-51e3-4ee1-8a04-b4f2014782fe` → `PORKBUN_SECRET_API_KEY`
+- `start.sh` fetches both by UUID with these defaults inline, the same as Namecheap's
+  production secrets, overridable with `BWS_PORKBUN_API_KEY_SECRET_ID` and
   `BWS_PORKBUN_SECRET_API_KEY_SECRET_ID`. A failed fetch leaves Porkbun disabled and logs a
   warning; it never exits.
 - Add both UUIDs to `.bws-secrets.toml`.
@@ -177,8 +195,10 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
   (for example `infraops-porkbun-test`, launched from the worktree's `start.sh`) and run these
   checks against Devon's real key:
   1. `porkbun_list_tools` lists tools and starts exactly one child process.
-  2. A read (for example `list_domains` or `ping`) succeeds.
-  3. One reversible write on a domain Devon names: add a TXT record, read it back, delete it.
+  2. `ping` succeeds, and its `scopes` include neither `purchase` nor `funding`.
+  3. One reversible write on a domain Devon names, with API Access turned on for that domain
+     in Porkbun (otherwise it fails with `API_ACCESS_DISABLED`): add a TXT record, read it
+     back, delete it.
   4. `get_ssl_bundle` comes back masked, and with `reveal: true` unmasked.
   5. A purchase tool is refused by the gateway.
   6. Killing the child mid-session recovers on the next call.
@@ -197,7 +217,10 @@ section, secret IDs, troubleshooting for `API_ACCESS_DISABLED`, `INSUFFICIENT_SC
 ## Claude's calls (Devon can overrule)
 
 - Three gateway tools with a read/write split, rather than two tools.
-- Gateway-level denylist for spend tools, on top of the key's scopes.
+- Gateway-level denylist for spend tools, on top of the key's scopes. `cancel_transfer`
+  and `update_auto_renew`, which the package calls money-adjacent, stay allowed on purpose:
+  auto-renew is ordinary domain management, and the key's lack of `purchase` scope governs
+  the rest.
 - Exact-version pin instead of `npx` or a caret range.
 - Minimal child environment.
 - Crash back-off of three failures in 60 seconds, then 5 minutes.
