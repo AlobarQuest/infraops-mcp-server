@@ -11,28 +11,35 @@ see the `infra-brain` MCP. For application-level context see `app-brain`.
 
 | Provider      | Prefix        | Tools | Always on | Required env                                                         |
 | ------------- | ------------- | ----- | --------- | -------------------------------------------------------------------- |
-| Coolify       | `coolify_`    | 67    | ✅        | `COOLIFY_PROD_BASE_URL` + `COOLIFY_PROD_API_TOKEN`                   |
-| VPS (SSH/orb) | `vps_`        | 7     | ✅        | — (defaults route to Hetzner prod)                                   |
+| Coolify       | `coolify_`    | 86    | ✅        | `COOLIFY_PROD_BASE_URL` + `COOLIFY_PROD_API_TOKEN`                   |
+| VPS (SSH/orb) | `vps_`        | 7     | ✅        | — (defaults route to the OVH prod VPS)                               |
 | Hetzner Cloud | `hetzner_`    | 26    | ❌        | `HETZNER_API_TOKEN`                                                  |
 | Namecheap     | `namecheap_`  | 19    | ❌        | `NAMECHEAP_API_USER` + `NAMECHEAP_API_KEY` + `NAMECHEAP_PROXY_TOKEN` |
+| Porkbun       | `porkbun_`    | 3     | ❌        | `PORKBUN_API_KEY` + `PORKBUN_SECRET_API_KEY`                         |
 | Cloudflare    | `cloudflare_` | 44    | ❌        | `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`                     |
 | Supabase      | `supabase_`   | 28    | ❌        | `SUPABASE_ACCESS_TOKEN`                                              |
 | GitHub        | `github_`     | 4     | ❌        | `GITHUB_TOKEN`                                                       |
 
-**195 tools across 7 providers.** Coolify and VPS register unconditionally;
+**217 tools across 8 providers.** Coolify and VPS register unconditionally;
 optional providers register only when their env vars are present at startup.
 
 Coolify and VPS tools both accept an `instance: "prod" | "dev"` parameter
-that routes between the Hetzner production VPS and a local OrbStack dev VM.
+that routes between the OVH production VPS and a local OrbStack dev VM.
 Tool implementations live in `src/tools/` — schemas are defined inline via
 Zod in each tool file.
+
+Porkbun's three tools are a gateway to Porkbun's official MCP server
+(`@porkbunllc/mcp-server`, pinned in `package.json`), which infraops starts as a
+child process on the first Porkbun call. Because that package lives in
+`node_modules`, run `npm ci` after any pull that changes `package-lock.json`; the
+session-start hook does this for you.
 
 ## Quickstart
 
 ```bash
 npm ci
 npm run build
-npm test        # vitest, 15 tests
+npm test        # vitest
 ```
 
 The server is launched by Claude Code as a subprocess via `start.sh`, which
