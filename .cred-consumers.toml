@@ -534,11 +534,12 @@ disposition = "reissue"
   note = "fetches both secrets by UUID at launch and exports them to the gateway"
 
 # ── The Authentik database password (Coolify service alcvxqq7yiidffen7jpn5zj6, role authentik) ──
-# Rotated by hand on 2026-10-30 after an agent-session exposure; orchestrator ADR-0055 amendment 17.
+# Rotated by hand on 2026-10-30 after an agent-session exposure, then by the SDS the same day
+# (package rotation-alobar-id-postgres revision 1); orchestrator ADR-0055 amendment 17.
 [[credential]]
 id = "alobar-id-postgres"
 class = "postgres-role-password"
-fingerprint_sha256_8 = "5ab2e4d8"
+fingerprint_sha256_8 = "9abdf9a7"
 provider = "postgres-role"
 provider_identity = "the authentik role in the Alobar ID Postgres container"
 bws_uuid = "f8d149d7-623f-407e-affa-b4f3012158f6"
@@ -548,7 +549,6 @@ health_url = "https://id.alobar.net/-/health/ready/"
 consumers_verified = "2026-10-30"
 verified_by = "alobar-id docker-compose.yml read and the fingerprints server and worker report, 2026-10-30; vps-backup dumps through docker exec with no password"
 disposition = "reissue"
-rotate_requested = "2026-10-30"
 
   [[credential.consumer]]
   kind = "bws-secret"
