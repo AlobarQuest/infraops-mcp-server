@@ -541,4 +541,25 @@ class = "postgres-role-password"
 fingerprint_sha256_8 = "5ab2e4d8"
 provider = "postgres-role"
 provider_identity = "the authentik role in the Alobar ID Postgres container"
+bws_uuid = "f8d149d7-623f-407e-affa-b4f3012158f6"
+rotated_by_sds = true
+helper_target = "alobar-id"
+health_url = "https://id.alobar.net/-/health/ready/"
+consumers_verified = "2026-10-30"
+verified_by = "alobar-id docker-compose.yml read and the fingerprints server and worker report, 2026-10-30; vps-backup dumps through docker exec with no password"
 disposition = "reissue"
+rotate_requested = "2026-10-30"
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "f8d149d7-623f-407e-affa-b4f3012158f6"
+  note = "the keeper: moved from Coolify's only copy on 2026-10-30"
+
+  [[credential.consumer]]
+  kind = "coolify-env"
+  instance = "prod"
+  resource_type = "service"
+  uuid = "alcvxqq7yiidffen7jpn5zj6"
+  key = "PG_PASS"
+  redeploy = true
+  note = "read by the server and worker containers; postgres reads it only at database creation"
