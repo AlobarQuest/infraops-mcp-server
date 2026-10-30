@@ -64,6 +64,15 @@ export const CLASS_POLICY = {
             'LANDMINE: rotating a brain MCP_ACCESS_KEY re-keys its live claude.ai connector — pair the rotation with an immediate connector reconfig; never batch unattended.',
         ],
     },
+    // A Postgres role password the orchestrator's rotation executor rotates (ADR-0055 amendment 17).
+    // Never due by age: a rotation restarts the service, so only an exposure or rotate_requested asks.
+    'postgres-role-password': {
+        maxAgeDays: Number.POSITIVE_INFINITY,
+        executor: false,
+        landmines: [
+            'Rotate through the SDS: a role has one password, so the service restarts with no overlap.',
+        ],
+    },
     'coolify-pg-password': {
         maxAgeDays: Number.POSITIVE_INFINITY,
         executor: false,

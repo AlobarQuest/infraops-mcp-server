@@ -496,6 +496,7 @@ describe('buildCredClassifications', () => {
 
   it.each([
     'coolify-pg-password',
+    'postgres-role-password',
     'bws-machine-token',
     'brain-mcp-key',
     'anthropic-api-key',
@@ -580,6 +581,7 @@ describe('CLASS_POLICY sanity', () => {
       'openai-key',
       'brain-mcp-key',
       'coolify-pg-password',
+      'postgres-role-password',
       'bws-machine-token',
       'anthropic-api-key',
       'porkbun-api-key',

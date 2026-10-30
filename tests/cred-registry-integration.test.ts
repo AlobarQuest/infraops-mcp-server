@@ -34,10 +34,11 @@ describe("the repo's own .cred-consumers.toml", () => {
   ];
 
   const API_KEYS = ['porkbun-api-keypair'];
+  const DATABASE_PASSWORDS = ['alobar-id-postgres'];
 
   it('parses and carries the leaked-cred entries (sweep-attested) and the platform BWS machine tokens', () => {
     expect(specs.map((s) => s.id).sort()).toEqual(
-      [...MACHINE_TOKENS, ...API_KEYS, ...LEAKED].sort(),
+      [...MACHINE_TOKENS, ...API_KEYS, ...DATABASE_PASSWORDS, ...LEAKED].sort(),
     );
     for (const s of specs.filter((x) => LEAKED.includes(x.id)))
       expect(s.consumers_verified, `${s.id} must be sweep-attested`).toBeTruthy();

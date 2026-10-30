@@ -532,3 +532,13 @@ disposition = "reissue"
   repo = "infraops-mcp-server"
   ref = "start.sh"
   note = "fetches both secrets by UUID at launch and exports them to the gateway"
+
+# ── The Authentik database password (Coolify service alcvxqq7yiidffen7jpn5zj6, role authentik) ──
+# Rotated by hand on 2026-10-30 after an agent-session exposure; orchestrator ADR-0055 amendment 17.
+[[credential]]
+id = "alobar-id-postgres"
+class = "postgres-role-password"
+fingerprint_sha256_8 = "5ab2e4d8"
+provider = "postgres-role"
+provider_identity = "the authentik role in the Alobar ID Postgres container"
+disposition = "reissue"
