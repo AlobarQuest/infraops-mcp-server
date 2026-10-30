@@ -95,6 +95,15 @@ export const CLASS_POLICY: Record<string, ClassPolicy> = {
       'NEVER cycle a Coolify Postgres password in place — delete the volume and redeploy fresh (repo CLAUDE.md). Manual + Devon-driven only.',
     ],
   },
+  // A Coolify API token (the orchestrator's estate lander: re-points an image tag and starts a
+  // deploy). Coolify tokens name actions, not resources, so the scope at minting is the whole bound.
+  'coolify-api-token': {
+    maxAgeDays: 365,
+    executor: false,
+    landmines: [
+      'Mint the replacement in Coolify (Keys & Tokens) with exactly the permissions the registry row names; never read:sensitive (env responses then carry secret values) or root. Revoke the old token in Coolify after the new one is verified.',
+    ],
+  },
   'bws-machine-token': {
     maxAgeDays: 365,
     executor: false,
