@@ -7,7 +7,11 @@
 # infra tooling (see CLAUDE.md). This hook fast-forwards `main` to origin at session
 # start *only when it's safe* — on `main`, clean tree, behind origin. Otherwise it
 # just informs and does nothing. It NEVER blocks session start and NEVER switches
-# branches or deletes anything. (After a sync, run `npm run build` so dist/ matches.)
+# branches or deletes anything. dist/ is tracked, so the fast-forward alone updates it; when
+# the fast-forward changes package-lock.json the hook also runs `npm ci` (the
+# Porkbun gateway starts from node_modules, which git does not deliver) and reminds the
+# agent to `/mcp reconnect infraops`. A lockfile-changing sync can make session start take
+# noticeably longer (npm ci); the hook timeout in .claude/settings.json allows for it.
 #
 # Output: a SessionStart JSON object whose additionalContext is injected into the
 # agent's context, so the agent starts knowing the repo is current (or why it isn't).
@@ -35,13 +39,26 @@ dirty=""; [ -n "$(git status --porcelain 2>/dev/null)" ] && dirty=" with uncommi
 if [ "$branch" = "main" ] && [ -z "$dirty" ]; then
   before="$(git rev-parse HEAD 2>/dev/null)"
   if git merge --ff-only origin/main >/dev/null 2>&1; then
-    # dist/ IS the runtime (start.sh -> node dist/index.js). If the fast-forward
-    # moved dist/, the already-running infraops MCP is executing the OLD build;
-    # tell the agent to reload it in place (no full session restart needed).
-    if ! git diff --quiet "$before" HEAD -- dist/ 2>/dev/null; then
-      emit "[session-sync] main was ${behind} commit(s) behind origin; fast-forwarded to $(git rev-parse --short HEAD). dist/ changed — the running infraops MCP is on the OLD build; run '/mcp reconnect infraops' to load the new one before relying on infraops tools."
+    head="[session-sync] main was ${behind} commit(s) behind origin; fast-forwarded to $(git rev-parse --short HEAD)."
+    reload=""
+    # Dependencies are not delivered by git. A failed install is reported, never fatal, and npm's
+    # own output is dropped so nothing in it can break the printf-built JSON.
+    if ! git diff --quiet "$before" HEAD -- package-lock.json 2>/dev/null; then
+      reload=1
+      if npm ci --no-audit --no-fund >/dev/null 2>&1; then
+        head="${head} package-lock.json changed — ran 'npm ci'."
+      else
+        head="${head} package-lock.json changed but 'npm ci' FAILED — run 'npm ci' by hand before relying on the Porkbun tools."
+      fi
     fi
-    emit "[session-sync] main was ${behind} commit(s) behind origin; fast-forwarded to $(git rev-parse --short HEAD). Repo is current — safe to start."
+    # dist/ IS the runtime (start.sh -> node dist/index.js). If the fast-forward moved dist/,
+    # the already-running infraops MCP is executing the OLD build; tell the agent to reload it
+    # in place (no full session restart needed).
+    git diff --quiet "$before" HEAD -- dist/ 2>/dev/null || reload=1
+    if [ -n "$reload" ]; then
+      emit "${head} The running infraops MCP is on the OLD build; run '/mcp reconnect infraops' to load the new one before relying on infraops tools."
+    fi
+    emit "${head} Repo is current — safe to start."
   fi
   emit "[session-sync] main is ${behind} behind origin but fast-forward failed (diverged?). Run 'git sync' or inspect before coding."
 fi

@@ -26,6 +26,8 @@ src/
 │   ├── hetzner-client.ts
 │   ├── cloudflare-client.ts
 │   ├── namecheap-client.ts
+│   ├── porkbun-catalog.ts # Reviewed classification of the pinned Porkbun MCP's tools
+│   ├── porkbun-gateway.ts # Lazy child-process client for the Porkbun MCP server
 │   ├── supabase-client.ts
 │   ├── ssh-client.ts     # SSH backend (prod — Hetzner)
 │   ├── orb-client.ts     # OrbStack `orb run` backend (dev — local)
@@ -40,6 +42,7 @@ src/
     ├── hetzner-servers.ts, hetzner-networking.ts          # Hetzner (26 tools)
     ├── vps.ts                                             # VPS SSH (7 tools)
     ├── namecheap-domains.ts, namecheap-dns.ts             # Namecheap (19 tools)
+    ├── porkbun.ts                                         # Porkbun gateway (3 tools)
     ├── cloudflare-dns.ts, cloudflare-pages.ts,
     │   cloudflare-workers.ts, cloudflare-r2.ts,
     │   cloudflare-tunnels.ts, cloudflare-security.ts      # Cloudflare (44 tools)
@@ -47,7 +50,7 @@ src/
         supabase-functions.ts, supabase-config.ts          # Supabase (28 tools)
 ```
 
-**~213 tools total** across 7 providers. (`src/utils/` holds the shared `response`/`summaries`/`masking` helpers used by the Coolify read tools.)
+**~216 tools total** across 8 providers. (`src/utils/` holds the shared `response`/`summaries`/`masking` helpers used by the Coolify read tools.)
 
 See [RUNBOOK.md](./RUNBOOK.md) for provider configuration details (env vars, BWS secret IDs, `.claude.json` wiring, troubleshooting).
 
@@ -61,16 +64,22 @@ out-of-date infra tooling**. The `SessionStart` hook
 safe* (on `main`, clean, behind origin); otherwise it just notifies. It never
 switches branches, deletes, or blocks startup.
 
-**The full chain to make a code change live: PR → merge → `git sync` → `/mcp
-reconnect infraops`.** You do **not** need a local `npm run build`: `dist/` is
+**The full chain to make a code change live: PR → merge → `git sync` → (if
+`package-lock.json` changed and the sync happened outside a session start, a one-time
+manual `npm ci`) → `/mcp reconnect infraops`.** You do **not** need a local `npm run build`: `dist/` is
 tracked and the CI `Build` workflow fails any PR whose committed `dist/` does not
 match a fresh build (`git status --porcelain dist/`), so a merged `main` always
-carries current compiled output — `git sync` brings it down via git alone. The one
+carries current compiled output — `git sync` brings it down via git (the session-sync hook also runs
+`npm ci` when a fast-forward changes `package-lock.json`, so the pinned Porkbun
+package is installed). The one
 remaining step is reloading the runtime: the MCP runs as a subprocess
 (`start.sh` → `node dist/index.js`) launched at session start, so a session that
 was already open is still executing the OLD `dist/`. Re-spawn it in place with
 `/mcp reconnect infraops` (lighter than a full session restart); the session-sync
-hook emits this reminder automatically when a fast-forward changed `dist/`.
+hook emits this reminder automatically when a fast-forward changed `dist/` or `package-lock.json`.
+`npm ci` deletes and reinstalls `node_modules`, so an infraops started from this checkout
+while it runs (another session starting, or a reconnect) can fail to import its
+dependencies; once the install finishes, `/mcp reconnect infraops` recovers it.
 
 ## Provider agent — escalation when the MCP isn't enough
 
@@ -90,6 +99,7 @@ edits land on a `provider-agent/<session>` review branch for you to review/merge
 | GitHub | `github_` | No | `GITHUB_TOKEN` |
 | Hetzner | `hetzner_` | No | `HETZNER_API_TOKEN` |
 | Namecheap | `namecheap_` | No | `NAMECHEAP_API_USER`, `NAMECHEAP_API_KEY`, `NAMECHEAP_PROXY_TOKEN` |
+| Porkbun | `porkbun_` | No | `PORKBUN_API_KEY`, `PORKBUN_SECRET_API_KEY` (optional `PORKBUN_TOOL_GROUPS`) |
 | Cloudflare | `cloudflare_` | No | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` |
 | Supabase | `supabase_` | No | `SUPABASE_ACCESS_TOKEN` |
 
@@ -137,6 +147,10 @@ All `vps_*` tools (`vps_exec`, `vps_health`, `vps_read_file`, `vps_write_file`, 
 - **Dev** (`instance: "dev"`): `orb run -m $VPS_DEV_ORB_MACHINE bash -c <cmd>` against an OrbStack Linux machine. The optional `VPS_DEV_ORB_MACHINE` env var selects the OrbStack machine name and defaults to `"ubuntu"` (see `src/services/orb-client.ts`); the machine is routable at `192.168.139.217`. Runs as `devon`, so the docker-specific tools automatically prefix `sudo docker` — callers of `vps_exec` must add `sudo` themselves for raw docker commands.
 
 **Why this exists:** prior to v3.3.0 the `vps_*` tools silently ignored any instance intent and always hit Hetzner prod, so pairing `coolify_list_applications({instance: "dev"})` with `vps_exec(...)` misrouted and returned phantom "container not found" results. See the routing dispatcher in `src/services/vps-dispatch.ts`.
+
+### Porkbun gateway
+
+Porkbun is reached through three tools (`porkbun_list_tools`, `porkbun_read`, `porkbun_write`) that forward to Porkbun's official `@porkbunllc/mcp-server`, run as a child process. The child starts lazily on the first Porkbun call, never at infraops startup, and receives only the two Porkbun keys. The package is pinned to an exact version in `package.json`; `porkbun-catalog.ts` classifies every tool it serves (a test fails on any unclassified tool). Upgrading the pin is a PR that also updates the catalog. Purchase, top-up, sandbox, and API-key-request tools are denied. See RUNBOOK.md for secrets and troubleshooting.
 
 ### Private Repo Deployment Workflow
 

@@ -20,6 +20,10 @@
 #   Sandbox: NAMECHEAP_SANDBOX_API_USER, NAMECHEAP_SANDBOX_API_KEY
 #   Production: NAMECHEAP_API_USER, NAMECHEAP_API_KEY
 #   Proxy token: NAMECHEAP_PROXY_BEARER_TOKEN
+#
+# Porkbun keys are fetched from BWS by UUID (override via BWS_PORKBUN_API_KEY_SECRET_ID /
+# BWS_PORKBUN_SECRET_KEY_SECRET_ID; set either to empty to disable Porkbun):
+#   PORKBUN_API_KEY, PORKBUN_SECRET_API_KEY
 
 set -euo pipefail
 
@@ -131,6 +135,26 @@ fi
 
 if [ -n "${NAMECHEAP_API_USER:-}" ] && [ -n "${NAMECHEAP_API_KEY:-}" ] && [ -n "${NAMECHEAP_PROXY_TOKEN:-}" ]; then
   echo "Namecheap tools enabled (env: ${NC_ENV_LABEL}, via VPS proxy)" >&2
+fi
+
+# ── Porkbun API (optional) ─────────────────────────────────────────
+# `-` (no colon): a variable set to empty disables Porkbun; only an unset one takes the default.
+# A failed fetch leaves the variable empty and never exits — the tools just do not register.
+PB_KEY_ID="${BWS_PORKBUN_API_KEY_SECRET_ID-27e165db-5d54-4176-94df-b4f201476bed}"
+PB_SECRET_ID="${BWS_PORKBUN_SECRET_KEY_SECRET_ID-28acc253-51e3-4ee1-8a04-b4f2014782fe}"
+export PORKBUN_API_KEY=$(fetch_bws_secret "$PB_KEY_ID")
+export PORKBUN_SECRET_API_KEY=$(fetch_bws_secret "$PB_SECRET_ID")
+if [ -n "$PORKBUN_API_KEY" ] && [ -n "$PORKBUN_SECRET_API_KEY" ]; then
+  echo "Porkbun tools enabled" >&2
+else
+  pb_failed=""
+  if [ -n "$PB_KEY_ID" ] && [ -z "$PORKBUN_API_KEY" ]; then pb_failed="API key"; fi
+  if [ -n "$PB_SECRET_ID" ] && [ -z "$PORKBUN_SECRET_API_KEY" ]; then
+    pb_failed="${pb_failed:+$pb_failed and }secret key"
+  fi
+  if [ -n "$pb_failed" ]; then
+    echo "WARN: failed to fetch Porkbun $pb_failed from BWS — Porkbun tools disabled" >&2
+  fi
 fi
 
 # ── Cloudflare API (optional) ────────────────────────────────────

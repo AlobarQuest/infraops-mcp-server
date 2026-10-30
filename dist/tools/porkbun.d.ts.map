@@ -1,0 +1,1 @@
+{"version":3,"file":"porkbun.d.ts","sourceRoot":"","sources":["../../src/tools/porkbun.ts"],"names":[],"mappings":"AAAA;;;;;;;;;;;;;;;;GAgBG;AAEH,OAAO,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AAWpE,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,gCAAgC,CAAC;AAgBrE,wBAAgB,oBAAoB,CAClC,MAAM,EAAE,SAAS,EACjB,OAAO,GAAE,IAAI,CAAC,cAAc,EAAE,WAAW,GAAG,UAAU,CAAuB,GAC5E,IAAI,CAyIN"}

@@ -499,6 +499,7 @@ describe('buildCredClassifications', () => {
     'bws-machine-token',
     'brain-mcp-key',
     'anthropic-api-key',
+    'porkbun-api-key',
     'github-app-private-key',
   ])('class %s is always manual — never an executor rotation plan', (cls) => {
     const spec = baseSpec({ class: cls });
@@ -581,10 +582,17 @@ describe('CLASS_POLICY sanity', () => {
       'coolify-pg-password',
       'bws-machine-token',
       'anthropic-api-key',
+      'porkbun-api-key',
       'github-app-private-key',
     ]) {
       expect(CLASS_POLICY[cls]).toBeDefined();
     }
+  });
+});
+
+describe('porkbun lane class', () => {
+  it('treats porkbun-api-key as a manual-lane 365-day class', () => {
+    expect(CLASS_POLICY['porkbun-api-key']).toMatchObject({ maxAgeDays: 365, executor: false });
   });
 });
 

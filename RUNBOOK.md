@@ -22,7 +22,7 @@ Version 3.3.0 | TypeScript | stdio transport | Node.js 18+
 
 InfraOps MCP Server is a local-only Model Context Protocol server that exposes infrastructure operations as tools to Claude Code. It communicates over stdio — there is no HTTP server, no Docker container, and no Coolify deployment. The process is started by Claude Code as a subprocess.
 
-**195 tools across 7 providers:**
+**198 tools across 8 providers:**
 
 | Provider   | Prefix        | Always On | Tools |
 | ---------- | ------------- | --------- | ----- |
@@ -30,6 +30,7 @@ InfraOps MCP Server is a local-only Model Context Protocol server that exposes i
 | VPS SSH    | `vps_`        | Yes       | 7     |
 | Hetzner    | `hetzner_`    | No        | 26    |
 | Namecheap  | `namecheap_`  | No        | 19    |
+| Porkbun    | `porkbun_`    | No        | 3     |
 | Cloudflare | `cloudflare_` | No        | 44    |
 | Supabase   | `supabase_`   | No        | 28    |
 | GitHub     | `github_`     | No        | 4     |
@@ -217,6 +218,22 @@ Namecheap's API requires IP whitelisting. Rather than whitelisting the local mac
 
 `isNamecheapConfigured()` returns true only when all three of `NAMECHEAP_API_USER`, `NAMECHEAP_API_KEY`, and `NAMECHEAP_PROXY_TOKEN` are set.
 
+**Porkbun**
+
+Porkbun requires two values, both fetched from BWS by `start.sh`:
+
+```
+PORKBUN_API_KEY             Porkbun API key (BWS porkbun-api-key)
+PORKBUN_SECRET_API_KEY      Porkbun secret API key (BWS porkbun-secret-key)
+PORKBUN_TOOL_GROUPS         Optional comma-separated areas to expose (default: all allowed tools)
+```
+
+`isPorkbunConfigured()` returns true only when both keys are non-empty. Three tools register (`porkbun_list_tools`, `porkbun_read`, `porkbun_write`); they forward to Porkbun's official `@porkbunllc/mcp-server`, which runs as a child process started on the first Porkbun call. Purchase, top-up, sandbox, and API-key-request tools are denied by the gateway.
+
+The key pair is created and revoked at porkbun.com/account/api (rotation is a manual-lane credential, `porkbun-api-keypair` in `.cred-consumers.toml`). To disable Porkbun, set both `BWS_PORKBUN_API_KEY_SECRET_ID` and `BWS_PORKBUN_SECRET_KEY_SECRET_ID` to empty strings in the `.claude.json` env block.
+
+To upgrade the pinned package: change the exact version in `package.json`, run `npm install`, run `npx vitest run` (the catalog test fails on any tool the new version serves that `src/services/porkbun-catalog.ts` has not classified), update the catalog and `PORKBUN_PACKAGE_VERSION`, and open a PR.
+
 **Cloudflare**
 
 ```
@@ -263,14 +280,16 @@ provisioned, so their IDs default empty). See infra-brain lesson #277.
 
 The following env vars in `.claude.json` are secret IDs (UUIDs), not the actual tokens:
 
-| Env var in .claude.json        | What it resolves to     |
-| ------------------------------ | ----------------------- |
-| `BWS_COOLIFY_PROD_SECRET_ID`   | `COOLIFY_API_TOKEN`     |
-| `BWS_COOLIFY_DEV_SECRET_ID`    | `COOLIFY_DEV_API_TOKEN` |
-| `BWS_HETZNER_SECRET_ID`        | `HETZNER_API_TOKEN`     |
-| `BWS_SSH_PASSPHRASE_SECRET_ID` | `VPS_SSH_PASSPHRASE`    |
-| `BWS_CLOUDFLARE_SECRET_ID`     | `CLOUDFLARE_API_TOKEN`  |
-| `BWS_SUPABASE_SECRET_ID`       | `SUPABASE_ACCESS_TOKEN` |
+| Env var in .claude.json            | What it resolves to                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------- |
+| `BWS_COOLIFY_PROD_SECRET_ID`       | `COOLIFY_API_TOKEN`                                                       |
+| `BWS_COOLIFY_DEV_SECRET_ID`        | `COOLIFY_DEV_API_TOKEN`                                                   |
+| `BWS_HETZNER_SECRET_ID`            | `HETZNER_API_TOKEN`                                                       |
+| `BWS_SSH_PASSPHRASE_SECRET_ID`     | `VPS_SSH_PASSPHRASE`                                                      |
+| `BWS_CLOUDFLARE_SECRET_ID`         | `CLOUDFLARE_API_TOKEN`                                                    |
+| `BWS_SUPABASE_SECRET_ID`           | `SUPABASE_ACCESS_TOKEN`                                                   |
+| `BWS_PORKBUN_API_KEY_SECRET_ID`    | `PORKBUN_API_KEY` (default `27e165db-5d54-4176-94df-b4f201476bed`)        |
+| `BWS_PORKBUN_SECRET_KEY_SECRET_ID` | `PORKBUN_SECRET_API_KEY` (default `28acc253-51e3-4ee1-8a04-b4f2014782fe`) |
 
 Namecheap and the Namecheap proxy token are fetched by name — no secret ID env vars are needed for them, just that the BWS vault contains keys named:
 
@@ -526,6 +545,16 @@ HETZNER_API_TOKEN not set — Hetzner Cloud tools disabled
 4. Confirm the BWS secret named `NAMECHEAP_PROXY_BEARER_TOKEN` exists and matches the token the proxy expects
 
 **Sandbox vs production:** `NAMECHEAP_USE_SANDBOX` defaults to `"true"`. Sandbox credentials are separate from production credentials in BWS. Set `NAMECHEAP_USE_SANDBOX=false` in `.claude.json` env to use production.
+
+### Porkbun issues
+
+**Symptom:** Porkbun tools are missing, or a Porkbun call returns an error.
+
+- **Tools missing:** check start.sh output for "Porkbun tools enabled". If absent, either a key failed to fetch from BWS or a `BWS_PORKBUN_*_SECRET_ID` is set to empty.
+- **`API_ACCESS_DISABLED`:** API Access is off for the domain. Turn it on in the Porkbun dashboard (Domain Management, the domain's Details, API Access).
+- **`INSUFFICIENT_SCOPE`:** the API key lacks the scope the operation needs. Adjust the key's scopes at porkbun.com/account/api, or accept that the operation is out of reach.
+- **`DOMAIN_NOT_ALLOWED`:** the key is restricted to specific domains and the target is not among them. Add the domain to the key's allowed list.
+- **Missing `node_modules`:** the gateway resolves `@porkbunllc/mcp-server` from `node_modules`, so a checkout that never ran `npm ci` fails the first Porkbun call with a module-not-found error. Run `npm ci` in the checkout, then `/mcp reconnect infraops`.
 
 ### Server does not start (no output)
 

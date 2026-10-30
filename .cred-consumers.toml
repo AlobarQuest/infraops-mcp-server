@@ -499,3 +499,36 @@ rotated_by_sds = true
   service = "Claude"
   account = "BWS_ACCESS_TOKEN_BRAIN_OPS"
   note = "no reader found; the keeper itself"
+
+# ── Porkbun API key pair (infraops Porkbun gateway) ─────────────────────────────
+# The API key and secret API key are one credential: Porkbun issues and revokes them together
+# at porkbun.com/account/api. Minted 2026-10-29 for the gateway; start.sh is the only reader.
+# Manual lane (class porkbun-api-key): create and revoke are Devon console actions. The
+# fingerprint is the API key's; the secret API key travels with it.
+[[credential]]
+id = "porkbun-api-keypair"
+class = "porkbun-api-key"
+fingerprint_sha256_8 = "b7939409"
+provider = "porkbun"
+provider_identity = "Porkbun account API key + secret API key (porkbun.com/account/api)"
+bws_uuid = "27e165db-5d54-4176-94df-b4f201476bed"
+created = "2026-10-29"
+consumers_verified = "2026-10-29"
+verified_by = "manual: key newly minted for the gateway; sole reader is start.sh (repo grep, BWS fingerprints read in-process)"
+disposition = "reissue"
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "27e165db-5d54-4176-94df-b4f201476bed"
+  note = "porkbun-api-key (Ops / Platform) — PORKBUN_API_KEY"
+
+  [[credential.consumer]]
+  kind = "bws-secret"
+  uuid = "28acc253-51e3-4ee1-8a04-b4f2014782fe"
+  note = "porkbun-secret-key (Ops / Platform) — PORKBUN_SECRET_API_KEY"
+
+  [[credential.consumer]]
+  kind = "runtime-fetch"
+  repo = "infraops-mcp-server"
+  ref = "start.sh"
+  note = "fetches both secrets by UUID at launch and exports them to the gateway"

@@ -63,6 +63,7 @@ export const CLASS_POLICY: Record<string, ClassPolicy> = {
   // Anthropic API key (fork-sync lane: ANTHROPIC_API_KEY Actions secrets in the forks). No
   // provider probe exists for Anthropic, so it stays on the manual checklist.
   'anthropic-api-key': { maxAgeDays: 365, executor: false, landmines: [] },
+  'porkbun-api-key': { maxAgeDays: 365, executor: false, landmines: [] },
   // A GitHub App's private key (the fork-sync lane's APP_PRIVATE_KEY Actions secrets).
   'github-app-private-key': {
     maxAgeDays: 365,

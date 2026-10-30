@@ -8,6 +8,8 @@ describe('isSecretName', () => {
   it('flags secret-bearing names', () => {
     for (const k of [
       'private_key',
+      'privatekey',
+      'privateKey',
       'postgres_password',
       'redis_password',
       'root_password',
@@ -17,6 +19,7 @@ describe('isSecretName', () => {
       'tunnel_secret',
       'jwt_secret',
       'credentials',
+      'authorization',
       'access_token',
     ]) {
       expect(isSecretName(k)).toBe(true);
@@ -25,6 +28,7 @@ describe('isSecretName', () => {
   it('preserves guarded / non-secret names', () => {
     for (const k of [
       'public_key',
+      'publickey',
       'key_name',
       'private_key_id',
       'private_key_uuid',
@@ -84,6 +88,30 @@ describe('redactText (value-shape)', () => {
 });
 
 describe('deepRedact', () => {
+  it('masks the Porkbun SSL bundle privatekey by name, not publickey', () => {
+    const out: any = deepRedact({
+      status: 'SUCCESS',
+      certificatechain: 'chain',
+      privatekey: 'MIIEvQIBADANBgkqhkiG9w0BAQEFAASC', // base64 body without PEM armour
+      publickey: 'MIIBIjANBgkqhkiG9w0BAQEFAAOC',
+    });
+    expect(out.privatekey).toBe('***');
+    expect(out.publickey).toBe('MIIBIjANBgkqhkiG9w0BAQEFAAOC');
+    expect(out.certificatechain).toBe('chain');
+  });
+
+  it('masks authorization at any depth without touching unrelated fields', () => {
+    const out: any = deepRedact({
+      authorization: 'Basic dXNlcjpwdw==',
+      wp: { authorization: 'Basic dXNlcjpwdw==', restUrl: 'https://d.com/wp-json/' },
+      role: 'editor',
+    });
+    expect(out.authorization).toBe('***');
+    expect(out.wp.authorization).toBe('***');
+    expect(out.wp.restUrl).toBe('https://d.com/wp-json/');
+    expect(out.role).toBe('editor');
+  });
+
   it('masks secret-named fields, preserves null and guarded fields', () => {
     const out: any = deepRedact({
       private_key: PEM,

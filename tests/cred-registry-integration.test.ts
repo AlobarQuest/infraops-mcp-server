@@ -33,8 +33,12 @@ describe("the repo's own .cred-consumers.toml", () => {
     'bws-tok-ops-mini-20260730',
   ];
 
+  const API_KEYS = ['porkbun-api-keypair'];
+
   it('parses and carries the leaked-cred entries (sweep-attested) and the platform BWS machine tokens', () => {
-    expect(specs.map((s) => s.id).sort()).toEqual([...MACHINE_TOKENS, ...LEAKED].sort());
+    expect(specs.map((s) => s.id).sort()).toEqual(
+      [...MACHINE_TOKENS, ...API_KEYS, ...LEAKED].sort(),
+    );
     for (const s of specs.filter((x) => LEAKED.includes(x.id)))
       expect(s.consumers_verified, `${s.id} must be sweep-attested`).toBeTruthy();
   });
