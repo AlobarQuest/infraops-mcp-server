@@ -37,4 +37,9 @@ required_checks:
 - [ ] (P3) Local make check passes shellcheck SC2317 findings that CI's shellcheck fails (hit twice on 2026-10-25: tests/report-notice.test.sh, tests/change-window.test.sh); align the local and CI shellcheck version or config so the local gate matches CI. — added 2026-10-25
 - [ ] (P3) coolify_create_scheduled_task always fails with an opaque 'Validation failed' (tried cron '* * * * *' and 'every_minute'), while a direct POST /api/v1/applications/<uuid>/scheduled-tasks with {name, command, frequency} succeeds; the tool likely sends an extra or wrongly typed field. Fix and surface Coolify's validation errors. Found 2026-10-25. — added 2026-10-25
 - [ ] (P3) Porkbun: get_invoice_pdf returns a resource block that skips the 25K CHARACTER_LIMIT truncation in porkbun_read — added 2026-10-30
+- [ ] (P3) Porkbun: porkbun_list_tools masks schema properties named password, hiding argument descriptions for two email tools — added 2026-10-30
+- [ ] (P3) Redaction over-masks camelCase names like privateKeyId (SECRET_NAME matches privatekey substring) — added 2026-10-30
+- [ ] (P3) Redaction masks Porkbun ping's boolean credentialsValid as *** (credentials name match) — added 2026-10-30
+- [ ] (P3) Porkbun: a child initialize timeout shows the 'write may have completed' warning, which only applies to tool calls — added 2026-10-30
+- [ ] (P2) npm audit on main: 9 transitive vulnerabilities (1 critical proxy-addr, 5 high incl. body-parser, follow-redirects, fast-uri) predating the Porkbun PR — added 2026-10-30
 ## Future plans
