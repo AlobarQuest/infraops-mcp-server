@@ -275,6 +275,16 @@
 
 ---
 
+## 20a. Alobar ID database password
+
+| App      | Env Var | Status | Class | Notes |
+| -------- | ------- | ------ | ----- | ----- |
+| alobar-id | PG_PASS | IN_BWS | INFRA | Keeper `f8d149d7-623f-407e-affa-b4f3012158f6` in `Rotation / Keepers`. Registry row `alobar-id-postgres`. |
+
+**Action:** The SDS rotates it on an exposure or a `rotate_requested` date; it has no age limit.
+
+---
+
 ## 21. Non-Secret Configuration (no rotation needed)
 
 These env vars were found during the audit but are NOT secrets. Included for completeness.
