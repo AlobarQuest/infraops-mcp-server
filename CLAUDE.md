@@ -50,7 +50,7 @@ src/
         supabase-functions.ts, supabase-config.ts          # Supabase (28 tools)
 ```
 
-**~216 tools total** across 8 providers. (`src/utils/` holds the shared `response`/`summaries`/`masking` helpers used by the Coolify read tools.)
+**~217 tools total** across 8 providers. (`src/utils/` holds the shared `response`/`summaries`/`masking` helpers used by the Coolify read tools.)
 
 See [RUNBOOK.md](./RUNBOOK.md) for provider configuration details (env vars, BWS secret IDs, `.claude.json` wiring, troubleshooting).
 
