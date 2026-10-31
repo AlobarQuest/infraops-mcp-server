@@ -132,8 +132,8 @@ export function credScan(listFile, stateFile, now) {
 /** The credential-rotation findings as JSON, for the orchestrator's rotation proposer
  *  (ADR-0054 amendment 1). READ-ONLY: it loads the listed registries and the rotation state
  *  exactly as `run` does and writes nothing. Only `cred.*` findings that carry `facts` are
- *  printed, each as its check plus those fields -- never the prose detail. A registry that does
- *  not parse throws, so the caller gets a non-zero exit rather than an empty list. */
+ *  printed, each as its check plus those fields -- never the prose detail. `last_rotated` is
+ *  additive, so `schema_version` stays 1. A registry that does not parse throws, so the caller gets a non-zero exit rather than an empty list. */
 export function doCredFindings(args) {
     const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
     const p = securityPaths();
@@ -158,7 +158,11 @@ export function doCredFindings(args) {
         // true, so a standing package alone can never put two executors on one credential.
         rotated_by_sds: owned.has(String(f.facts?.id)),
     }));
-    process.stdout.write(JSON.stringify({ schema_version: 1, findings }) + '\n');
+    // When each handed-over credential last rotated, due or not: the proposer compares it with a
+    // finished rotation so a repeat pass never resets an age clock. A row with no recorded rotation
+    // has no key.
+    const last_rotated = Object.fromEntries(Object.entries(state.lastRotated).filter(([id]) => owned.has(id)));
+    process.stdout.write(JSON.stringify({ schema_version: 1, findings, last_rotated }) + '\n');
 }
 export async function main(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);

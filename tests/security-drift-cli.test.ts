@@ -3,7 +3,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { credScan, doRecordRotation, main, parseArgs } from '../src/cli/security-drift-cli.js';
-import { loadRotationState, saveRotationState } from '../src/security-drift/cred-rotation.js';
+import {
+  CLASS_POLICY,
+  loadRotationState,
+  saveRotationState,
+} from '../src/security-drift/cred-rotation.js';
 
 const TOML = `version = 1
 [[credential]]
@@ -316,6 +320,35 @@ describe('security-drift-cli — the SDS handover flag', () => {
     expect(owned).toEqual({ sds: true, legacy: false });
   });
 
+  it('cred-findings serves lastRotated for handed-over rows only', async () => {
+    saveRotationState(path.join(dir, 'cred-rotation-state.json'), {
+      resolvedExposures: {},
+      lastRotated: {
+        sds: '2026-07-02T00:00:00.000Z',
+        legacy: '2026-07-03T00:00:00.000Z',
+        // A state entry the registry no longer lists is not a handed-over row.
+        gone: '2026-07-04T00:00:00.000Z',
+      },
+    });
+    await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
+    const document = JSON.parse(out);
+    expect(document.schema_version).toBe(1);
+    expect(document.last_rotated).toEqual({ sds: '2026-07-02T00:00:00.000Z' });
+  });
+
+  it('cred-findings serves an empty lastRotated for an empty state', async () => {
+    await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
+    expect(JSON.parse(out).last_rotated).toEqual({});
+  });
+
+  it('cred-findings answers the top-level shape the shared fixture pins', async () => {
+    await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'fixtures', 'rotation_findings.json'), 'utf8'),
+    );
+    expect(Object.keys(JSON.parse(out)).sort()).toEqual(Object.keys(fixture).sort());
+  });
+
   it('the 03:00 scan builds no rotation plan for an SDS credential', () => {
     const { classifications } = credScan(
       path.join(dir, 'cred-consumers.list'),
@@ -325,5 +358,20 @@ describe('security-drift-cli — the SDS handover flag', () => {
     const keys = Object.keys(classifications ?? {});
     expect(keys.some((k) => k.endsWith('cred:legacy'))).toBe(true);
     expect(keys.some((k) => k.endsWith('cred:sds'))).toBe(false);
+  });
+});
+
+// A byte-identical copy lives in the orchestrator, which holds its CLASS_TYPES to it.
+describe('rotation_class_policy.json', () => {
+  it('is CLASS_POLICY, so a new class fails here until the fixture moves', () => {
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(__dirname, 'fixtures', 'rotation_class_policy.json'), 'utf8'),
+    );
+    const generated = Object.fromEntries(
+      Object.entries(CLASS_POLICY)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([name, policy]) => [name, { executor: policy.executor }]),
+    );
+    expect(fixture).toEqual(generated);
   });
 });
