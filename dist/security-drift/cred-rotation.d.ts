@@ -44,6 +44,8 @@ export declare function recordRotation(state: RotationState, specs: readonly Cre
  * rotation before a re-classification) is not a revoke.
  */
 export declare function isRecordedRevoked(spec: CredentialSpec, state: RotationState): boolean;
+/** When a credential last rotated, as far as anything knows: the date its age is measured from. */
+export declare function rotationAnchor(spec: CredentialSpec, state: RotationState): string | undefined;
 export declare function credTarget(credId: string): string;
 /** Findings for the current registry + state. Pure — no I/O. */
 export declare function credFindings(specs: CredentialSpec[], state: RotationState, now: string): Finding[];

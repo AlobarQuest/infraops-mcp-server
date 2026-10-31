@@ -287,7 +287,11 @@ describe('security-drift-cli — the SDS handover flag', () => {
     fs.writeFileSync(
       toml,
       'version = 1\n[[credential]]\nid = "sds"\nclass = "openrouter-key"\n' +
-        'rotate_requested = "2026-10-01"\nrotated_by_sds = true\n' +
+        'created = "2026-01-02"\nrotate_requested = "2026-10-01"\nrotated_by_sds = true\n' +
+        '[[credential]]\nid = "sds-dated"\nclass = "openrouter-key"\ncreated = "2026-01-03"\n' +
+        'last_rotated = "2026-09-20"\nrotated_by_sds = true\n' +
+        '[[credential]]\nid = "sds-created"\nclass = "openrouter-key"\n' +
+        'created = "2026-05-01"\nrotated_by_sds = true\n' +
         '[[credential]]\nid = "legacy"\nclass = "openrouter-key"\nrotate_requested = "2026-10-01"\n',
     );
     fs.writeFileSync(path.join(dir, 'cred-consumers.list'), `${toml}\n`);
@@ -320,7 +324,7 @@ describe('security-drift-cli — the SDS handover flag', () => {
     expect(owned).toEqual({ sds: true, legacy: false });
   });
 
-  it('cred-findings serves lastRotated for handed-over rows only', async () => {
+  it('cred-findings serves the recorded rotation for handed-over rows only', async () => {
     saveRotationState(path.join(dir, 'cred-rotation-state.json'), {
       resolvedExposures: {},
       lastRotated: {
@@ -333,12 +337,36 @@ describe('security-drift-cli — the SDS handover flag', () => {
     await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
     const document = JSON.parse(out);
     expect(document.schema_version).toBe(1);
-    expect(document.last_rotated).toEqual({ sds: '2026-07-02T00:00:00.000Z' });
+    expect(document.last_rotated).toEqual({
+      sds: '2026-07-02T00:00:00.000Z',
+      'sds-dated': '2026-09-20',
+      'sds-created': '2026-05-01',
+    });
   });
 
-  it('cred-findings serves an empty lastRotated for an empty state', async () => {
+  it('cred-findings serves the age anchor for a handed-over row with an empty state', async () => {
     await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
-    expect(JSON.parse(out).last_rotated).toEqual({});
+    expect(JSON.parse(out).last_rotated).toEqual({
+      sds: '2026-01-02',
+      'sds-dated': '2026-09-20',
+      'sds-created': '2026-05-01',
+    });
+  });
+
+  it('cred-findings serves the anchor the age finding uses', async () => {
+    fs.writeFileSync(
+      path.join(dir, 'old.cred-consumers.toml'),
+      'version = 1\n[[credential]]\nid = "sds-old"\nclass = "openrouter-key"\n' +
+        'created = "2024-02-03"\nrotated_by_sds = true\n',
+    );
+    fs.appendFileSync(
+      path.join(dir, 'cred-consumers.list'),
+      `${path.join(dir, 'old.cred-consumers.toml')}\n`,
+    );
+    await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
+    const document = JSON.parse(out);
+    const age = document.findings.find((f: { id: string }) => f.id === 'sds-old');
+    expect(document.last_rotated['sds-old']).toBe(age.anchor);
   });
 
   it('cred-findings answers the top-level shape the shared fixture pins', async () => {

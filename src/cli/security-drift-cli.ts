@@ -37,6 +37,7 @@ import {
   scanFindings,
   loadRotationState,
   recordRotation,
+  rotationAnchor,
   saveRotationState,
 } from '../security-drift/cred-rotation.js';
 import type { Finding } from '../security-drift/scan-parser.js';
@@ -185,11 +186,13 @@ export function doCredFindings(args: Record<string, string | boolean>): void {
       // true, so a standing package alone can never put two executors on one credential.
       rotated_by_sds: owned.has(String(f.facts?.id)),
     }));
-  // When each handed-over credential last rotated, due or not: the proposer compares it with a
-  // finished rotation so a repeat pass never resets an age clock. A row with no recorded rotation
-  // has no key.
+  // Each handed-over credential's age anchor, due or not, so a value here can't disagree with the
+  // findings: the proposer records a finished rotation only when it is later than this, and a
+  // repeat pass never resets an age clock.
   const last_rotated = Object.fromEntries(
-    Object.entries(state.lastRotated).filter(([id]) => owned.has(id)),
+    specs
+      .filter((spec) => spec.rotated_by_sds === true)
+      .map((spec) => [spec.id, rotationAnchor(spec, state)]),
   );
   process.stdout.write(JSON.stringify({ schema_version: 1, findings, last_rotated }) + '\n');
 }
