@@ -3,7 +3,7 @@
 // tampered. (The DEEP check of the *deployed* change-manager on Coolify is fast-follow.)
 //
 // Checks:
-//   1. state-file perms — baseline / emit-state / rollback must be 0600 + owned by us
+//   1. state-file perms — baseline / rollback must be 0600 + owned by us
 //   2. audit-log tamper — high-power-actions.jsonl must never SHRINK (append-only)
 //   3a. source integrity — deployed scanner must byte-match its blessed source
 //   3b. change integrity — allowlist config files must not change unexpectedly

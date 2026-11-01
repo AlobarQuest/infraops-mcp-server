@@ -90,14 +90,14 @@ Urgent security alerts and the two daily reports go to Devon through alert-hub
 Both wrappers fetch both tokens through `load_alert_hub_tokens`, by UUID from the BWS project
 `Alert Hub Senders`. The UUIDs default inline, like the other secrets, and `BWS_ALERT_HUB_TOKEN_ID` /
 `BWS_ALERT_HUB_REPORT_TOKEN_ID` (in `~/.config/infra-drift/env`) override them. The security-drift
-CLI (3am) and the security executor (4am) send the urgent messages.
+CLI (3am) sends the urgent messages.
 
 **Failure rule.** A failed send, or a missing token, logs one line and never fails the run. A
 digest or alert that the hub refuses is not retried or emailed, so watch the hub's History and the
 wrapper logs.
 
-**Events and states.** An urgent escalation and a security-executor refusal are one-off events, so
-they go as critical _notices_, which the hub never deduplicates. Scanner version skew is a state: it
+**Events and states.** An urgent escalation is a one-off event, so
+it goes as a critical _notice_, which the hub never deduplicates. Scanner version skew is a state: it
 is an alert under the key `security-drift-version-skew`, and the next clean run resolves it.
 
 **Limits.** The hub rejects an alert message over 4,000 characters, a notice message over 12,000, and

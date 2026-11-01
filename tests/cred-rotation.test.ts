@@ -13,8 +13,6 @@ import {
   credTarget,
   isRecordedRevoked,
   recordRotation,
-  STAGING_SERVICE,
-  SUPPORTED_CONSUMER_KINDS,
   type RotationState,
 } from '../src/security-drift/cred-rotation.js';
 import { classify } from '../src/security-drift/taxonomy.js';
@@ -354,7 +352,7 @@ class = "openrouter-key"
   it('routes through classify() to the same tier and plan as rotation-age', () => {
     const spec = fresh({ rotate_requested: '2026-06-01' });
     const [finding] = credFindings([spec], emptyState(), NOW);
-    const credClassifications = buildCredClassifications([spec], emptyState());
+    const credClassifications = buildCredClassifications([spec]);
     const c = classify(finding, { autoFixAllowlist: [], credClassifications });
     const age = credClassifications[`cred.rotation-age|${credTarget(spec.id)}`];
     expect(c!.tier).toBe('NORMAL');
@@ -397,10 +395,10 @@ describe('recordRotation', () => {
     expect(state.lastRotated).toEqual({});
   });
 
-  it('refuses a revoke-no-replacement credential — the executor records revokes', () => {
+  it('refuses a revoke-no-replacement credential', () => {
     const state = emptyState();
     expect(() => recordRotation(state, specs, 'cred-gone', '2026-06-30', NOW)).toThrow(
-      /revoke-no-replacement.*recorded by the rotation executor/,
+      /revoke-no-replacement.*resolve-exposure/,
     );
     expect(state.lastRotated).toEqual({});
   });
@@ -428,70 +426,48 @@ describe('recordRotation', () => {
 });
 
 describe('buildCredClassifications', () => {
-  it('builds an executor-runnable reissue plan for an eligible spec', () => {
+  it('offers a manual reissue checklist for every trigger, urgent for an exposure', () => {
     const spec = baseSpec();
-    const out = buildCredClassifications([spec], emptyState());
+    const out = buildCredClassifications([spec]);
     const target = credTarget(spec.id);
 
     const rotate = out[`cred.exposure-rotate|${target}`];
     expect(rotate.tier).toBe('URGENT');
-    expect(rotate.kind).toBe('remediation');
-    expect('rotation' in rotate.remediation).toBe(true);
-    const plan = (rotate.remediation as { rotation: any }).rotation;
-    expect(plan.staging).toEqual({ service: STAGING_SERVICE, account: spec.id });
-    expect(plan.keeperBwsUuid).toBe(spec.bws_uuid);
-    expect(plan.quarantineName).toBe(`${spec.id}-pre-rotation-quarantine`);
-    expect(plan.retireBwsUuids).toEqual([]);
-    expect(plan.exposureIds).toContain('exp-1');
-    expect(plan.manualSteps.join('\n')).toContain('CREATE (Devon)');
-
-    const age = out[`cred.rotation-age|${target}`];
-    expect(age.tier).toBe('NORMAL');
-  });
-
-  it('builds a retire-only plan for revoke-no-replacement, with the SSH-key landmine', () => {
-    const spec = baseSpec({
-      class: 'github-pat-classic',
-      disposition: 'revoke-no-replacement',
-    });
-    const target = credTarget(spec.id);
-    const out = buildCredClassifications([spec], emptyState());
-    const rotate = out[`cred.exposure-rotate|${target}`];
-    expect(rotate.kind).toBe('remediation');
-    const plan = (rotate.remediation as { rotation: any }).rotation;
-    expect(plan.retireBwsUuids).toEqual([spec.bws_uuid]);
-    expect(plan.staging).toBeUndefined();
-    expect(plan.keeperBwsUuid).toBeUndefined();
-    expect(plan.manualSteps.join('\n')).toContain('LANDMINE');
-  });
-
-  it('falls back to manual when consumers_verified is missing (fail-safe)', () => {
-    const spec = baseSpec({ consumers_verified: undefined });
-    const target = credTarget(spec.id);
-    const out = buildCredClassifications([spec], emptyState());
-    const rotate = out[`cred.exposure-rotate|${target}`];
     expect(rotate.kind).toBe('question');
-    expect('rotation' in rotate.remediation).toBe(false);
-    const manual = (rotate.remediation as { manual: string[] }).manual;
-    expect(manual.join('\n')).toContain('consumer set not attested');
+    expect(rotate.remediation).not.toHaveProperty('rotation');
+    const manual = (rotate.remediation as { manual: string[] }).manual.join('\n');
+    expect(manual).toContain('CREATE (Devon)');
+    expect(manual).toContain(spec.bws_uuid!);
+    expect(manual).toContain(`record-rotation --cred ${spec.id}`);
+    expect(manual).toContain(`resolve-exposure --cred ${spec.id}`);
+
+    expect(out[`cred.rotation-age|${target}`].tier).toBe('NORMAL');
+    expect(out[`cred.rotation-requested|${target}`].tier).toBe('NORMAL');
   });
 
-  it('falls back to manual when rotation_preconditions is non-empty', () => {
-    const spec = baseSpec({ rotation_preconditions: ['fix the thing first'] });
-    const out = buildCredClassifications([spec], emptyState());
-    const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
-    expect('rotation' in rotate.remediation).toBe(false);
-    const manual = (rotate.remediation as { manual: string[] }).manual;
-    expect(manual.join('\n')).toContain('fix the thing first');
+  it('carries open preconditions and an unattested consumer set into the checklist', () => {
+    const spec = baseSpec({
+      rotation_preconditions: ['decode first'],
+      consumers_verified: undefined,
+    });
+    const manual = (
+      buildCredClassifications([spec])[`cred.rotation-age|${credTarget(spec.id)}`].remediation as {
+        manual: string[];
+      }
+    ).manual.join('\n');
+    expect(manual).toContain('Open precondition: decode first');
+    expect(manual).toContain('Consumer set not attested');
+    expect(manual).not.toContain('resolve-exposure');
   });
 
-  it('falls back to manual for an unsupported consumer kind', () => {
-    const spec = baseSpec({ consumers: [{ kind: 'shell-export' }] });
-    const out = buildCredClassifications([spec], emptyState());
-    const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
-    expect('rotation' in rotate.remediation).toBe(false);
-    const manual = (rotate.remediation as { manual: string[] }).manual;
-    expect(manual.join('\n')).toContain('shell-export');
+  it('offers a revoke-and-retire checklist for revoke-no-replacement, with the class landmine', () => {
+    const spec = baseSpec({ class: 'github-pat-classic', disposition: 'revoke-no-replacement' });
+    const rotate = buildCredClassifications([spec])[`cred.exposure-rotate|${credTarget(spec.id)}`];
+    const manual = (rotate.remediation as { manual: string[] }).manual.join('\n');
+    expect(manual).toContain('LANDMINE');
+    expect(manual).toContain('REVOKE (Devon)');
+    expect(manual).toContain('Retire the BWS copy');
+    expect(manual).not.toContain('record-rotation');
   });
 
   it.each([
@@ -502,9 +478,9 @@ describe('buildCredClassifications', () => {
     'anthropic-api-key',
     'porkbun-api-key',
     'github-app-private-key',
-  ])('class %s is always manual — never an executor rotation plan', (cls) => {
+  ])('class %s offers a manual checklist, never a rotation plan', (cls) => {
     const spec = baseSpec({ class: cls });
-    const out = buildCredClassifications([spec], emptyState());
+    const out = buildCredClassifications([spec]);
     const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
     expect('rotation' in rotate.remediation).toBe(false);
     expect(rotate.kind).toBe('question');
@@ -512,7 +488,7 @@ describe('buildCredClassifications', () => {
 
   it('mentions the NEVER-cycle landmine for coolify-pg-password', () => {
     const spec = baseSpec({ class: 'coolify-pg-password' });
-    const out = buildCredClassifications([spec], emptyState());
+    const out = buildCredClassifications([spec]);
     const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
     const manual = (rotate.remediation as { manual: string[] }).manual;
     expect(manual.join('\n')).toContain('NEVER cycle');
@@ -520,20 +496,11 @@ describe('buildCredClassifications', () => {
 
   it('tells the operator to delete the old key pair for github-app-private-key', () => {
     const spec = baseSpec({ class: 'github-app-private-key' });
-    const out = buildCredClassifications([spec], emptyState());
+    const out = buildCredClassifications([spec]);
     const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
     const manual = (rotate.remediation as { manual: string[] }).manual;
     expect(manual.join('\n')).toContain('delete the old key pair');
     expect(manual.join('\n')).toContain('Key pairs tab');
-  });
-
-  it('falls back to manual with no BWS copy of the old value (orphan credential)', () => {
-    const spec = baseSpec({ class: 'openai-key', bws_uuid: undefined });
-    const out = buildCredClassifications([spec], emptyState());
-    const rotate = out[`cred.exposure-rotate|${credTarget(spec.id)}`];
-    expect('rotation' in rotate.remediation).toBe(false);
-    const manual = (rotate.remediation as { manual: string[] }).manual;
-    expect(manual.join('\n')).toContain('cannot confirm');
   });
 });
 
@@ -593,25 +560,22 @@ describe('CLASS_POLICY sanity', () => {
 });
 
 describe('porkbun lane class', () => {
-  it('treats porkbun-api-key as a manual-lane 365-day class', () => {
-    expect(CLASS_POLICY['porkbun-api-key']).toMatchObject({ maxAgeDays: 365, executor: false });
+  it('ages porkbun-api-key at 365 days', () => {
+    expect(CLASS_POLICY['porkbun-api-key']).toMatchObject({ maxAgeDays: 365 });
   });
 });
 
 describe('fork-sync lane classes', () => {
-  it('are manual-lane only, with no provider probe, and age at 365 days', () => {
+  it('age at 365 days', () => {
     for (const cls of ['anthropic-api-key', 'github-app-private-key']) {
-      expect(CLASS_POLICY[cls].executor).toBe(false);
-      expect(CLASS_POLICY[cls].probe).toBeUndefined();
       expect(CLASS_POLICY[cls].maxAgeDays).toBe(365);
     }
   });
 });
 
 describe('M2M bearer classes (SDS 1.1 L1b)', () => {
-  it('are never executor-run, even with an attested, executor-supported consumer set', () => {
+  it('offer a manual checklist even with an attested consumer set', () => {
     for (const cls of ['orchestrator-m2m-bearer', 'change-manager-m2m-bearer']) {
-      expect(CLASS_POLICY[cls].executor).toBe(false);
       const spec: CredentialSpec = {
         id: `x-${cls}`,
         class: cls,
@@ -622,9 +586,7 @@ describe('M2M bearer classes (SDS 1.1 L1b)', () => {
         consumers: [{ kind: 'bws-secret', uuid: 'keeper-uuid' }],
         exposures: [],
       };
-      const c = buildCredClassifications([spec], { resolvedExposures: {}, lastRotated: {} })[
-        `cred.exposure-rotate|cred:x-${cls}`
-      ];
+      const c = buildCredClassifications([spec])[`cred.exposure-rotate|cred:x-${cls}`];
       expect(c.remediation).toHaveProperty('manual');
       expect(c.remediation).not.toHaveProperty('rotation');
     }
@@ -632,8 +594,7 @@ describe('M2M bearer classes (SDS 1.1 L1b)', () => {
 });
 
 describe('the rotation executor canary class (orchestrator ADR-0055 increment 4)', () => {
-  it('never ages, is never executor-run, and raises nothing for an old canary', () => {
-    expect(CLASS_POLICY['rotation-canary'].executor).toBe(false);
+  it('never ages and raises nothing for an old canary', () => {
     const specs = parseCredConsumers(`
 version = 1
 
@@ -679,7 +640,7 @@ created = "2020-01-01"
     const [f] = credFindings(specs, state, NOW);
     const c = classify(f, {
       autoFixAllowlist: [],
-      credClassifications: buildCredClassifications(specs, state),
+      credClassifications: buildCredClassifications(specs),
     });
     expect(c!.title).toBe('Unknown credential class: typo-class (orchestrator-m2m-baerer)');
     expect(c!.tier).toBe('NORMAL');
@@ -691,38 +652,6 @@ created = "2020-01-01"
     spec.exposures.push({ id: 'e1', date: '2026-07-01' });
     const findings = credFindings([spec], { resolvedExposures: {}, lastRotated: {} }, NOW);
     expect(findings.map((f) => f.check)).toEqual(['cred.exposure-rotate']);
-  });
-});
-
-describe('coolify-env-hash consumer kind', () => {
-  it('is not executor-deployable, so it forces an otherwise executor-eligible credential manual', () => {
-    expect(SUPPORTED_CONSUMER_KINDS.has('coolify-env-hash')).toBe(false);
-    const spec: CredentialSpec = {
-      id: 'or-hash',
-      class: 'openrouter-key',
-      bws_uuid: 'keeper-uuid',
-      consumers_verified: '2026-10-06',
-      disposition: 'reissue',
-      rotation_preconditions: [],
-      consumers: [
-        { kind: 'bws-secret', uuid: 'keeper-uuid' },
-        {
-          kind: 'coolify-env-hash',
-          instance: 'prod',
-          resource_type: 'application',
-          uuid: 'app',
-          key: 'K',
-        },
-      ],
-      exposures: [],
-    };
-    const c = buildCredClassifications([spec], { resolvedExposures: {}, lastRotated: {} })[
-      'cred.exposure-rotate|cred:or-hash'
-    ];
-    expect(c.remediation).not.toHaveProperty('rotation');
-    expect((c.remediation as { manual: string[] }).manual).toContain(
-      "NOT executor-eligible: consumer kind 'coolify-env-hash' not supported by the executor",
-    );
   });
 });
 

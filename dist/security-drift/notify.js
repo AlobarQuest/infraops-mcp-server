@@ -22,9 +22,7 @@ function renderBody(items) {
         lines.push(`  ${e.reasoning}`);
         const rem = 'manual' in e.plan.remediation
             ? e.plan.remediation.manual.join('; ')
-            : 'rotation' in e.plan.remediation
-                ? `credential rotation plan for ${e.plan.remediation.rotation.credId} (${e.plan.remediation.rotation.credClass}) — approve in change-manager; console steps in the item`
-                : e.plan.remediation.exec.map((c) => c.join(' ')).join(' && ');
+            : e.plan.remediation.exec.map((c) => c.join(' ')).join(' && ');
         lines.push(`  remediation: ${rem}`);
         lines.push('');
     }

@@ -1,17 +1,12 @@
 import type { Finding } from './scan-parser.js';
 import type { Classification } from './taxonomy.js';
-import { type ConsumerSpec, type CredentialSpec } from './cred-consumers.js';
-export type ProviderProbe = 'github' | 'openrouter' | 'openai' | 'bitbucket';
+import { type CredentialSpec } from './cred-consumers.js';
 interface ClassPolicy {
     maxAgeDays: number;
-    probe?: ProviderProbe;
-    /** may this class produce an executor-runnable plan at all? */
-    executor: boolean;
     /** class-specific landmine steps prepended to every manual checklist */
     landmines: string[];
 }
 export declare const CLASS_POLICY: Record<string, ClassPolicy>;
-export declare const SUPPORTED_CONSUMER_KINDS: ReadonlySet<string>;
 export declare class RotationStateIntegrityError extends Error {
     constructor(message: string);
 }
@@ -54,43 +49,13 @@ export declare function credFindings(specs: CredentialSpec[], state: RotationSta
  *  still the scan's to report. */
 export declare const ROTATION_TRIGGER_CHECKS: ReadonlySet<string>;
 /** What the 03:00 scan posts: every finding except the rotation triggers of SDS-rotated
- *  credentials, which would otherwise become change-manager security items the 04:00 window
- *  could act on outside the SDS. */
+ *  credentials, which would otherwise become change-manager security items that offer a manual
+ *  checklist for a rotation the SDS owns. */
 export declare function scanFindings(findings: Finding[], specs: CredentialSpec[]): Finding[];
-/** The executor-runnable rotation plan — hash-gated verbatim through change-manager.
- *  NO secret value ever appears here: everything is referenced by BWS UUID,
- *  Keychain item name, or consumer coordinates. */
-export interface RotationPlanSpec {
-    credId: string;
-    credClass: string;
-    fingerprint8?: string;
-    consumersVerified: string;
-    /** reissue path: Keychain staging item Devon fills with the NEW provider-minted value */
-    staging?: {
-        service: string;
-        account: string;
-    };
-    /** reissue path: BWS keeper secret edited in place (UUID stays stable for by-UUID fetchers) */
-    keeperBwsUuid?: string;
-    /** reissue path: distinctly-named quarantine secret holding the OLD value until confirmed dead */
-    quarantineName?: string;
-    bwsProjectId?: string;
-    /** revoke-no-replacement path: BWS secrets that HOLD the old value — probed until dead, then retired */
-    retireBwsUuids: string[];
-    consumers: ConsumerSpec[];
-    providerProbe: ProviderProbe;
-    /** Basic-auth probe context (bitbucket): the account email and workspace. Non-secret. */
-    probeEmail?: string;
-    probeWorkspace?: string;
-    exposureIds: string[];
-    /** Devon's console steps (create/revoke are ALWAYS human) — shown in change-manager */
-    manualSteps: string[];
-}
-export declare const STAGING_SERVICE = "cred-rotation";
 /**
  * Build the Classification for every managed credential's findings, keyed by
  * `${check}|${target}` (the lookup the taxonomy uses for cred.* checks).
  */
-export declare function buildCredClassifications(specs: CredentialSpec[], state: RotationState): Record<string, Classification>;
+export declare function buildCredClassifications(specs: CredentialSpec[]): Record<string, Classification>;
 export {};
 //# sourceMappingURL=cred-rotation.d.ts.map

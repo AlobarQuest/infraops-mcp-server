@@ -2,9 +2,8 @@
 // that gates rotation (a credential whose consumer set is not attested here is
 // NEVER auto-revoked).
 //
-// STRICT SUBSET TOML parser, deliberately not a third-party dependency: this feeds
-// the 4am no-LLM write path, so the parsing surface stays minimal and fully
-// unit-tested. Supported syntax: comments/blank lines, `key = value` (string,
+// STRICT SUBSET TOML parser, deliberately not a third-party dependency: the parsing
+// surface stays minimal and fully unit-tested. Supported syntax: comments/blank lines, `key = value` (string,
 // integer, boolean, array-of-strings), [[credential]] and
 // [[credential.consumer]] / [[credential.exposure]] tables. Anything else throws
 // CredConsumersParseError — deny-by-default: a malformed file yields NO

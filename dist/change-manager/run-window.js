@@ -3,10 +3,10 @@
  * runs the agent, posts the outcome. Per-item isolation; capped at maxChangesPerWindow.
  */
 export async function runWindow(deps) {
-    // Security items are handled by the dedicated verbatim executor (runSecurityWindow),
-    // never by the Coolify Sonnet agent — exclude them here.
+    // Security and rotation items are not the Coolify Sonnet agent's: nothing here runs a security
+    // item (its plan is a manual checklist), and the orchestrator's rotation service owns a rotation.
     const approved = (await deps.getApproved())
-        .filter((i) => i.source !== 'security')
+        .filter((i) => i.source !== 'security' && i.source !== 'rotation')
         .slice(0, deps.maxChangesPerWindow);
     const summary = {
         considered: 0,

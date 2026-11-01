@@ -22,7 +22,10 @@ cat > "$WORK/bin/node" <<'STUB'
 # Record the environment the CLI sees; the argument after the script names the command.
 { echo "== $2"; env | grep -E '^(RESEND_API_KEY|ALERT_HUB_TOKEN|ALERT_HUB_REPORT_TOKEN)=' | sort; } >> "$STUB_DIR/node.env"
 STUB
-printf '#!/bin/bash\nexit 0\n' > "$WORK/bin/curl"
+cat > "$WORK/bin/curl" <<'STUB'
+#!/bin/bash
+echo "$*" >> "$STUB_DIR/curl.log"
+STUB
 chmod +x "$WORK/bin"/*
 
 check() { # check <name> <command...>
@@ -32,7 +35,7 @@ check() { # check <name> <command...>
 
 # run_wrapper [VAR=value ...]: run change-window.sh once, with the given extra environment.
 run_wrapper() {
-  rm -f "$WORK/node.env"
+  rm -f "$WORK/node.env" "$WORK/curl.log"
   env -i PATH="$WORK/bin:/usr/bin:/bin" HOME="$WORK/home" STUB_DIR="$WORK" BWS_ACCESS_TOKEN=fake \
     INFRADRIFT_ENV=/nonexistent INFRADRIFT_REPO="$WORK/repo" INFRADRIFT_REPORT_DIR="$WORK/reports" \
     INFRADRIFT_CW_LOG="$WORK/cw.log" "$@" bash "$ROOT/scripts/change-window.sh" >"$WORK/out.log" 2>&1
@@ -40,14 +43,22 @@ run_wrapper() {
 # env_of <command>: the environment lines recorded for one CLI command.
 env_of() { sed -n "/^== $1\$/,/^==/p" "$WORK/node.env" | grep -v '^=='; }
 
-run_wrapper
-check "run-security-window sees the default ALERT_HUB_TOKEN for the integrity-refusal notice" \
-  grep -qx 'ALERT_HUB_TOKEN=value-of-7a36a369-c649-4893-a768-b4ee00feb92a' < <(env_of run-security-window)
+run_wrapper INFRADRIFT_CW_HC_PING_URL=https://hc.example/cw
+check "run-window sees the default ALERT_HUB_TOKEN" \
+  grep -qx 'ALERT_HUB_TOKEN=value-of-7a36a369-c649-4893-a768-b4ee00feb92a' < <(env_of run-window)
 no_resend() { ! grep -q RESEND_API_KEY "$WORK/node.env"; }
 check "the CLIs get no RESEND_API_KEY" no_resend
+only_run_window() { [ "$(grep -c '^== ' "$WORK/node.env")" -eq 1 ] && grep -qx '== run-window' "$WORK/node.env"; }
+check "the wrapper launches run-window and nothing else (the security step is gone)" only_run_window
+hc_started_and_succeeded() {
+  grep -qx 'https://hc.example/cw/start' <(sed -n 's/^.*\(https:[^ ]*\)$/\1/p' "$WORK/curl.log") &&
+    grep -qx 'https://hc.example/cw' <(sed -n 's/^.*\(https:[^ ]*\)$/\1/p' "$WORK/curl.log") &&
+    ! grep -q '/fail' "$WORK/curl.log"
+}
+check "the wrapper still pings Healthchecks start and success" hc_started_and_succeeded
 
 run_wrapper BWS_ALERT_HUB_TOKEN_ID=hub-id BWS_ALERT_HUB_REPORT_TOKEN_ID=rep-id
-check "run-security-window sees a token from an overriding ID" \
-  grep -qx 'ALERT_HUB_TOKEN=value-of-hub-id' < <(env_of run-security-window)
+check "run-window sees a token from an overriding ID" \
+  grep -qx 'ALERT_HUB_TOKEN=value-of-hub-id' < <(env_of run-window)
 
 exit "$FAILED"

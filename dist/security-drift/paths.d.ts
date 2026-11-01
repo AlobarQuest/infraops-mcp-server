@@ -4,7 +4,6 @@ export interface SecurityPaths {
     scanPath: string;
     scanSourcePath: string;
     baselineFile: string;
-    emitStateFile: string;
     rollbackLog: string;
     autoFixAllowlistFile: string;
     fpAllowlistFile: string;

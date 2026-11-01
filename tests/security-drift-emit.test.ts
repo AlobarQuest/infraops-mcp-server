@@ -5,7 +5,6 @@ import {
   type ClassifiedFinding,
 } from '../src/security-drift/emit.js';
 import { classify } from '../src/security-drift/taxonomy.js';
-import { planHash } from '../src/security-drift/canonical.js';
 import type { Finding } from '../src/security-drift/scan-parser.js';
 
 const cf = (check: string, target: string, detail: string): ClassifiedFinding => {
@@ -28,25 +27,26 @@ describe('toEscalation', () => {
     expect(e.reasoning.startsWith('[URGENT]')).toBe(true);
   });
 
-  it('maps a NORMAL os toggle to a remediation with an exact exec', () => {
+  it('maps a NORMAL os toggle to a remediation whose plan is a manual step', () => {
     const e = toEscalation(
       cf('os.screen_lock', 'screen lock off', 'screen lock off (askForPassword=0)'),
     );
     expect(e.kind).toBe('remediation');
     expect(e.urgent).toBe(false);
-    expect('exec' in e.plan.remediation && e.plan.remediation.exec[0][0]).toBe('defaults');
+    expect('manual' in e.plan.remediation && e.plan.remediation.manual[0]).toContain(
+      'defaults write',
+    );
+    expect(e.plan.rollback).toMatch(/manual remediation/);
   });
 });
 
 describe('buildEscalations', () => {
-  it('records a plan-hash keyed by fingerprint that matches planHash(plan)', () => {
+  it('builds one escalation per classified finding', () => {
     const item = cf(
       'shell.plaintext_secret',
       '/Users/x/.zshrc',
       '/Users/x/.zshrc: TOKEN=<inline value>',
     );
-    const { escalations, hashes } = buildEscalations([item], '2026-06-15T03:00:00Z');
-    const e = escalations[0];
-    expect(hashes[e.target.uuid]).toBe(planHash(e.plan));
+    expect(buildEscalations([item])).toEqual([toEscalation(item)]);
   });
 });

@@ -48,12 +48,10 @@ const URGENT_KEYS = new Set([
 ]);
 // Findings surfaced in the scan log but intentionally NOT escalated (expected churn).
 const IGNORE_KEYS = new Set(['controlplane.local_churn']);
-// NORMAL checks with a deterministic, idempotent exec remediation.
-// ONLY non-sudo, user-scope, idempotent commands belong here — the 4am executor runs
-// unattended as the user, so anything needing sudo (gatekeeper, critical-updates) or
-// environment-specific judgement (supply re-pins) stays manual (deny-by-default).
-const NORMAL_EXEC = {
-    'os.screen_lock': [['defaults', 'write', 'com.apple.screensaver', 'askForPassword', '-int', '1']],
+// NORMAL checks with a known user-scope fix. Nothing runs it: the plan carries the command as a
+// manual step, because no executor applies an approved security item.
+const NORMAL_MANUAL = {
+    'os.screen_lock': ['defaults write com.apple.screensaver askForPassword -int 1'],
 };
 const SHORT_TITLES = {
     'credfile.over_permissive': 'Over-permissive credential file',
@@ -133,12 +131,12 @@ export function classify(f, opts) {
             title,
         };
     }
-    if (f.check in NORMAL_EXEC) {
+    if (f.check in NORMAL_MANUAL) {
         return {
             tier: 'NORMAL',
             kind: 'remediation',
             risk: 'safe',
-            remediation: { exec: NORMAL_EXEC[f.check] },
+            remediation: { manual: [`Run: ${NORMAL_MANUAL[f.check].join(' ; ')}`] },
             title,
         };
     }

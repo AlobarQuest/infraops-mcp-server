@@ -7,14 +7,13 @@
 # whose consumer set here is not attested (`consumers_verified` date set by a
 # fingerprint sweep). Values NEVER appear here — identity is sha256[:8] only.
 #
-# Consumer kinds the executor can DEPLOY to (src/security-drift/cred-rotation.ts
-# SUPPORTED_CONSUMER_KINDS — any other kind forces the credential to the manual lane):
+# Consumer kinds a registry row can declare. The SDS rotation executor (orchestrator) deploys
+# to the first four; the 03:00 scan offers a manual checklist for every row not handed over:
 #   bws-secret        { uuid }                              — keeper storage in BWS
 #   keychain          { service, account }                  — macOS login Keychain item
 #   coolify-env       { instance, resource_type, uuid, key, redeploy } — app/service env
 #   gh-actions-secret { repo, name }                        — write-only; deploy via `gh secret set`
-# Declarative-only kinds (documented consumers, NOT executor-deployable — their
-# presence keeps the credential manual-lane by design):
+# Declarative-only kinds (documented consumers, not deployable by the executor):
 #   shell-export      { file, var }                         — literal export line in a shell file
 #   runtime-fetch     { repo, ref }                         — code fetches from BWS by UUID at runtime
 #   coolify-env-hash  { instance, resource_type, uuid, key, entry } — env holds sha256(credential),
@@ -35,72 +34,16 @@
 # to a [[credential]] to raise cred.rotation-requested from that date, before the
 # credential is due. A malformed value raises cred.invalid-rotate-requested for that
 # credential only. It clears once a rotation is recorded on or after that date — the
-# executor records it, or after a verified rotation run
+# SDS records it, or after a verified rotation run
 #   node dist/cli/security-drift-cli.js record-rotation --cred <id> --date <YYYY-MM-DD | now>
-# (refused for revoke-no-replacement credentials: the executor records revokes).
+# (refused for revoke-no-replacement credentials).
 # Remove the key afterwards to keep the file tidy (leaving it is harmless).
 
 version = 1
 
-# Staging convention for reissued values: Devon parks the NEW provider-minted value
-# in the login Keychain item service="cred-rotation", account="<credential id>",
-# typed in a real Terminal (TTY prompt, never via `!`):
-#   security add-generic-password -U -s cred-rotation -a <id> -T /usr/bin/security -w
-# The 4am executor consumes it from there (store → deploy → verify → revoke-confirm)
-# and deletes the staging item once the old credential is confirmed dead.
-
-# ── 1. GitHub classic PAT — "AIHELPER" (leaked fp 26058655) ─────────────────────
-# Scopes: repo, workflow, read:org, project, read:packages, read:audit_log, read:user.
-# Sweep 2026-07-02: value lives ONLY in BWS (AIHELPER-GH-AUTH-TOKEN). No repo,
-# Coolify app, or Actions secret consumes it; no aihelper project exists locally.
-# Retired-project relic ⇒ least-privilege replacement is NO token: revoke + retire
-# the BWS secret. Class landmine: enumerate SSH/deploy keys before revoke.
-[[credential]]
-id = "github-classic-aihelper"
-class = "github-pat-classic"
-fingerprint_sha256_8 = "26058655"
-provider = "github"
-provider_identity = "AlobarQuest (classic PAT, Settings → Developer settings → PATs classic)"
-bws_uuid = "f548b632-879b-4c10-904e-b3a4010b6429"
-consumers_verified = "2026-07-02"
-verified_by = "scripts/cred-consumer-sweep.py"
-disposition = "revoke-no-replacement"
-
-  [[credential.consumer]]
-  kind = "bws-secret"
-  uuid = "f548b632-879b-4c10-904e-b3a4010b6429"
-  note = "AIHELPER-GH-AUTH-TOKEN (Ops / Platform) — keeper storage only; retire after revoke"
-
-  [[credential.exposure]]
-  id = "codex-2026-07-02"
-  date = "2026-07-02"
-  source = "~/.codex logs (WS-0.5 scan) — probed LIVE 2026-07-02"
-
-# ── 2. GitHub classic PAT — "lifeops" (leaked fp 2d53ed7a) ──────────────────────
-# Scopes: repo, workflow, delete:packages, write:packages, notifications, project,
-# audit_log, write:discussion — broadest of the three. Sweep 2026-07-02: value lives
-# ONLY in BWS (lifeops-github-token); the lifeops-portal repo is ARCHIVED.
-# Retired-project relic ⇒ revoke + retire the BWS secret, no replacement.
-[[credential]]
-id = "github-classic-lifeops"
-class = "github-pat-classic"
-fingerprint_sha256_8 = "2d53ed7a"
-provider = "github"
-provider_identity = "AlobarQuest (classic PAT)"
-bws_uuid = "d0007bfe-0aad-420c-b256-b40900fb2da7"
-consumers_verified = "2026-07-02"
-verified_by = "scripts/cred-consumer-sweep.py"
-disposition = "revoke-no-replacement"
-
-  [[credential.consumer]]
-  kind = "bws-secret"
-  uuid = "d0007bfe-0aad-420c-b256-b40900fb2da7"
-  note = "lifeops-github-token (Ops / Platform) — keeper storage only; retire after revoke"
-
-  [[credential.exposure]]
-  id = "codex-2026-07-02"
-  date = "2026-07-02"
-  source = "~/.codex logs (WS-0.5 scan) — probed LIVE 2026-07-02"
+# Retired 2026-11-01 (Devon): github-classic-aihelper, github-classic-lifeops and openai-project, the
+# three revoke-no-replacement rows of the 2026-07-02 Codex-log exposure, already revoked at their
+# providers. The rows existed for the 04:00 window's revoke-confirm, which was removed that day.
 
 # ── 3. GitHub fine-grained PAT — github-to-bitbucket-mirror (leaked fp 64b11252) ─
 # Same credential already tracked as pending-rotation (container-log leak, 2026-06-20;
@@ -203,7 +146,7 @@ class = "openrouter-key"
 # The live value, minted by the orchestrator's rotation executor on 2026-10-13; 1f9697cd was the key
 # it retired, and 57543baa the key leaked 2026-07-02.
 fingerprint_sha256_8 = "018a8ca6"
-# ADR-0054: the orchestrator's rotation proposer rotates this credential; the 04:00 window refuses it.
+# ADR-0054: the orchestrator's rotation proposer rotates this credential.
 rotated_by_sds = true
 # Rotated by the orchestrator's rotation executor on 2026-10-13 (ADR-0055 increment 5; package
 # rotation-openrouter-generic revision 3): every minted key carries a $5 limit and a 400-day expiry.
@@ -224,28 +167,9 @@ disposition = "reissue"
   date = "2026-07-02"
   source = "~/.codex logs (WS-0.5 scan) — probed LIVE 2026-07-02"
 
-# ── 5. OpenAI project key (leaked fp cb3a0415) ──────────────────────────────────
-# Sweep 2026-07-02: NO consumer found on any scanned surface (Keychain, shell files,
-# ~/.config, LaunchAgents, git creds, BWS ×104, Coolify prod+dev envs ×854, process
-# env, GH Actions secret names). Orphaned key ⇒ revoke-only at the OpenAI console.
-[[credential]]
-id = "openai-project"
-class = "openai-key"
-fingerprint_sha256_8 = "cb3a0415"
-provider = "openai"
-provider_identity = "OpenAI → API keys (sk-proj-…, 120 models visible)"
-consumers_verified = "2026-07-02"
-verified_by = "scripts/cred-consumer-sweep.py"
-disposition = "revoke-no-replacement"
-
-  [[credential.exposure]]
-  id = "codex-2026-07-02"
-  date = "2026-07-02"
-  source = "~/.codex logs (WS-0.5 scan) — probed LIVE 2026-07-02"
-
 # ── Sweep blind spots (attested 2026-07-02) ─────────────────────────────────────
 # - GH Actions secret VALUES are write-only; NAMES enumerated across all AlobarQuest
-#   repos — none suggest any of the five (no PAT-named / OPENAI-named secrets).
+#   repos — none suggest any of the credentials swept.
 # - Account-level GitHub SSH keys not API-listable with the current keeper scope
 #   (needs admin:public_key) — pre-revoke enumeration is a Devon UI step.
 # - Surfaces off this Mac (other personal machines, browsers) not scanned.
@@ -455,8 +379,9 @@ rotate_requested = "2026-10-26"
   note = "the keeper; VideoCreator's start.sh (launchd com.devon.videocreator) reads it once at boot, and that agent is disabled (2026-10-23): a restart of VideoCreator is the only switch it needs, and nothing runs today to restart"
 
 # The dedicated cred-rotation token (PR #33, 2026-07-02): the ONLY local token with
-# secret write on Ops / Platform. Read by src/cli/change-mgr-cli.ts credRotationBwsToken();
-# overridable by the BWS_CRED_ROTATION_TOKEN env var. Absent => executor rotations block.
+# secret write on Ops / Platform. Its one reader, the 04:00 window's rotation executor, was
+# removed 2026-11-01, so nothing reads it now. Revoke it (Devon, rotation Part 5 task 6) and
+# delete this row and the Keychain item together.
 # Created date = the Keychain item's creation (2026-07-02T22:44Z), the same evening as #33.
 [[credential]]
 id = "bws-cred-rotation-token"
@@ -471,7 +396,7 @@ disposition = "reissue"
   kind = "keychain"
   service = "Claude"
   account = "BWS_ACCESS_TOKEN_CRED_ROTATION"
-  note = "change-mgr-cli.ts: the 04:00 rotation executor's bws child processes only"
+  note = "no reader since 2026-11-01 (the 04:00 rotation executor was removed); revoke, then delete this row"
 
 # The brains token: read-only on BWS project "brains". Created 2026-07-02 (the Keychain item's
 # creation). No reader was found by name across the portfolio, launchd and ~/.claude

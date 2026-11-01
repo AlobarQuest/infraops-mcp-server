@@ -19,7 +19,6 @@ function cfg(scanStdout: string, over: Partial<RunnerConfig> = {}): RunnerConfig
     now: '2026-06-15T03:00:00Z',
     autoFixAllowlist: [],
     baselineFile: path.join(dir, 'baseline.json'),
-    emitStateFile: path.join(dir, 'emit.json'),
     rollbackLog: path.join(dir, 'rollback.jsonl'),
     autoFixCap: 10,
     ...over,

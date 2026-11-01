@@ -7,12 +7,8 @@ import type { Finding } from './scan-parser.js';
 
 export type Tier = 'AUTO_FIX' | 'URGENT' | 'NORMAL';
 
-/** A remediation is a list of exact commands to run verbatim, OR human steps, OR a
- *  typed credential-rotation plan (WS-0.7) the rotation executor interprets. */
-export type Remediation =
-  | { exec: string[][] }
-  | { manual: string[] }
-  | { rotation: import('./cred-rotation.js').RotationPlanSpec };
+/** A remediation is a list of exact commands to run verbatim (the auto-fix tier), OR human steps. */
+export type Remediation = { exec: string[][] } | { manual: string[] };
 
 export interface Classification {
   tier: Tier;
@@ -80,12 +76,10 @@ const URGENT_KEYS = new Set<string>([
 // Findings surfaced in the scan log but intentionally NOT escalated (expected churn).
 const IGNORE_KEYS = new Set<string>(['controlplane.local_churn']);
 
-// NORMAL checks with a deterministic, idempotent exec remediation.
-// ONLY non-sudo, user-scope, idempotent commands belong here — the 4am executor runs
-// unattended as the user, so anything needing sudo (gatekeeper, critical-updates) or
-// environment-specific judgement (supply re-pins) stays manual (deny-by-default).
-const NORMAL_EXEC: Record<string, string[][]> = {
-  'os.screen_lock': [['defaults', 'write', 'com.apple.screensaver', 'askForPassword', '-int', '1']],
+// NORMAL checks with a known user-scope fix. Nothing runs it: the plan carries the command as a
+// manual step, because no executor applies an approved security item.
+const NORMAL_MANUAL: Record<string, string[]> = {
+  'os.screen_lock': ['defaults write com.apple.screensaver askForPassword -int 1'],
 };
 
 const SHORT_TITLES: Record<string, string> = {
@@ -174,12 +168,12 @@ export function classify(f: Finding, opts: ClassifyOptions): Classification | nu
     };
   }
 
-  if (f.check in NORMAL_EXEC) {
+  if (f.check in NORMAL_MANUAL) {
     return {
       tier: 'NORMAL',
       kind: 'remediation',
       risk: 'safe',
-      remediation: { exec: NORMAL_EXEC[f.check] },
+      remediation: { manual: [`Run: ${NORMAL_MANUAL[f.check].join(' ; ')}`] },
       title,
     };
   }

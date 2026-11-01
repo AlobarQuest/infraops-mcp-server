@@ -219,24 +219,23 @@ resolves the scanner at `~/.claude/bin/security-scan.sh` (`paths.ts`, env-overri
 `SECURITY_SCAN_PATH`). CLI entry: `dist/cli/security-drift-cli.js run` (chained into
 `scripts/drift-audit.sh`). Modules: `scan-parser` → `taxonomy` (classify, deny-by-default)
 → `baseline` (0600-validated accepted baseline + diff) → `autofix` (guarded chmod) →
-`emit`/`emit-state` (CM escalations + plan-hash) → `notify` (alert-hub urgent) → `runner`
+`emit` (CM escalations) → `notify` (alert-hub urgent) → `runner`
 (orchestrator). `security-scan.sh` includes Check 13: control-plane git drift (`~/.claude`
 tracked-file tamper-evidence) — critical-set changes escalate URGENT; `settings.local.json`
-churn is dropped by `taxonomy.ts`. The 4am verbatim executor is `security-executor.ts`, invoked via
-`change-mgr-cli.js run-security-window` (chained into `scripts/change-window.sh`). Shared
-file locations live in `paths.ts`. See `~/docs/security-audit/security-drift-taxonomy.md`
+churn is dropped by `taxonomy.ts`. Nothing applies an approved security item: its plan is a manual
+checklist. Shared file locations live in `paths.ts`. See `~/docs/security-audit/security-drift-taxonomy.md`
 for the authoritative tier rules.
 
 ### Credential-rotation lane (WS-0.7)
 
-The same detect→approve→execute loop rotates credentials as a change-class
+The 03:00 scan detects credential rotations; the orchestrator's rotation service (SDS) executes them
 (spec: `~/docs/software-delivery-system/2026-07-02-ws07-credential-rotation-spec.md`):
 
 - **Registry:** per-repo `.cred-consumers.toml` (this repo's covers the machine/ops-scope
   creds) maps each managed credential → its consumers (BWS secret, Keychain item, Coolify
   env, GH Actions secret). Files are listed in `~/.config/infra-drift/cred-consumers.list`
   (deny-by-default: unlisted ⇒ unmanaged). Parsed by `cred-consumers.ts` (strict-subset
-  TOML parser, deliberately dependency-free in the 4am write path).
+  TOML parser, deliberately dependency-free).
 - **Detect:** `cred-rotation.ts` emits `cred.exposure-rotate` (FAIL, one-shot until the
   exposure is recorded resolved in the 0600 `cred-rotation-state.json`),
   `cred.rotation-age` (WARN past per-class max age; infra-brain rules #1031/#1032) and
@@ -248,28 +247,22 @@ The same detect→approve→execute loop rotates credentials as a change-class
   every other credential still loads (it is the only key whose bad value does not fail
   the whole registry). An open exposure supersedes age and request. A
   `revoke-no-replacement` credential is recorded revoked only when one of its registry
-  exposures was resolved with a `ts` equal to its `lastRotated` — the single write the
-  executor's revoke-confirm makes; it then raises neither, and a `lastRotated` from an
-  ordinary rotation before a re-classification still ages. Merged
+  exposures was resolved with a `ts` equal to its `lastRotated`; it then raises neither, and a
+  `lastRotated` from an ordinary rotation before a re-classification still ages. The registry holds
+  no such row now, and nothing writes that pair any more. Merged
   into the 3am run via `extraFindings`; classifications are pre-built per credential and
-  routed through `taxonomy.ts`'s `cred.*` branch (no plan ⇒ URGENT manual, never guessed).
-- **Execute:** approved `{ rotation: RotationPlanSpec }` remediations run in
-  `rotation-executor.ts` (same plan-hash gate): store (quarantine old value under a
-  distinct BWS name, edit the keeper secret IN PLACE so by-UUID fetchers keep working) →
-  deploy (consumer updates, value moved by pipe/UUID, never argv where avoidable) →
-  verify (provider auth 200; gh keeper probe for GitHub classes) → revoke-confirm (probe
-  old value; retire the BWS copy ONLY on a strict 401 — 403/5xx is indeterminate and
-  refuses). Multi-night by design: "old still live" posts `blocked` until Devon's console
-  revoke, then a re-approve completes it.
-- **Devon-only steps:** CREATE (mint at the provider console) and provider REVOKE. Staged
-  handoff = Keychain item `cred-rotation/<cred-id>` filled in a real Terminal. Orphan
-  creds with no probe-able old value are closed via
+  routed through `taxonomy.ts`'s `cred.*` branch (no plan ⇒ URGENT manual, never guessed). Every
+  classification is a manual checklist; a credential flagged `rotated_by_sds` gets none.
+- **Execute:** the orchestrator's rotation service, for a credential marked `rotated_by_sds`
+  (its `docs/operations/rotation-executor.md`). This repo executes nothing. For an unflagged row the
+  scan's checklist is the plan: Devon mints and revokes at the provider console, then runs
+  `record-rotation`. Orphan creds are closed via
   `security-drift-cli.js resolve-exposure --cred <id> --exposure <id>`.
-- **Recording a rotation done outside the executor** (e.g. an SDS rotation unit): after
+- **Recording a finished rotation** (by hand, or an SDS rotation unit): after
   the new credential is verified, run
   `node dist/cli/security-drift-cli.js record-rotation --cred <id> --date <YYYY-MM-DD | now>`.
   It refuses an id absent from every listed `.cred-consumers.toml`, a
-  `revoke-no-replacement` credential (revokes are recorded by the executor), and a date
+  `revoke-no-replacement` credential, and a date
   that is not a real `YYYY-MM-DD` (UTC midnight) or is in the future; `now` records the
   current instant. It writes `lastRotated` atomically (0600, fsync, tmp+rename) and
   prints old -> new.
@@ -286,11 +279,8 @@ The same detect→approve→execute loop rotates credentials as a change-class
 - **Handover to the SDS:** `rotated_by_sds = true` on a registry entry (a boolean; anything else
   fails the registry) hands that credential's rotation to the orchestrator's proposer. The 3am
   scan then posts none of its rotation triggers (`cred.exposure-rotate`, `cred.rotation-age`,
-  `cred.rotation-requested`) to change-manager and builds no rotation plan for it; its other
-  findings still post. The 4am window refuses any rotation plan whose credential is flagged OR
-  absent from the live registry, read at window time (`change-mgr-cli.ts::rotationRefusals`), so an
-  item approved before the flag is refused too, and an unreadable registry refuses every plan.
-  `cred-findings` reports `rotated_by_sds` on every finding; the proposer acts only on flagged
+  `cred.rotation-requested`) to change-manager and builds no checklist for it; its other
+  findings still post. `cred-findings` reports `rotated_by_sds` on every finding; the proposer acts only on flagged
   credentials. Flag a credential only when no legacy rotation of it is in flight: the next 3am
   sync resolves its open security item and would strand a half-done reissue's quarantine copy.
 - **Never in the lane:** Coolify PG passwords (volume-recreate only), BWS machine tokens
@@ -308,19 +298,11 @@ vice-versa). The runner therefore POSTs the FULL current non-auto finding set ev
 the diff) so reconcile resolves cleared items correctly; the baseline/diff gates only the
 immediate URGENT email.
 
-**The 4am security executor runs approved `exec:` plans VERBATIM (no LLM) and is gated by a plan-hash.**
-`security-executor.ts` recomputes `sha256(canonicalJSON(plan))` and compares it to the hash
-recorded in the 0600 `security-emit-state.json` at emit time (keyed by the finding fingerprint
-= `resource_uuid`). Mismatch / missing / tampered emit-state → refuse + alert, never execute.
-`manual:` remediations are tracked-only. The Coolify `run-window` excludes `source==="security"`
-so the Sonnet agent never receives a security item.
-
-**Rotation never revokes: the executor's "revoke" step only CONFIRMS death (strict 401) then retires the BWS copy.**
-Create and provider-revoke are ALWAYS Devon console actions (decision 2026-07-02). The executor
-refuses to touch any credential whose `.cred-consumers.toml` entry lacks a `consumers_verified`
-attestation (fail-safe #1), any class outside `CLASS_POLICY`'s `executor: true` set, and any
-old-value probe that isn't exactly 401. Verify-before-revoke is structural (sequential code with
-early returns), not plan-authored — a plan cannot express revoke-first.
+**No executor applies an approved security item, so a security plan must never promise execution.**
+Every non-auto remediation is `manual:`; only the auto-fix tier carries `exec:` (guarded chmod, run
+in the 03:00 scan itself). The Coolify `run-window` excludes `source==="security"` and
+`source==="rotation"`, so the Sonnet agent never receives either: a `rotation` item belongs to the
+orchestrator's rotation service, and the agent would otherwise act on it as a change.
 
 **Auto-fix is Node `O_NOFOLLOW` + `fchmod`-on-fd, not bash `chmod`.** The taxonomy's TOCTOU /
 symlink / hardlink / owner guards require operating on the open fd (the inode), which bash's

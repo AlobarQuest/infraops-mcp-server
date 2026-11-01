@@ -6,34 +6,6 @@ import { ChangeMgrClient } from '../change-manager/api-client.js';
 import { runChangeAgent } from '../change-manager/agent.js';
 import { runWindow } from '../change-manager/run-window.js';
 import { renderWindowMarkdown } from '../change-manager/window-report.js';
-import { runSecurityWindow } from '../security-drift/security-executor.js';
-import { securityPaths } from '../security-drift/paths.js';
-import { notifyDepsFromEnv, sendUrgentAlert } from '../security-drift/notify.js';
-import { execFileSync } from 'child_process';
-import { defaultRotationDeps } from '../security-drift/rotation-executor.js';
-import { loadRotationState, saveRotationState } from '../security-drift/cred-rotation.js';
-import { loadCredConsumerFiles } from '../security-drift/cred-consumers.js';
-import { coolifyGet, coolifyPatch, coolifyPost } from '../services/coolify-client.js';
-
-/** The dedicated, least-privilege cred-rotation BWS token (read+write on the
- *  rotation projects only), from the login Keychain. Kept SEPARATE from the broad
- *  ambient BWS_ACCESS_TOKEN the drift/change pipeline reads with, so secret
- *  create/edit/delete power is isolated to the no-LLM rotation executor. Absent ⇒
- *  rotation deps are not wired and executor-assisted rotations block (fail-safe,
- *  never falls back to the broad token). Overridable via BWS_CRED_ROTATION_TOKEN. */
-function credRotationBwsToken(): string | undefined {
-  if (process.env.BWS_CRED_ROTATION_TOKEN) return process.env.BWS_CRED_ROTATION_TOKEN;
-  try {
-    const v = execFileSync(
-      '/usr/bin/security',
-      ['find-generic-password', '-s', 'Claude', '-a', 'BWS_ACCESS_TOKEN_CRED_ROTATION', '-w'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-    ).replace(/\n$/, '');
-    return v || undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 export function parseArgs(argv: string[]): Record<string, string | boolean> {
   const args: Record<string, string | boolean> = {};
@@ -100,96 +72,6 @@ async function doRunWindow(reportDir: string | undefined, now: string): Promise<
   process.stdout.write(md + '\n');
 }
 
-/** Which rotation plans the window must refuse, from the live registry: any credential the SDS
- *  rotates, and any credential the registry does not hold (so a list naming no file refuses
- *  everything). A registry that cannot be read refuses every plan. */
-export function rotationRefusals(listFile: string): (credId: string) => boolean {
-  let files: string[];
-  try {
-    files = fs
-      .readFileSync(listFile, 'utf8')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith('#'));
-  } catch {
-    return () => true;
-  }
-  try {
-    const specs = loadCredConsumerFiles(files);
-    const legacy = new Set(specs.filter((c) => c.rotated_by_sds !== true).map((c) => c.id));
-    return (credId) => !legacy.has(credId);
-  } catch {
-    return () => true;
-  }
-}
-
-async function doRunSecurityWindow(reportDir: string | undefined, now: string): Promise<void> {
-  const c = client('security-executor');
-  const p = securityPaths();
-  const rotationToken = credRotationBwsToken();
-  const notifyDeps = notifyDepsFromEnv();
-  const refusesRotation = rotationRefusals(p.credConsumersList);
-  const summary = await runSecurityWindow({
-    refusesRotation,
-    getApprovedSecurity: () => c.getApprovedBySource('security'),
-    claim: async (id) => {
-      await c.claim(id);
-    },
-    postOutcome: async (id, body) => {
-      await c.postOutcome(id, body);
-    },
-    onIntegrityFailure: async (item, reason) => {
-      await sendUrgentAlert(
-        `security-executor-refused:${item.id}`,
-        '🚨 Security executor REFUSED a plan (integrity)',
-        `${item.resource_name} (item ${item.id}): ${reason}`,
-        notifyDeps,
-      );
-    },
-    emitStateFile: p.emitStateFile,
-    maxChanges: Number.parseInt(process.env.SECURITY_MAX_CHANGES ?? '10', 10) || 10,
-    rotation: rotationToken
-      ? defaultRotationDeps({
-          coolifyGet: (pth, instance) =>
-            coolifyGet(pth, undefined, (instance ?? 'prod') as 'prod' | 'dev'),
-          coolifyPatch: (pth, body, instance) =>
-            coolifyPatch(
-              pth,
-              body as Record<string, unknown>,
-              (instance ?? 'prod') as 'prod' | 'dev',
-            ),
-          coolifyPost: (pth, body, instance) =>
-            coolifyPost(
-              pth,
-              body as Record<string, unknown> | undefined,
-              (instance ?? 'prod') as 'prod' | 'dev',
-            ),
-          loadState: () => loadRotationState(p.credRotationStateFile),
-          saveState: (s) => saveRotationState(p.credRotationStateFile, s),
-          now,
-          bwsToken: rotationToken,
-        })
-      : undefined,
-  });
-  if (!rotationToken) {
-    process.stdout.write(
-      'note: BWS_ACCESS_TOKEN_CRED_ROTATION not configured — executor-assisted rotations will BLOCK (no broad-token fallback).\n',
-    );
-  }
-  const lines = [
-    `# Security window — ${now}`,
-    `**${summary.applied} applied**, ${summary.blocked} blocked, ${summary.failed} failed, ${summary.skipped} skipped (of ${summary.considered}).`,
-    ...summary.results.map(
-      (r) =>
-        `- ${r.outcome === 'done' ? '✅' : r.outcome === 'blocked' ? '🚫' : r.outcome === 'failed' ? '❌' : '⏭️'} **${r.name}** — ${r.outcome}: ${r.detail}`,
-    ),
-  ];
-  const md = lines.join('\n');
-  if (reportDir)
-    fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.security-window.md`), md, 'utf-8');
-  process.stdout.write(md + '\n');
-}
-
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
@@ -200,12 +82,8 @@ async function main(): Promise<void> {
     await doSync(reportDir, now);
   } else if (args.command === 'run-window') {
     await doRunWindow(reportDir, now);
-  } else if (args.command === 'run-security-window') {
-    await doRunSecurityWindow(reportDir, now);
   } else {
-    throw new Error(
-      `unknown command: ${String(args.command)} (use sync | run-window | run-security-window)`,
-    );
+    throw new Error(`unknown command: ${String(args.command)} (use sync | run-window)`);
   }
 }
 

@@ -46,7 +46,6 @@ export declare class ChangeMgrClient {
     private req;
     postSync(body: SyncBody): Promise<SyncSummary>;
     getApproved(): Promise<ApprovedItem[]>;
-    getApprovedBySource(source: string): Promise<ApprovedItem[]>;
     claim(id: number): Promise<ApprovedItem>;
     postOutcome(id: number, body: OutcomeBody): Promise<unknown>;
     startWindow(startedAt: string): Promise<{

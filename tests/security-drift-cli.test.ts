@@ -99,9 +99,7 @@ describe('security-drift-cli record-rotation', () => {
 
   it('refuses a revoke-no-replacement credential without writing', () => {
     const before = fs.readFileSync(stateFile, 'utf8');
-    expect(() => run(['--cred', 'cred-revoked', '--date', 'now'])).toThrow(
-      /recorded by the rotation executor/,
-    );
+    expect(() => run(['--cred', 'cred-revoked', '--date', 'now'])).toThrow(/resolve-exposure/);
     expect(fs.readFileSync(stateFile, 'utf8')).toBe(before);
   });
 
@@ -407,15 +405,10 @@ describe('security-drift-cli — the SDS handover flag', () => {
 
 // A byte-identical copy lives in the orchestrator, which holds its CLASS_TYPES to it.
 describe('rotation_class_policy.json', () => {
-  it('is CLASS_POLICY, so a new class fails here until the fixture moves', () => {
+  it('names every CLASS_POLICY class, so a new class fails here until the fixture moves', () => {
     const fixture = JSON.parse(
       fs.readFileSync(path.join(__dirname, 'fixtures', 'rotation_class_policy.json'), 'utf8'),
     );
-    const generated = Object.fromEntries(
-      Object.entries(CLASS_POLICY)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([name, policy]) => [name, { executor: policy.executor }]),
-    );
-    expect(fixture).toEqual(generated);
+    expect([...fixture].sort()).toEqual(Object.keys(CLASS_POLICY).sort());
   });
 });
