@@ -6,10 +6,8 @@ export interface RunnerConfig {
     autoFixAllowlist: string[];
     fpExtra?: string[];
     baselineFile: string;
-    emitStateFile: string;
     rollbackLog: string;
     autoFixCap: number;
-    emitStateMaxAgeDays?: number;
     /** extra findings to merge with the scan output (e.g. control-plane self-check) */
     extraFindings?: import('./scan-parser.js').Finding[];
     /** pre-built cred.* classifications (WS-0.7), keyed `${check}|${target}` */

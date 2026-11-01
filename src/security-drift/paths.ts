@@ -1,6 +1,4 @@
-// Single source of truth for security-drift state file locations, so the runner
-// (writer) and the 4am executor (reader) always agree on the emit-state path the
-// integrity gate depends on.
+// Single source of truth for security-drift state file locations.
 
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -11,7 +9,6 @@ export interface SecurityPaths {
   scanPath: string;
   scanSourcePath: string;
   baselineFile: string;
-  emitStateFile: string;
   rollbackLog: string;
   autoFixAllowlistFile: string;
   fpAllowlistFile: string;
@@ -38,7 +35,6 @@ export function securityPaths(): SecurityPaths {
       process.env.SECURITY_SCAN_SOURCE_PATH ??
       path.join(home, 'Projects', 'security-standards', 'scripts', 'security-scan.sh'),
     baselineFile: path.join(stateDir, 'security-baseline.json'),
-    emitStateFile: path.join(stateDir, 'security-emit-state.json'),
     rollbackLog: path.join(stateDir, 'security-rollback.jsonl'),
     autoFixAllowlistFile,
     fpAllowlistFile,

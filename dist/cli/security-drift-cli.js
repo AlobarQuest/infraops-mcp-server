@@ -112,7 +112,7 @@ export function credScan(listFile, stateFile, now) {
         const state = loadRotationState(stateFile);
         return {
             findings: scanFindings(credFindings(specs, state, now), specs),
-            classifications: buildCredClassifications(specs.filter((spec) => spec.rotated_by_sds !== true), state),
+            classifications: buildCredClassifications(specs.filter((spec) => spec.rotated_by_sds !== true)),
         };
     }
     catch (e) {
@@ -191,7 +191,7 @@ export async function main(argv = process.argv.slice(2)) {
     const client = new ChangeMgrClient(base, token);
     const p = securityPaths();
     const selfCheckFindings = runSelfCheck({
-        stateFiles: [p.baselineFile, p.emitStateFile, p.rollbackLog],
+        stateFiles: [p.baselineFile, p.rollbackLog],
         auditLog: p.auditLog,
         hwmFile: p.hwmFile,
         sourceVerifiedFiles: [{ deployed: p.scanPath, source: p.scanSourcePath }],
@@ -214,7 +214,7 @@ export async function main(argv = process.argv.slice(2)) {
             if (classification)
                 classified.push({ finding, classification });
         }
-        const { escalations } = buildEscalations(classified, now);
+        const escalations = buildEscalations(classified);
         const urgent = escalations.filter((e) => e.urgent);
         const emailed = await sendVersionSkewAlert(urgent, notifyDepsFromEnv());
         const digest = `# Security drift ${now.slice(0, 10)} — ABORTED (scanner output-version skew)\n\n` +
@@ -241,7 +241,6 @@ export async function main(argv = process.argv.slice(2)) {
         autoFixAllowlist: readList(p.autoFixAllowlistFile),
         fpExtra: readList(p.fpAllowlistFile),
         baselineFile: p.baselineFile,
-        emitStateFile: p.emitStateFile,
         rollbackLog: p.rollbackLog,
         autoFixCap: Number.parseInt(process.env.SECURITY_AUTOFIX_CAP ?? '10', 10) || 10,
         extraFindings: [...selfCheckFindings, ...credExtraFindings],

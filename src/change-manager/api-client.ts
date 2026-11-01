@@ -68,11 +68,6 @@ export class ChangeMgrClient {
   getApproved(): Promise<ApprovedItem[]> {
     return this.req<ApprovedItem[]>('/api/items?status=approved');
   }
-  getApprovedBySource(source: string): Promise<ApprovedItem[]> {
-    return this.req<ApprovedItem[]>(
-      `/api/items?status=approved&source=${encodeURIComponent(source)}`,
-    );
-  }
   claim(id: number): Promise<ApprovedItem> {
     return this.req<ApprovedItem>(`/api/items/${id}/claim`, {
       method: 'POST',

@@ -1,9 +1,8 @@
 // The shared 0600/owner-validated JSON store backing every security-drift trust
-// boundary (accepted baseline, emit-state plan hashes, cred-rotation state).
+// boundary (accepted baseline, cred-rotation state).
 //
 // SECURITY: these files are attacker targets — a writable store lets an adversary
-// suppress a finding, forge an "accepted" state, or pass a tampered plan through the
-// 4am integrity gate. So every read validates regular-file + mode 0600 + owner, and
+// suppress a finding, forge an "accepted" state, So every read validates regular-file + mode 0600 + owner, and
 // every write is atomic (tmp + rename) at mode 0600. Callers supply their own error
 // constructor so existing error types (BaselineIntegrityError, …) stay stable.
 

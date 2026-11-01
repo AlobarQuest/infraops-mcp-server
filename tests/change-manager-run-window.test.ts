@@ -123,3 +123,24 @@ describe('runWindow', () => {
     await expect(runWindow(d)).rejects.toThrow(/unreachable/);
   });
 });
+
+describe('runWindow source exclusions', () => {
+  it.each(['security', 'rotation'])(
+    'never hands a source=%s item to the Coolify agent',
+    async (source) => {
+      const other = { ...item(1), source } as ApprovedItem;
+      const drift = { ...item(2), source: 'drift' } as ApprovedItem;
+      const runAgent = vi.fn(async (it: ApprovedItem) => ({
+        outcome: 'done' as const,
+        detail: String(it.id),
+        rollback: {},
+        tool_calls: { calls: [] },
+      }));
+      const d = deps({ getApproved: vi.fn(async () => [other, drift]), runAgent });
+      const s = await runWindow(d);
+      expect(runAgent.mock.calls.map(([it]) => it.id)).toEqual([2]);
+      expect(d.claim).not.toHaveBeenCalledWith(1);
+      expect(s.considered).toBe(1);
+    },
+  );
+});

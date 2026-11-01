@@ -36,7 +36,7 @@ describe('classify', () => {
     expect(c && 'manual' in c.remediation).toBe(true);
   });
 
-  it('classifies an OS hardening toggle as NORMAL with an exact exec', () => {
+  it('classifies an OS hardening toggle as NORMAL with the fix as a manual step', () => {
     const c = classify(
       f({
         check: 'os.screen_lock',
@@ -46,7 +46,7 @@ describe('classify', () => {
       { autoFixAllowlist: [] },
     );
     expect(c?.tier).toBe('NORMAL');
-    expect(c && 'exec' in c.remediation && c.remediation.exec[0][0]).toBe('defaults');
+    expect(c && 'manual' in c.remediation && c.remediation.manual[0]).toContain('defaults write');
   });
 
   it('URGENTs an unknown check key (deny-by-default)', () => {

@@ -1,13 +1,10 @@
 import type { Finding } from './scan-parser.js';
 export type Tier = 'AUTO_FIX' | 'URGENT' | 'NORMAL';
-/** A remediation is a list of exact commands to run verbatim, OR human steps, OR a
- *  typed credential-rotation plan (WS-0.7) the rotation executor interprets. */
+/** A remediation is a list of exact commands to run verbatim (the auto-fix tier), OR human steps. */
 export type Remediation = {
     exec: string[][];
 } | {
     manual: string[];
-} | {
-    rotation: import('./cred-rotation.js').RotationPlanSpec;
 };
 export interface Classification {
     tier: Tier;

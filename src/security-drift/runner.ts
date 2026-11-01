@@ -1,18 +1,16 @@
 // Orchestrates a security-drift run: parse → classify → auto-fix the narrow set →
 // emit the rest to the change-manager → email only NEW urgent items. Deps (CM POST,
 // urgent email) are injected so this is unit-testable; file paths point at the
-// 0600-validated baseline / emit-state / rollback stores.
+// 0600-validated baseline / rollback stores.
 
 import type { SyncBody, SyncSummary } from '../change-manager/api-client.js';
 import { diffFindings, loadBaseline, saveBaseline, snapshot } from './baseline.js';
 import {
   buildEscalations,
-  mergeEmitState,
   newEscalations,
   type ClassifiedFinding,
   type SecurityEscalation,
 } from './emit.js';
-import { loadEmitState, pruneEmitState, saveEmitState } from './emit-state.js';
 import { runAutoFixes } from './autofix.js';
 import { parseScan } from './scan-parser.js';
 import { classify } from './taxonomy.js';
@@ -23,10 +21,8 @@ export interface RunnerConfig {
   autoFixAllowlist: string[];
   fpExtra?: string[];
   baselineFile: string;
-  emitStateFile: string;
   rollbackLog: string;
   autoFixCap: number;
-  emitStateMaxAgeDays?: number;
   /** extra findings to merge with the scan output (e.g. control-plane self-check) */
   extraFindings?: import('./scan-parser.js').Finding[];
   /** pre-built cred.* classifications (WS-0.7), keyed `${check}|${target}` */
@@ -108,25 +104,13 @@ export async function runSecurityDrift(
   const diffs = seeded ? [] : diffFindings(finalClassified, baseline);
 
   // --- Emit the full current non-auto set every run (so reconcile resolves cleared items correctly) ---
-  const { escalations, hashes } = buildEscalations(nonAuto, config.now);
+  const escalations = buildEscalations(nonAuto);
   await deps.postSync({
     generated_at: config.now,
     source_report: `${date}.security.json`,
     source: 'security',
     escalations,
   });
-
-  // Persist plan-hashes (merge + prune) for the 4am integrity gate.
-  const merged = mergeEmitState(
-    pruneEmitState(
-      loadEmitState(config.emitStateFile),
-      config.emitStateMaxAgeDays ?? 14,
-      config.now,
-    ),
-    hashes,
-    config.now,
-  );
-  saveEmitState(config.emitStateFile, merged);
 
   // --- Immediate URGENT email: only NEW urgent items, and never on the seed run ---
   const newUrgent = seeded

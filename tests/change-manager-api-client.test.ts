@@ -41,10 +41,10 @@ describe('ChangeMgrClient', () => {
 
   it('claim sends the declared actor in the body', async () => {
     fetchMock.mockResolvedValue(ok({ id: 1, status: 'in_progress' }));
-    const c = new ChangeMgrClient('https://cm.example', 'tok', 'security-executor');
+    const c = new ChangeMgrClient('https://cm.example', 'tok', 'test-actor');
     await c.claim(1);
     const [, opts] = fetchMock.mock.calls[0];
-    expect(JSON.parse(opts.body)).toEqual({ actor: 'security-executor' });
+    expect(JSON.parse(opts.body)).toEqual({ actor: 'test-actor' });
   });
 
   it('postOutcome merges the declared actor into the body', async () => {

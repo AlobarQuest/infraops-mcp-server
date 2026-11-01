@@ -1,5 +1,4 @@
-// Maps classified findings to change-manager security escalations, and records the
-// plan-hash (keyed by fingerprint) for the 4am integrity gate.
+// Maps classified findings to change-manager security escalations.
 //
 // Security escalations POST directly to /api/sync as opaque JSON (the web app stores
 // `plan` as a JSON object), so the plan shape here is free to carry an exact
@@ -7,7 +6,6 @@
 // types. proposal_id is crafted so the web app's rule_key_of() (split on ":") yields
 // a clean "sec.<check>" rule key (see change-manager app/identity.py).
 import { fingerprint } from './baseline.js';
-import { planHash } from './canonical.js';
 const BLIND_SPOTS = 'File-scan does NOT cover secrets in env vars (ps/proc) or secrets surviving in git history — ' +
     'a clean working tree never means a leaked secret is gone; rotation is still required.';
 /** Build one escalation from a classified finding. */
@@ -21,9 +19,7 @@ export function toEscalation(cf) {
         remediation: classification.remediation,
         rollback: 'exec' in classification.remediation
             ? 'Prior file mode/owner recorded in the security-drift rollback log; restore from there.'
-            : 'rotation' in classification.remediation
-                ? 'Old credential value stays quarantined in BWS until it provably probes dead (401); to roll back before revoke, re-deploy the quarantined value to the mapped consumers. After revoke there is no rollback — mint a fresh credential.'
-                : 'n/a — manual remediation (human applies and verifies).',
+            : 'n/a — manual remediation (human applies and verifies).',
         source: 'security',
         blind_spots: BLIND_SPOTS,
     };
@@ -43,23 +39,9 @@ export function toEscalation(cf) {
         urgent: classification.tier === 'URGENT',
     };
 }
-/** Build the full set of escalations to POST, plus the plan-hashes to record. */
-export function buildEscalations(items, _now) {
-    const escalations = [];
-    const hashes = {};
-    for (const cf of items) {
-        const esc = toEscalation(cf);
-        escalations.push(esc);
-        hashes[esc.target.uuid] = planHash(esc.plan);
-    }
-    return { escalations, hashes };
-}
-/** Merge freshly-emitted hashes into the existing emit-state with a timestamp. */
-export function mergeEmitState(state, hashes, now) {
-    const next = { ...state };
-    for (const [fp, hash] of Object.entries(hashes))
-        next[fp] = { hash, ts: now };
-    return next;
+/** Build the full set of escalations to POST. */
+export function buildEscalations(items) {
+    return items.map(toEscalation);
 }
 /** Pick the escalations that correspond to NEW/changed findings (for the immediate email). */
 export function newEscalations(escalations, diffs) {

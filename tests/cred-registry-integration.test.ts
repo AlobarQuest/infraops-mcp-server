@@ -18,14 +18,7 @@ const REPO_TOML = path.join(__dirname, '..', '.cred-consumers.toml');
 describe("the repo's own .cred-consumers.toml", () => {
   const specs = parseCredConsumers(fs.readFileSync(REPO_TOML, 'utf8'));
 
-  const LEAKED = [
-    'bitbucket-mirror-token',
-    'github-classic-aihelper',
-    'github-classic-lifeops',
-    'github-finegrained-mirror',
-    'openai-project',
-    'openrouter-generic',
-  ];
+  const LEAKED = ['bitbucket-mirror-token', 'github-finegrained-mirror', 'openrouter-generic'];
   const MACHINE_TOKENS = [
     'bws-cred-rotation-token',
     'bws-tok-brain-ops',
@@ -54,7 +47,7 @@ describe("the repo's own .cred-consumers.toml", () => {
     expect(credFindings(tokens, state, '2026-10-06T03:00:00Z')).toEqual([]);
     const later = credFindings(tokens, state, '2027-08-01T03:00:00Z');
     expect(later.map((f) => f.check)).toEqual(Array(tokens.length).fill('cred.rotation-age'));
-    const cls = buildCredClassifications(tokens, state);
+    const cls = buildCredClassifications(tokens);
     for (const f of later) {
       const c = classify(f, { autoFixAllowlist: [], credClassifications: cls });
       expect(c!.remediation).toHaveProperty('manual');
@@ -64,8 +57,8 @@ describe("the repo's own .cred-consumers.toml", () => {
   it('routes every emitted finding to its registry-built classification, never the unplanned fallback', () => {
     const state = { resolvedExposures: {}, lastRotated: {} };
     const findings = credFindings(specs, state, '2026-07-02T03:00:00Z');
-    expect(findings.length).toBe(6); // one open exposure per credential
-    const credClassifications = buildCredClassifications(specs, state);
+    expect(findings.length).toBe(3); // one open exposure per credential
+    const credClassifications = buildCredClassifications(specs);
     for (const f of findings) {
       const c = classify(f, { autoFixAllowlist: [], credClassifications });
       expect(c, `${f.target} must classify`).not.toBeNull();
@@ -73,40 +66,12 @@ describe("the repo's own .cred-consumers.toml", () => {
     }
   });
 
-  it('raises no age finding for the revoked classic PATs after their 180-day mark', () => {
-    // Mirrors the live state: the executor confirmed both revokes on 2026-07-02 and
-    // recorded the exposure resolved plus lastRotated in one write.
-    const revoked = ['github-classic-aihelper', 'github-classic-lifeops'];
-    const ts = '2026-07-02T22:49:52.254Z';
-    const state = {
-      resolvedExposures: Object.fromEntries(
-        revoked.map((id) => [
-          `${id}:codex-2026-07-02`,
-          { ts, detail: 'revoke confirmed dead (401)' },
-        ]),
-      ),
-      lastRotated: Object.fromEntries(revoked.map((id) => [id, ts])),
-    };
-    const pats = specs.filter((s) => revoked.includes(s.id));
-    expect(pats.map((s) => s.disposition)).toEqual(Array(2).fill('revoke-no-replacement'));
-    expect(credFindings(pats, state, '2026-12-30T03:00:00Z')).toEqual([]);
-    expect(credFindings(pats, state, '2028-01-01T03:00:00Z')).toEqual([]);
-  });
-
-  it('yields executor-runnable plans for exactly the eligible creds (openrouter + the 2 BWS-held classic PATs)', () => {
-    const state = { resolvedExposures: {}, lastRotated: {} };
-    const cls = buildCredClassifications(specs, state);
-    const kindOf = (id: string) => {
-      const c = cls[`cred.exposure-rotate|cred:${id}`];
-      return 'rotation' in c.remediation ? 'rotation' : 'manual';
-    };
-    expect(kindOf('openrouter-generic')).toBe('rotation');
-    expect(kindOf('github-classic-aihelper')).toBe('rotation');
-    expect(kindOf('github-classic-lifeops')).toBe('rotation');
-    // The mirror fetches both tokens from BWS each cycle (runtime-fetch), a kind this executor
-    // never deploys to; the orchestrator's rotation executor rotates them (ADR-0055 increment 7).
-    expect(kindOf('github-finegrained-mirror')).toBe('manual');
-    expect(kindOf('bitbucket-mirror-token')).toBe('manual');
-    expect(kindOf('openai-project')).toBe('manual'); // no BWS copy to probe
+  it('offers a manual checklist for every credential, never a rotation plan', () => {
+    const cls = buildCredClassifications(specs);
+    for (const s of specs) {
+      const c = cls[`cred.exposure-rotate|cred:${s.id}`];
+      expect(c.remediation, s.id).toHaveProperty('manual');
+      expect(c.remediation, s.id).not.toHaveProperty('rotation');
+    }
   });
 });
