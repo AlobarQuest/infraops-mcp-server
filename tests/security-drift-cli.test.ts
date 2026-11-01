@@ -353,6 +353,22 @@ describe('security-drift-cli — the SDS handover flag', () => {
     });
   });
 
+  it('cred-findings serves null for a handed-over row with no date at all', async () => {
+    fs.writeFileSync(
+      path.join(dir, 'bare.cred-consumers.toml'),
+      'version = 1\n[[credential]]\nid = "sds-bare"\nclass = "openrouter-key"\n' +
+        'rotated_by_sds = true\n',
+    );
+    fs.appendFileSync(
+      path.join(dir, 'cred-consumers.list'),
+      `${path.join(dir, 'bare.cred-consumers.toml')}\n`,
+    );
+    await main(['cred-findings', '--now', '2026-10-07T12:00:00.000Z']);
+    const served = JSON.parse(out).last_rotated;
+    expect(Object.keys(served)).toContain('sds-bare');
+    expect(served['sds-bare']).toBeNull();
+  });
+
   it('cred-findings serves the anchor the age finding uses', async () => {
     fs.writeFileSync(
       path.join(dir, 'old.cred-consumers.toml'),

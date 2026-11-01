@@ -158,12 +158,12 @@ export function doCredFindings(args) {
         // true, so a standing package alone can never put two executors on one credential.
         rotated_by_sds: owned.has(String(f.facts?.id)),
     }));
-    // Each handed-over credential's age anchor, due or not, so a value here can't disagree with the
-    // findings: the proposer records a finished rotation only when it is later than this, and a
+    // Each handed-over credential's age anchor, due or not, or null for a row with no date, so a value
+    // here can't disagree with the findings: the proposer records a finished rotation only when it is later than this, and a
     // repeat pass never resets an age clock.
     const last_rotated = Object.fromEntries(specs
         .filter((spec) => spec.rotated_by_sds === true)
-        .map((spec) => [spec.id, rotationAnchor(spec, state)]));
+        .map((spec) => [spec.id, rotationAnchor(spec, state) ?? null]));
     process.stdout.write(JSON.stringify({ schema_version: 1, findings, last_rotated }) + '\n');
 }
 export async function main(argv = process.argv.slice(2)) {

@@ -278,7 +278,7 @@ The same detect→approve→execute loop rotates credentials as a change-class
   prints the `cred.*` findings as JSON (`{"schema_version": 1, "findings": [...],
   "last_rotated": {...}}`), each finding as its check plus the values its detail embeds (`id`,
   `class`, and `exposure_id`/`exposure_date`, `rotate_requested` or `anchor`). `last_rotated` is
-  each `rotated_by_sds` row's age anchor, due or not. It is read-only. The orchestrator's rotation proposer
+  each `rotated_by_sds` row's age anchor, due or not, or `null` for a row with no date. It is read-only. The orchestrator's rotation proposer
   (ADR-0054 amendment 1) reads it so that "due" is decided here and nowhere else; its
   `tests/fixtures/rotation_findings.json` pins the shape, so change both together. It exits
   non-zero, rather than reporting nothing due, when the registry list names no file or the
