@@ -378,17 +378,17 @@ rotate_requested = "2026-10-26"
   account = "BWS_ACCESS_TOKEN_VIDEOCREATOR"
   note = "the keeper; VideoCreator's start.sh (launchd com.devon.videocreator) reads it once at boot, and that agent is disabled (2026-10-23): a restart of VideoCreator is the only switch it needs, and nothing runs today to restart"
 
-# The dedicated cred-rotation token (PR #33, 2026-07-02): the ONLY local token with
-# secret write on Ops / Platform. Its one reader, the 04:00 window's rotation executor, was
-# removed 2026-11-01, so nothing reads it now. Revoke it (Devon, rotation Part 5 task 6) and
-# delete this row and the Keychain item together.
+# The cred-rotation token (PR #33, 2026-07-02). Its only reader, the 04:00 window, retired on
+# 2026-11-01, and Devon removed its one project, Ops / Platform (read and write), that day rather
+# than revoke it (orchestrator ADR-0055 amendment 18). It reads nothing. To restore it, grant the
+# project again. Its age finding of 2027-07-02 is the point to decide whether to revoke it.
 # Created date = the Keychain item's creation (2026-07-02T22:44Z), the same evening as #33.
 [[credential]]
 id = "bws-cred-rotation-token"
 class = "bws-machine-token"
 fingerprint_sha256_8 = "0f0b60a2"
 provider = "bitwarden-sm"
-provider_identity = "Bitwarden SM cred-rotation machine account (read+write, Ops / Platform), access-key 9a597098-…"
+provider_identity = "Bitwarden SM cred-rotation machine account (no project access since 2026-11-01), access-key 9a597098-…"
 created = "2026-07-02"
 disposition = "reissue"
 
@@ -396,7 +396,7 @@ disposition = "reissue"
   kind = "keychain"
   service = "Claude"
   account = "BWS_ACCESS_TOKEN_CRED_ROTATION"
-  note = "no reader since 2026-11-01 (the 04:00 rotation executor was removed); revoke, then delete this row"
+  note = "no reader since 2026-11-01 (the 04:00 rotation executor was removed), and no project access"
 
 # The brains token: read-only on BWS project "brains". Created 2026-07-02 (the Keychain item's
 # creation). No reader was found by name across the portfolio, launchd and ~/.claude
