@@ -411,6 +411,6 @@ describe('rotation_class_policy.json', () => {
     const fixture = JSON.parse(
       fs.readFileSync(path.join(__dirname, 'fixtures', 'rotation_class_policy.json'), 'utf8'),
     );
-    expect(Object.keys(fixture).sort()).toEqual(Object.keys(CLASS_POLICY).sort());
+    expect([...fixture].sort()).toEqual(Object.keys(CLASS_POLICY).sort());
   });
 });
