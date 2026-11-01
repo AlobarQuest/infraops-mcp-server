@@ -191,6 +191,10 @@ export function isRecordedRevoked(spec, state) {
         return false;
     return spec.exposures.some((e) => state.resolvedExposures[`${spec.id}:${e.id}`]?.ts === at);
 }
+/** When a credential last rotated, as far as anything knows: the date its age is measured from. */
+export function rotationAnchor(spec, state) {
+    return state.lastRotated[spec.id] ?? spec.last_rotated ?? spec.created;
+}
 // ── Findings ─────────────────────────────────────────────────────────────────────
 export function credTarget(credId) {
     return `cred:${credId}`;
@@ -237,7 +241,7 @@ export function credFindings(specs, state, now) {
         // A revoked credential has nothing left to rotate.
         if (isRecordedRevoked(spec, state))
             continue;
-        const anchor = state.lastRotated[spec.id] ?? spec.last_rotated ?? spec.created;
+        const anchor = rotationAnchor(spec, state);
         if (anchor && Number.isFinite(policy.maxAgeDays)) {
             const ageDays = (nowMs - new Date(anchor).getTime()) / 86400_000;
             if (ageDays > policy.maxAgeDays) {

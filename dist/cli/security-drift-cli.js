@@ -22,7 +22,7 @@ import { classify } from '../security-drift/taxonomy.js';
 import { buildEscalations } from '../security-drift/emit.js';
 import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION, } from '../security-drift/scanner-version.js';
 import { loadCredConsumerFiles } from '../security-drift/cred-consumers.js';
-import { buildCredClassifications, credFindings, scanFindings, loadRotationState, recordRotation, saveRotationState, } from '../security-drift/cred-rotation.js';
+import { buildCredClassifications, credFindings, scanFindings, loadRotationState, recordRotation, rotationAnchor, saveRotationState, } from '../security-drift/cred-rotation.js';
 export function parseArgs(argv) {
     const args = {};
     if (argv[0] && !argv[0].startsWith('--'))
@@ -132,8 +132,8 @@ export function credScan(listFile, stateFile, now) {
 /** The credential-rotation findings as JSON, for the orchestrator's rotation proposer
  *  (ADR-0054 amendment 1). READ-ONLY: it loads the listed registries and the rotation state
  *  exactly as `run` does and writes nothing. Only `cred.*` findings that carry `facts` are
- *  printed, each as its check plus those fields -- never the prose detail. A registry that does
- *  not parse throws, so the caller gets a non-zero exit rather than an empty list. */
+ *  printed, each as its check plus those fields -- never the prose detail. `last_rotated` is
+ *  additive, so `schema_version` stays 1. A registry that does not parse throws, so the caller gets a non-zero exit rather than an empty list. */
 export function doCredFindings(args) {
     const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
     const p = securityPaths();
@@ -158,7 +158,13 @@ export function doCredFindings(args) {
         // true, so a standing package alone can never put two executors on one credential.
         rotated_by_sds: owned.has(String(f.facts?.id)),
     }));
-    process.stdout.write(JSON.stringify({ schema_version: 1, findings }) + '\n');
+    // Each handed-over credential's age anchor, due or not, or null for a row with no date, so a value
+    // here can't disagree with the findings: the proposer records a finished rotation only when it is later than this, and a
+    // repeat pass never resets an age clock.
+    const last_rotated = Object.fromEntries(specs
+        .filter((spec) => spec.rotated_by_sds === true)
+        .map((spec) => [spec.id, rotationAnchor(spec, state) ?? null]));
+    process.stdout.write(JSON.stringify({ schema_version: 1, findings, last_rotated }) + '\n');
 }
 export async function main(argv = process.argv.slice(2)) {
     const args = parseArgs(argv);
