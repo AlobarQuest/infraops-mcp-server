@@ -169,7 +169,7 @@ export function recordRotation(
     throw new Error(`unknown credential id '${credId}' — not in any listed .cred-consumers.toml`);
   if (spec.disposition === 'revoke-no-replacement')
     throw new Error(
-      `${credId} is revoke-no-replacement: there is no rotation to record — its revoke is recorded by the rotation executor's revoke-confirm`,
+      `${credId} is revoke-no-replacement: there is no rotation to record — close its exposure with resolve-exposure, then delete its registry row`,
     );
   const nowMs = Date.parse(now);
   const ms = date === 'now' ? nowMs : parseIsoDay(date);
@@ -312,6 +312,7 @@ function rotationClassification(spec: CredentialSpec): Classification {
       ? [
           `1. REVOKE (Devon): revoke the credential at the provider console (${where}). No replacement is needed.`,
           `2. Retire the BWS copy${spec.bws_uuid ? ` (${spec.bws_uuid})` : ''}.`,
+          `3. Delete the row from its .cred-consumers.toml.`,
         ]
       : [
           `1. CREATE (Devon): mint the replacement at the provider (${where})` +
@@ -321,11 +322,18 @@ function rotationClassification(spec: CredentialSpec): Classification {
           `3. REVOKE (Devon): revoke the OLD credential at the provider console once the consumers verify.`,
           `4. Record it: node dist/cli/security-drift-cli.js record-rotation --cred ${spec.id} --date now`,
         ];
+  const before = [
+    ...(policy?.landmines ?? []),
+    ...spec.rotation_preconditions.map((pre) => `Open precondition: ${pre}`),
+    ...(spec.consumers_verified
+      ? []
+      : ['Consumer set not attested (consumers_verified missing): map it before any revoke.']),
+  ];
   return {
     tier: 'URGENT',
     kind: 'question',
     risk: 'caution',
-    remediation: { manual: [...(policy?.landmines ?? []), ...steps] },
+    remediation: { manual: [...before, ...steps] },
     title: `Rotate ${spec.id} (${spec.class}) — manual`,
   };
 }
@@ -339,7 +347,15 @@ export function buildCredClassifications(specs: CredentialSpec[]): Record<string
   for (const spec of specs) {
     const target = credTarget(spec.id);
     const rotate = rotationClassification(spec);
-    out[`cred.exposure-rotate|${target}`] = rotate;
+    out[`cred.exposure-rotate|${target}`] = {
+      ...rotate,
+      remediation: {
+        manual: [
+          ...(rotate.remediation as { manual: string[] }).manual,
+          `Close the exposure: node dist/cli/security-drift-cli.js resolve-exposure --cred ${spec.id} --exposure <id>`,
+        ],
+      },
+    };
     out[`cred.rotation-age|${target}`] = {
       ...rotate,
       tier: 'NORMAL',

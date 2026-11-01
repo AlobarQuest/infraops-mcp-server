@@ -395,10 +395,10 @@ describe('recordRotation', () => {
     expect(state.lastRotated).toEqual({});
   });
 
-  it('refuses a revoke-no-replacement credential — the executor records revokes', () => {
+  it('refuses a revoke-no-replacement credential', () => {
     const state = emptyState();
     expect(() => recordRotation(state, specs, 'cred-gone', '2026-06-30', NOW)).toThrow(
-      /revoke-no-replacement.*recorded by the rotation executor/,
+      /revoke-no-replacement.*resolve-exposure/,
     );
     expect(state.lastRotated).toEqual({});
   });
@@ -439,9 +439,25 @@ describe('buildCredClassifications', () => {
     expect(manual).toContain('CREATE (Devon)');
     expect(manual).toContain(spec.bws_uuid!);
     expect(manual).toContain(`record-rotation --cred ${spec.id}`);
+    expect(manual).toContain(`resolve-exposure --cred ${spec.id}`);
 
     expect(out[`cred.rotation-age|${target}`].tier).toBe('NORMAL');
     expect(out[`cred.rotation-requested|${target}`].tier).toBe('NORMAL');
+  });
+
+  it('carries open preconditions and an unattested consumer set into the checklist', () => {
+    const spec = baseSpec({
+      rotation_preconditions: ['decode first'],
+      consumers_verified: undefined,
+    });
+    const manual = (
+      buildCredClassifications([spec])[`cred.rotation-age|${credTarget(spec.id)}`].remediation as {
+        manual: string[];
+      }
+    ).manual.join('\n');
+    expect(manual).toContain('Open precondition: decode first');
+    expect(manual).toContain('Consumer set not attested');
+    expect(manual).not.toContain('resolve-exposure');
   });
 
   it('offers a revoke-and-retire checklist for revoke-no-replacement, with the class landmine', () => {

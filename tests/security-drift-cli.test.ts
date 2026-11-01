@@ -99,9 +99,7 @@ describe('security-drift-cli record-rotation', () => {
 
   it('refuses a revoke-no-replacement credential without writing', () => {
     const before = fs.readFileSync(stateFile, 'utf8');
-    expect(() => run(['--cred', 'cred-revoked', '--date', 'now'])).toThrow(
-      /recorded by the rotation executor/,
-    );
+    expect(() => run(['--cred', 'cred-revoked', '--date', 'now'])).toThrow(/resolve-exposure/);
     expect(fs.readFileSync(stateFile, 'utf8')).toBe(before);
   });
 
