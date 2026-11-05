@@ -48,6 +48,8 @@ export const CLASS_POLICY: Record<string, ClassPolicy> = {
   // Anthropic API key (fork-sync lane: ANTHROPIC_API_KEY Actions secrets in the forks).
   'anthropic-api-key': { maxAgeDays: 365, landmines: [] },
   'porkbun-api-key': { maxAgeDays: 365, landmines: [] },
+  // An alert-hub sender token (the Bearer a producer such as the orchestrator presents to alert-hub).
+  'alert-hub-sender-token': { maxAgeDays: 365, landmines: [] },
   // A GitHub App's private key (the fork-sync lane's APP_PRIVATE_KEY Actions secrets).
   'github-app-private-key': {
     maxAgeDays: 365,

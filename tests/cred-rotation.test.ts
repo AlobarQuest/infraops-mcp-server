@@ -559,6 +559,12 @@ describe('CLASS_POLICY sanity', () => {
   });
 });
 
+describe('alert-hub sender class', () => {
+  it('ages alert-hub-sender-token at 365 days with no landmines', () => {
+    expect(CLASS_POLICY['alert-hub-sender-token']).toEqual({ maxAgeDays: 365, landmines: [] });
+  });
+});
+
 describe('porkbun lane class', () => {
   it('ages porkbun-api-key at 365 days', () => {
     expect(CLASS_POLICY['porkbun-api-key']).toMatchObject({ maxAgeDays: 365 });
