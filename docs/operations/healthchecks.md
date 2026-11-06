@@ -29,9 +29,11 @@ HC_KEY=$(bws secret get 51509d5e-64f5-4781-ae82-b4ed00b644e1 --output json --col
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')
 ```
 
-Pass `--color no` on every parsed `bws` call. The read-only key, which hides ping URLs, belongs to
-the rotation executor alone (BWS `f07b1368-…` in `Rotation / Healthchecks`). Healthchecks allows
-one read-write and one read-only key per project, so don't create more.
+Pass `--color no` on every parsed `bws` call. The read-only key, which hides ping URLs, is BWS
+`f07b1368-…` in `Rotation / Healthchecks`; the rotation executor owns and rotates it. Healthchecks
+allows one read-write and one read-only key per project, so don't create more. A reader that needs
+read-only access gets a direct read grant on that one secret, never on its project. The readers
+are the rotation executor, `sds-operator`, and the `estate-dashboard` machine account.
 
 Healthcheck.alobar.net is proxied by Cloudflare, which refuses default Python User-Agents with
 `error code: 1010`. A Python client must send a named User-Agent; curl's default passes.
