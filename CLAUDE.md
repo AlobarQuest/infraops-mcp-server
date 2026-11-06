@@ -199,8 +199,8 @@ Coolify has two distinct resource types with separate env var APIs:
 
 Calling `coolify_create_app_env` with a service UUID fails with a validation error. Always check which resource type a UUID belongs to before writing env vars.
 
-**`coolify_update_service` requires base64-encoded `docker_compose_raw`**
-The PATCH `/services/{uuid}` endpoint rejects raw YAML. Encode with `Buffer.from(yaml, "utf8").toString("base64")` before sending. The GET endpoints return raw YAML; only writes require base64.
+**Service writes require base64-encoded `docker_compose_raw`**
+`POST /services` and `PATCH /services/{uuid}` reject raw YAML. `coolify_create_service` and `coolify_update_service` take plain YAML and encode it with `Buffer.from(yaml, "utf8").toString("base64")` before sending. The GET endpoints return raw YAML. `POST /services` also returns 422 when both `type` and `docker_compose_raw` are sent, so `coolify_create_service` takes exactly one.
 
 **`coolify_list_deployments` uses a non-obvious endpoint path**
 The deployment history endpoint is `/deployments/applications/{app_uuid}` (not `/applications/{uuid}/deployments`). Response is `{ count, deployments: [] }`, not a raw array.

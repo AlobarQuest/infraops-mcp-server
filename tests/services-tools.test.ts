@@ -94,6 +94,43 @@ describe('coolify_create_service', () => {
   it('no longer accepts domains', () => {
     expect(mockServer._schemas['coolify_create_service'].inputSchema.domains).toBeUndefined();
   });
+
+  const compose = 'services:\n  app:\n    image: nginx:alpine # placeholder — ü\n';
+
+  it('sends raw compose base64-encoded and no type', async () => {
+    vi.mocked(client.coolifyGet).mockResolvedValueOnce({ environments: [{ name: 'non-prod' }] });
+    vi.mocked(client.coolifyPost).mockResolvedValueOnce({ uuid: 'svc' });
+    const { type: _omit, ...rawBase } = base;
+    const res = await mockServer._handlers['coolify_create_service']({
+      ...rawBase,
+      docker_compose_raw: compose,
+    });
+    expect(res.isError).toBeUndefined();
+    const body = vi.mocked(client.coolifyPost).mock.calls[0][1] as Record<string, unknown>;
+    expect(body).not.toHaveProperty('type');
+    expect(body.docker_compose_raw).not.toBe(compose);
+    expect(Buffer.from(body.docker_compose_raw as string, 'base64').toString('utf8')).toBe(compose);
+  });
+
+  it('sends type and no compose for a template', async () => {
+    vi.mocked(client.coolifyGet).mockResolvedValueOnce({ environments: [{ name: 'non-prod' }] });
+    vi.mocked(client.coolifyPost).mockResolvedValueOnce({ uuid: 'svc' });
+    await mockServer._handlers['coolify_create_service'](base);
+    const body = vi.mocked(client.coolifyPost).mock.calls[0][1] as Record<string, unknown>;
+    expect(body.type).toBe('uptime-kuma');
+    expect(body).not.toHaveProperty('docker_compose_raw');
+  });
+
+  it.each([
+    ['both', { ...base, docker_compose_raw: compose }],
+    ['neither', { project_uuid: 'p1', server_uuid: 's1', instance: 'dev' }],
+  ])('refuses %s of type and docker_compose_raw with no HTTP call', async (_label, args) => {
+    const res = await mockServer._handlers['coolify_create_service'](args);
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).toContain('exactly one of type');
+    expect(client.coolifyGet).not.toHaveBeenCalled();
+    expect(client.coolifyPost).not.toHaveBeenCalled();
+  });
 });
 
 describe('coolify_update_service', () => {

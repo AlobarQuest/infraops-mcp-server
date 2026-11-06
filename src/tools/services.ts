@@ -154,8 +154,10 @@ export function registerServiceTools(server: McpServer): void {
     {
       title: 'Create Coolify Service',
       description:
-        'Create a new service from a Docker Compose definition or a one-click template. ' +
-        "For Devon's Flavor C apps (like Contact Hub), supply the docker-compose.yml content.",
+        'Create a new service from a one-click template or a raw Docker Compose definition. ' +
+        'Pass exactly one of `type` (a one-click template name) or `docker_compose_raw` ' +
+        "(plain docker-compose.yml text). For Devon's Flavor C apps (like Contact Hub), " +
+        'pass docker_compose_raw. The service is created without deploying.',
       inputSchema: {
         project_uuid: z.string().min(1).describe('UUID of the target project'),
         environment_name: z
@@ -171,15 +173,20 @@ export function registerServiceTools(server: McpServer): void {
           .describe("Destination UUID; omit to use the server's only destination"),
         type: z
           .string()
+          .min(1)
+          .optional()
           .describe(
-            "Service type — use a one-click template name or 'docker-compose' for custom compose",
+            'One-click template name (for example uptime-kuma). Omit when passing docker_compose_raw',
           ),
         name: z.string().optional().describe('Service display name'),
         description: z.string().optional().describe('Service description'),
         docker_compose_raw: z
           .string()
+          .min(1)
           .optional()
-          .describe('Raw docker-compose.yml content (required if type is docker-compose)'),
+          .describe(
+            'Plain docker-compose.yml text (the tool base64-encodes it). Omit when passing type',
+          ),
         urls: ServiceUrlsSchema,
         instance: CoolifyInstanceRequiredSchema,
       },
@@ -195,13 +202,25 @@ export function registerServiceTools(server: McpServer): void {
       environment_name?: string;
       server_uuid: string;
       destination_uuid?: string;
-      type: string;
+      type?: string;
       name?: string;
       description?: string;
       docker_compose_raw?: string;
       urls?: ServiceUrl[];
       instance: CoolifyInstance;
     }) => {
+      // Coolify returns 422 when both are sent, so refuse before any HTTP call.
+      if ((params.type === undefined) === (params.docker_compose_raw === undefined)) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Pass exactly one of type (a one-click template) or docker_compose_raw.',
+            },
+          ],
+        };
+      }
       try {
         const body: Record<string, unknown> = {
           project_uuid: params.project_uuid,
@@ -211,12 +230,17 @@ export function registerServiceTools(server: McpServer): void {
             params.instance,
           ),
           server_uuid: params.server_uuid,
-          type: params.type,
         };
+        if (params.type !== undefined) body.type = params.type;
+        if (params.docker_compose_raw !== undefined) {
+          // Coolify requires base64-encoded compose (same as coolify_update_service).
+          body.docker_compose_raw = Buffer.from(params.docker_compose_raw, 'utf8').toString(
+            'base64',
+          );
+        }
         if (params.destination_uuid) body.destination_uuid = params.destination_uuid;
         if (params.name) body.name = params.name;
         if (params.description) body.description = params.description;
-        if (params.docker_compose_raw) body.docker_compose_raw = params.docker_compose_raw;
         if (params.urls?.length) body.urls = params.urls;
 
         const svc = await coolifyPost<CoolifyService>('/services', body, params.instance);
