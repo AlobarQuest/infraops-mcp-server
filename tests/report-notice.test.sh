@@ -24,9 +24,11 @@ STUB
 chmod +x "$WORK/bin/curl" "$WORK/hub-send"
 
 log() { echo "$*" >> "$WORK/log"; }
-export STUB_DIR="$WORK" ALERT_HUB_SEND="$WORK/hub-send" PATH="$WORK/bin:$PATH"
+export STUB_DIR="$WORK" ALERT_HUB_SEND="$WORK/hub-send" PATH="$WORK/bin:$PATH" REPORT_OUTBOX="$WORK/outbox"
 # shellcheck source=../scripts/lib/report-notice.sh
 . "$ROOT/scripts/lib/report-notice.sh"
+# Inside send hours a queued report goes out at once, so these cases cover the cut and the send.
+send_report() { REPORT_NOW_HHMM=0900 queue_report "$@"; }
 
 units() { python3 -c 'import sys; print(len(sys.stdin.read().encode("utf-16-le")) // 2)'; }
 
@@ -35,7 +37,8 @@ check() { # check <name> <command...>
   if "$@"; then echo "ok   $name"; else echo "FAIL $name"; FAILED=1; fi
 }
 
-reset() { rm -f "$WORK"/{curl.args,hub.args,hub.token,log}; unset STUB_HUB_RC; }
+reset() { rm -rf "$WORK"/{curl.args,hub.args,hub.token,log,outbox}; unset STUB_HUB_RC; }
+queued() { queued_report_count; }
 # Fields of the recorded helper call, one per line: --notice, --, key, severity, subject, message.
 hub_field() { tr '\0' '\n' < "$WORK/hub.args" | sed -n "${1}p"; }
 hub_message() { python3 -c 'import sys; print(sys.stdin.buffer.read().split(b"\0")[5].decode(), end="")' < "$WORK/hub.args"; }
@@ -114,6 +117,57 @@ reset
 ALERT_HUB_REPORT_TOKEN=report-token send_report "k" "S" "$WORK/absent.md" "/x.md"
 check "missing body: hub not called" absent "$WORK/hub.args"
 check "missing body: nothing else is sent" absent "$WORK/curl.args"
+
+# --- night: a report queued outside send hours waits for the morning send -----------------------
+reset; printf 'night report\n' > "$WORK/body.md"
+REPORT_NOW_HHMM=0300 ALERT_HUB_REPORT_TOKEN=report-token \
+  queue_report "report:infra-drift:2026-11-07" "Night" "$WORK/body.md" "/reports"; rc=$?
+check "night: hub not called" absent "$WORK/hub.args"
+check "night: one report queued" eq "$(queued)" 1
+check "night: non-fatal" eq "$rc" 0
+check "night: the body is copied, so a temp file can go" rm "$WORK/body.md"
+ALERT_HUB_REPORT_TOKEN=report-token send_queued_reports
+check "morning: sent with the queued key and subject" \
+  eq "$(hub_field 3)|$(hub_field 5)" "report:infra-drift:2026-11-07|Night"
+check "morning: sent whole" eq "$(hub_message)" "night report"
+check "morning: removed from the queue" eq "$(queued)" 0
+
+# --- send hours: 07:30 up to, not including, 20:00 ---------------------------------------------
+for t in 0729:0 0730:1 1959:1 2000:0; do
+  reset; printf 'x\n' > "$WORK/body.md"
+  REPORT_NOW_HHMM=${t%%:*} ALERT_HUB_REPORT_TOKEN=report-token queue_report "k" "S" "$WORK/body.md" "/r"
+  check "send hours: at ${t%%:*} sends=${t##*:}" eq "$([ -s "$WORK/hub.args" ] && echo 1 || echo 0)" "${t##*:}"
+done
+
+# --- a failed send stays queued and goes out on the next send ------------------------------------
+reset; printf 'retry me\n' > "$WORK/body.md"
+REPORT_NOW_HHMM=0300 queue_report "k" "S" "$WORK/body.md" "/r"
+STUB_HUB_RC=1 ALERT_HUB_REPORT_TOKEN=report-token send_queued_reports
+check "failed send: still queued" eq "$(queued)" 1
+check "failed send: WARN logged" logged_warn
+ALERT_HUB_REPORT_TOKEN='' send_queued_reports
+check "no token: still queued" eq "$(queued)" 1
+rm -f "$WORK/hub.args"
+ALERT_HUB_REPORT_TOKEN=report-token send_queued_reports
+check "next send: sent" eq "$(hub_message)" "retry me"
+check "next send: queue empty" eq "$(queued)" 0
+
+# --- a failed queue leaves no partial entry behind ----------------------------------------------
+reset; mkdir -p "$WORK/outbox"; printf 'x\n' > "$WORK/body.md"
+cp() { return 1; }
+REPORT_NOW_HHMM=0300 queue_report "k" "S" "$WORK/body.md" "/r"
+unset -f cp
+check "failed queue: nothing queued" eq "$(queued)" 0
+check "failed queue: no partial entry" eq "$(find "$WORK/outbox" -mindepth 1 | wc -l | tr -d ' ')" 0
+check "failed queue: WARN logged" logged_warn
+
+# --- a report another send already claimed is skipped, not sent twice ------------------------------
+reset; printf 'once\n' > "$WORK/body.md"
+REPORT_NOW_HHMM=0300 queue_report "k" "S" "$WORK/body.md" "/r"
+entry="$(find "$WORK/outbox" -mindepth 1 -maxdepth 1 -name '[0-9]*')"
+mv "$entry" "$WORK/outbox/.sending.999.${entry##*/}"
+ALERT_HUB_REPORT_TOKEN=report-token send_queued_reports
+check "claimed elsewhere: not sent" absent "$WORK/hub.args"
 
 # --- load_alert_hub_tokens: fetch each token by its BWS_*_ID, otherwise leave it unset -------------
 get_secret_by_id() { printf 'value-of-%s' "$1"; }

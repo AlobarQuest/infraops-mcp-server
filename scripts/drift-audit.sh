@@ -215,8 +215,8 @@ if [ -f "$BODY_MD" ]; then
   { printf '👉 Review & approve pending items: %s/?status=pending\n\n' "$CHANGE_MGR_API_BASE"; cat "$BODY_MD"; } > "$LINKED_BODY" 2>/dev/null && BODY_MD="$LINKED_BODY"
 fi
 
-# ── Send the digest: alert-hub notice (best-effort) ───────────
-send_report "report:infra-drift:$DATE" "$SUBJECT" "$BODY_MD" "$REPORT_DIR"
+# ── Queue the digest for the 07:30 alert-hub send (best-effort) ───────────
+queue_report "report:infra-drift:$DATE" "$SUBJECT" "$BODY_MD" "$REPORT_DIR"
 
 # ── Heartbeat (Healthchecks.io dead-man's switch) ──────────────────────────────
 if [ -n "$HC_URL" ]; then

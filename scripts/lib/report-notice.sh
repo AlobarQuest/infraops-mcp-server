@@ -1,5 +1,6 @@
 #!/bin/bash
-# Shared by drift-audit.sh and change-window.sh: send a daily report to alert-hub as a notice.
+# Shared by drift-audit.sh, change-window.sh and send-reports.sh: send the daily reports to
+# alert-hub as notices, held until the morning.
 # Sourced, not executed. The caller defines log() and get_secret_by_id().
 
 _REPORT_NOTICE_DIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -55,16 +56,65 @@ _send_report_notice() { # _send_report_notice <key> <subject> <body-file> <full-
     "$ALERT_HUB_SEND" --notice -- "$1" info "$2" "$message"
 }
 
-# send_report <key> <subject> <body-file> <reports-dir-for-footer>
+# Reports wait here between the night jobs and the morning send, one directory per report.
+REPORT_OUTBOX="${REPORT_OUTBOX:-$HOME/infra-drift/outbox}"
+# Reports go out from REPORT_SEND_FROM until REPORT_SEND_UNTIL (local HHMM), outside alert-hub's
+# quiet hours. A night job that finishes inside that span sends at once instead of waiting a day.
+REPORT_SEND_FROM="${REPORT_SEND_FROM:-0730}"
+REPORT_SEND_UNTIL="${REPORT_SEND_UNTIL:-2000}"
+
+_in_send_hours() {
+  local now="${REPORT_NOW_HHMM:-$(date +%H%M)}"
+  [[ ! "$now" < "$REPORT_SEND_FROM" && "$now" < "$REPORT_SEND_UNTIL" ]]
+}
+
+# queue_report <key> <subject> <body-file> <reports-dir-for-footer>
+# Saves the report for the morning send, then sends the queue at once inside send hours.
 # Best-effort and non-fatal: logs one WARN line on failure and always returns 0.
-send_report() {
+queue_report() {
   [ -f "$3" ] || return 0
-  if [ -z "${ALERT_HUB_REPORT_TOKEN:-}" ]; then
-    log "WARN: no alert-hub report token; digest not sent"
-  elif _send_report_notice "$@"; then
-    log "digest sent to alert-hub ($1)"
+  local tmp=""
+  # Built beside the outbox and renamed in, so the sender never sees half a report.
+  if mkdir -p "$REPORT_OUTBOX" && tmp="$(mktemp -d "$REPORT_OUTBOX/.new.XXXXXX")" \
+    && printf '%s' "$1" > "$tmp/key" && printf '%s' "$2" > "$tmp/subject" \
+    && printf '%s' "$4" > "$tmp/full_path" && cp "$3" "$tmp/body.md" \
+    && mv "$tmp" "$REPORT_OUTBOX/$(date +%s).$$.${RANDOM}"; then
+    log "digest queued ($1)"
   else
-    log "WARN: alert-hub notice failed; digest not sent"
+    [ -n "$tmp" ] && rm -rf "$tmp"
+    log "WARN: could not queue the digest ($1); not sent"
+    return 0
   fi
+  if _in_send_hours; then send_queued_reports; fi
+  return 0
+}
+
+# Counts the reports waiting to be sent.
+queued_report_count() {
+  find "$REPORT_OUTBOX" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*' 2>/dev/null | wc -l | tr -d ' '
+}
+
+# send_queued_reports: sends every queued report in the order queued, to the second, and deletes
+# each one the hub accepts. A report that fails stays queued for the next send. Always returns 0.
+send_queued_reports() {
+  local dir claimed key
+  if [ -z "${ALERT_HUB_REPORT_TOKEN:-}" ]; then
+    [ "$(queued_report_count)" -eq 0 ] || log "WARN: no alert-hub report token; digests left queued"
+    return 0
+  fi
+  for dir in "$REPORT_OUTBOX"/[0-9]*; do
+    [ -d "$dir" ] || continue
+    # A rename is atomic, so two overlapping sends can't both claim, and both send, one report.
+    claimed="$REPORT_OUTBOX/.sending.$$.${dir##*/}"
+    mv "$dir" "$claimed" 2>/dev/null || continue
+    key="$(cat "$claimed/key")"
+    if _send_report_notice "$key" "$(cat "$claimed/subject")" "$claimed/body.md" "$(cat "$claimed/full_path")"; then
+      rm -rf "$claimed"
+      log "digest sent to alert-hub ($key)"
+    else
+      mv "$claimed" "$dir"
+      log "WARN: alert-hub notice failed; digest left queued ($key)"
+    fi
+  done
   return 0
 }
