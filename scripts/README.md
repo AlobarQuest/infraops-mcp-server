@@ -41,8 +41,8 @@ BWS + Healthchecks.io).
    (`claude-sonnet-4-6`) to write a remediation plan.
    Writes `~/infra-drift/reports/<date>.remediation.json` (machine record + the
    `escalations` change-manager contract) and `<date>.remediation.md`.
-5. Sends the **consolidated** digest (`<date>.remediation.md`) to alert-hub as a
-   notice (see [Alerts and reports through alert-hub](#alerts-and-reports-through-alert-hub)),
+5. Queues the **consolidated** digest (`<date>.remediation.md`) for the 07:30 alert-hub send
+   (see [Alerts and reports through alert-hub](#alerts-and-reports-through-alert-hub)),
    falling back to the raw audit `<date>.md` if the remediation step hard-failed.
 6. Pings the Healthchecks.io dead-man's switch (`/start`, success, `/fail`).
    The heartbeat is healthy only if BOTH the audit and remediate steps succeed.
@@ -82,19 +82,29 @@ a daily run is missed (e.g. mini offline), so a skipped run never goes unnoticed
 Urgent security alerts and the two daily reports go to Devon through alert-hub
 (`https://alerts.alobar.net`). There is no other path: Resend is gone.
 
-| Sender            | Sends                                                               | Token variable           | BWS UUID variable (in `~/.config/infra-drift/env`) |
-| ----------------- | ------------------------------------------------------------------- | ------------------------ | -------------------------------------------------- |
-| `infraops`        | Urgent security alerts (critical)                                   | `ALERT_HUB_TOKEN`        | `BWS_ALERT_HUB_TOKEN_ID`                           |
-| `report-infraops` | The 03:00 drift digest and the 04:00 change-window digest (notices) | `ALERT_HUB_REPORT_TOKEN` | `BWS_ALERT_HUB_REPORT_TOKEN_ID`                    |
+| Sender            | Sends                                                        | Token variable           | BWS UUID variable (in `~/.config/infra-drift/env`) |
+| ----------------- | ------------------------------------------------------------ | ------------------------ | -------------------------------------------------- |
+| `infraops`        | Urgent security alerts (critical)                            | `ALERT_HUB_TOKEN`        | `BWS_ALERT_HUB_TOKEN_ID`                           |
+| `report-infraops` | The drift and change-window digests (notices), sent at 07:30 | `ALERT_HUB_REPORT_TOKEN` | `BWS_ALERT_HUB_REPORT_TOKEN_ID`                    |
 
 Both wrappers fetch both tokens through `load_alert_hub_tokens`, by UUID from the BWS project
 `Alert Hub Senders`. The UUIDs default inline, like the other secrets, and `BWS_ALERT_HUB_TOKEN_ID` /
 `BWS_ALERT_HUB_REPORT_TOKEN_ID` (in `~/.config/infra-drift/env`) override them. The security-drift
 CLI (3am) sends the urgent messages.
 
+**Report timing.** The 03:00 and 04:00 jobs don't send their digests. Each one queues its digest
+in `~/infra-drift/outbox/`, and `send-reports.sh` (launchd `com.devon.infra-reports`, daily 07:30)
+sends the queue, so reports arrive after alert-hub's quiet hours. A job that finishes between
+07:30 and 20:00, for example after the Mac was asleep, sends at once. The Healthchecks check `infra-reports`
+(`sev:warning`, ping URL `INFRADRIFT_REPORTS_HC_PING_URL` in the env file) goes down when a
+morning send leaves anything queued or doesn't run. Install the sender with
+`bash scripts/install-reports-launchd.sh`. Urgent security alerts aren't queued: they go out
+during the run.
+
 **Failure rule.** A failed send, or a missing token, logs one line and never fails the run. A
-digest or alert that the hub refuses is not retried or emailed, so watch the hub's History and the
-wrapper logs.
+queued digest that fails to send stays queued and goes out with the next morning's send. An alert
+that the hub refuses is not retried or emailed, so watch the hub's History and the wrapper logs
+(`~/Library/Logs/infra-reports.log` for the morning send).
 
 **Events and states.** An urgent escalation is a one-off event, so
 it goes as a critical _notice_, which the hub never deduplicates. Scanner version skew is a state: it
@@ -104,7 +114,7 @@ is an alert under the key `security-drift-version-skew`, and the next clean run 
 any request body over 16,384 bytes. The sender cuts first. An urgent notice ends with a pointer to
 change-manager. A report is cut to 12,000 characters and 15,000 JSON-encoded bytes, and ends with a
 footer naming the reports directory on the Mac mini. Shared code: `lib/report-notice.sh`
-(`send_report`, `load_alert_hub_tokens`), `alert-hub-send.sh` and `src/alert-hub.ts` (vendored from
+(`queue_report`, `send_queued_reports`, `load_alert_hub_tokens`), `alert-hub-send.sh` and `src/alert-hub.ts` (vendored from
 alert-hub).
 
 # Standalone weekly security scan (`com.devon.security-scan`)

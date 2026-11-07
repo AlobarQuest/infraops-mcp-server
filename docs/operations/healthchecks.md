@@ -64,6 +64,14 @@ curl -fsS -X POST https://healthcheck.alobar.net/api/v3/checks/ \
 
 A new check stays in `new` status, which never alerts, until its first ping.
 
+**Severity:** the hub treats an untagged check as `critical`, which pages Devon at any hour and
+repeats until acknowledged. Give every check the tag `sev:warning` (add `"tags": "sev:warning"` to
+the create request) unless a missed run needs Devon awake: the hub holds warnings during quiet
+hours and delivers them at 07:00. Only the backup checks (`VPS Nightly Backup`,
+`vps-backup-mini-host`, `vps-backup-orb-dev`) stay critical. The 07:30 report sender's check,
+`infra-reports`, is a warning like the rest. Changing a check's tags means sending
+its whole tag list, so keep the tags it already has.
+
 ## Ping from the job
 
 Resolve the ping URL by name at run time, the pattern in `orchestrator/scripts/sds-deadman.sh`,
