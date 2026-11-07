@@ -81,6 +81,15 @@ export const CLASS_POLICY = {
             'BWS machine tokens are console-minted only — create/revoke in the Bitwarden console; never via CLI.',
         ],
     },
+    // A lane's BWS machine-account token (ADR-0059), rotated by the orchestrator's VM rotation executor (ADR-0055 amendment 19).
+    'bws-lane-token': { maxAgeDays: 365, landmines: [] },
+    // A lane's Healthchecks ping URL (ADR-0055 amendment 19); never due by age.
+    'healthchecks-ping-url': {
+        maxAgeDays: Number.POSITIVE_INFINITY,
+        landmines: [
+            "A ping URL can't be rotated, only replaced by recreating its Healthchecks check, which starts a new history.",
+        ],
+    },
     // The orchestrator's rotation executor's canary (ADR-0055 increment 4): a credential with no
     // consumer and no real provider, rotated only to prove the executor end to end. It never ages,
     // and this window never rotates it (it is rotated_by_sds).
