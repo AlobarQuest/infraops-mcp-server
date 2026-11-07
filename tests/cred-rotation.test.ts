@@ -565,6 +565,21 @@ describe('alert-hub sender class', () => {
   });
 });
 
+describe('bws lane token class', () => {
+  it('ages bws-lane-token at 365 days with no landmines', () => {
+    expect(CLASS_POLICY['bws-lane-token']).toEqual({ maxAgeDays: 365, landmines: [] });
+  });
+});
+
+describe('healthchecks ping URL class', () => {
+  it('never ages healthchecks-ping-url and warns that replacing it recreates the check', () => {
+    const policy = CLASS_POLICY['healthchecks-ping-url'];
+    expect(policy.maxAgeDays).toBe(Infinity);
+    expect(policy.landmines).toHaveLength(1);
+    expect(policy.landmines[0]).toContain('recreating its Healthchecks check');
+  });
+});
+
 describe('porkbun lane class', () => {
   it('ages porkbun-api-key at 365 days', () => {
     expect(CLASS_POLICY['porkbun-api-key']).toMatchObject({ maxAgeDays: 365 });
