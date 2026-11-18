@@ -262,6 +262,24 @@ All are in `tests/change-mgr-cli.test.ts`.
 - New head with the fix: `a4f32c0`, a fast-forward on `97d088b`. The commit that adds this
   section follows it and touches only `docs/superpowers/reports/`.
 
+### Files changed
+
+- `src/cli/change-mgr-cli.ts`
+- `tests/change-mgr-cli.test.ts`
+- `dist/bundle/change-mgr-cli.js`, `dist/cli/change-mgr-cli.js`, `dist/cli/change-mgr-cli.js.map`,
+  `dist/cli/change-mgr-cli.d.ts`, and `dist/cli/change-mgr-cli.d.ts.map`
+- `docs/superpowers/reports/change-window-cli-flags-report.md` and
+  `docs/superpowers/reports/change-window-cli-flags-fix-1-report.md`
+
+### Self-review
+
+- `/code-review` at low effort on `97d088b..a4f32c0` returned no findings.
+- Edge cases I checked by reading the code: a bare `--` is rejected as an unknown flag, and a
+  value that contains `=` (`--report-dir /a=b`) passes, because the check reads only arguments
+  that start with `--`.
+- `scripts/change-window.sh` line 84 is the only `run-window` caller in `scripts`, `tests`,
+  `docs`, and `src`. No LaunchAgent in `~/Library/LaunchAgents` calls the CLI directly.
+
 ### Concerns
 
 - The first build in this worktree ran with an empty `node_modules`. It resolved packages from
