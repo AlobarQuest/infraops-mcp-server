@@ -4,7 +4,7 @@ Multi-provider MCP server for infrastructure operations (v3.3.0). TypeScript, No
 
 ## Quick Reference
 
-- **Build:** `npm run build` (tsc → dist/)
+- **Build:** `npm run build` (tsc → dist/, then esbuild writes the self-contained change-window CLI to `dist/bundle/change-mgr-cli.js`)
 - **Dev:** `npm run dev` (tsx watch)
 - **Entry:** `src/index.ts` → `dist/index.js`
 - **Tests:** `npx vitest run` (test files in `tests/`)

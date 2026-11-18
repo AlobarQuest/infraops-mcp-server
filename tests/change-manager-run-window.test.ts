@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runWindow, type WindowDeps } from '../src/change-manager/run-window.js';
+import { runWindow, selectItems, type WindowDeps } from '../src/change-manager/run-window.js';
 import type { ApprovedItem } from '../src/change-manager/api-client.js';
 
 function item(id: number): ApprovedItem {
@@ -143,4 +143,60 @@ describe('runWindow source exclusions', () => {
       expect(s.considered).toBe(1);
     },
   );
+});
+
+describe('selectItems', () => {
+  const on = (id: number, instance: string, source?: string): ApprovedItem => ({
+    ...item(id),
+    instance,
+    source,
+  });
+
+  it('drops security and rotation items and keeps order', () => {
+    const items = [
+      on(1, 'prod', 'security'),
+      on(2, 'prod'),
+      on(3, 'dev', 'rotation'),
+      on(4, 'dev'),
+    ];
+    expect(selectItems(items, { maxChangesPerWindow: 5 }).map((i) => i.id)).toEqual([2, 4]);
+  });
+
+  it('keeps only the named instance', () => {
+    const items = [on(1, 'dev'), on(2, 'prod'), on(3, 'dev'), on(4, 'prod')];
+    expect(
+      selectItems(items, { maxChangesPerWindow: 5, instance: 'prod' }).map((i) => i.id),
+    ).toEqual([2, 4]);
+    expect(
+      selectItems(items, { maxChangesPerWindow: 5, instance: 'dev' }).map((i) => i.id),
+    ).toEqual([1, 3]);
+  });
+
+  it('filters by instance before the cap', () => {
+    const items = [on(1, 'dev'), on(2, 'dev'), on(3, 'prod'), on(4, 'prod'), on(5, 'prod')];
+    expect(
+      selectItems(items, { maxChangesPerWindow: 2, instance: 'prod' }).map((i) => i.id),
+    ).toEqual([3, 4]);
+  });
+
+  it('caps at maxChangesPerWindow with no instance set', () => {
+    const items = [on(1, 'dev'), on(2, 'prod'), on(3, 'dev')];
+    expect(selectItems(items, { maxChangesPerWindow: 2 }).map((i) => i.id)).toEqual([1, 2]);
+  });
+});
+
+describe('runWindow instance', () => {
+  it('claims and runs only items for the named instance', async () => {
+    const d = deps({
+      getApproved: vi.fn(async () => [
+        { ...item(1), instance: 'dev' },
+        item(2),
+        { ...item(3), instance: 'dev' },
+      ]),
+      instance: 'prod',
+    });
+    const s = await runWindow(d);
+    expect(vi.mocked(d.claim).mock.calls).toEqual([[2]]);
+    expect(s.considered).toBe(1);
+  });
 });

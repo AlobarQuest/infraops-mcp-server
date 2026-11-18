@@ -1,13 +1,21 @@
 /**
+ * The items a window would claim, in order. A dry run and a real run both select through here.
+ * The instance filter runs before the cap, so items for the other instance never use up a slot.
+ */
+export function selectItems(items, opts) {
+    // Security and rotation items are not the Coolify Sonnet agent's: nothing here runs a security
+    // item (its plan is a manual checklist), and the orchestrator's rotation service owns a rotation.
+    return items
+        .filter((i) => i.source !== 'security' && i.source !== 'rotation')
+        .filter((i) => opts.instance === undefined || i.instance === opts.instance)
+        .slice(0, opts.maxChangesPerWindow);
+}
+/**
  * The window executor core. Pulls approved items, claims each (skipping on a 409/claim error),
  * runs the agent, posts the outcome. Per-item isolation; capped at maxChangesPerWindow.
  */
 export async function runWindow(deps) {
-    // Security and rotation items are not the Coolify Sonnet agent's: nothing here runs a security
-    // item (its plan is a manual checklist), and the orchestrator's rotation service owns a rotation.
-    const approved = (await deps.getApproved())
-        .filter((i) => i.source !== 'security' && i.source !== 'rotation')
-        .slice(0, deps.maxChangesPerWindow);
+    const approved = selectItems(await deps.getApproved(), deps);
     const summary = {
         considered: 0,
         applied: 0,

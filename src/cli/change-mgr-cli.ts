@@ -4,7 +4,12 @@ import path from 'path';
 import Anthropic from '@anthropic-ai/sdk';
 import { ChangeMgrClient } from '../change-manager/api-client.js';
 import { runChangeAgent } from '../change-manager/agent.js';
-import { runWindow } from '../change-manager/run-window.js';
+import {
+  runWindow,
+  selectItems,
+  type Instance,
+  type WindowDeps,
+} from '../change-manager/run-window.js';
 import { renderWindowMarkdown } from '../change-manager/window-report.js';
 
 export function parseArgs(argv: string[]): Record<string, string | boolean> {
@@ -21,6 +26,25 @@ export function parseArgs(argv: string[]): Record<string, string | boolean> {
     } else args[key] = true;
   }
   return args;
+}
+
+/** The flags `run-window` reads: `main` reads `--report-dir` and `--now`, plus the two below. */
+const RUN_WINDOW_FLAGS = new Set(['report-dir', 'now', 'instance', 'dry-run']);
+
+/**
+ * `parseArgs` reads `--name=value` as the key `name=value` and keeps any unknown flag, so either
+ * would be silently ignored: `--instance=prod` would run both instances. Reject both. The message
+ * names only the flag, never its value.
+ */
+export function checkRunWindowFlags(argv: string[]): void {
+  for (const a of argv) {
+    if (!a.startsWith('--')) continue;
+    const eq = a.indexOf('=');
+    if (eq !== -1) {
+      throw new Error(`run-window flags take no "=": ${a.slice(0, eq)}=...`);
+    }
+    if (!RUN_WINDOW_FLAGS.has(a.slice(2))) throw new Error(`unknown run-window flag: ${a}`);
+  }
 }
 
 function client(actor: string = 'executor'): ChangeMgrClient {
@@ -42,21 +66,72 @@ async function doSync(reportDir: string, now: string): Promise<void> {
   process.stdout.write(`synced: ${JSON.stringify(summary)}\n`);
 }
 
-async function doRunWindow(reportDir: string | undefined, now: string): Promise<void> {
-  const c = client('change-window-agent');
-  const anthropic = new Anthropic();
-  const wr = await c.startWindow(now);
+/** `--instance prod|dev`; absent keeps both instances. Throws on any other value or no value. */
+export function parseInstance(value: string | boolean | undefined): Instance | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'prod' || value === 'dev') return value;
+  if (value === true) throw new Error('--instance needs a value: prod or dev');
+  throw new Error(`--instance needs prod or dev, got: ${value}`);
+}
+
+/** `--dry-run` is a bare flag; a value after it is a mistyped command, not a dry run. */
+export function parseDryRun(value: string | boolean | undefined): boolean {
+  if (value === undefined) return false;
+  if (value === true) return true;
+  throw new Error(`--dry-run takes no value, got: ${value}`);
+}
+
+type WindowClient = Pick<
+  ChangeMgrClient,
+  'getApproved' | 'claim' | 'postOutcome' | 'startWindow' | 'finishWindow'
+>;
+
+export interface RunWindowOptions {
+  reportDir?: string;
+  now: string;
+  instance?: Instance;
+  dryRun: boolean;
+}
+
+/**
+ * Runs the change window. `makeAgent` is called only for a real run, so a dry run needs no
+ * Anthropic key. A dry run lists approved items, applies the same selection, prints the ids it
+ * would claim as one JSON line, and changes nothing.
+ */
+export async function doRunWindow(
+  c: WindowClient,
+  makeAgent: () => WindowDeps['runAgent'],
+  opts: RunWindowOptions,
+): Promise<void> {
+  const maxChangesPerWindow = Number.parseInt(process.env.MAX_CHANGES_PER_WINDOW ?? '5', 10) || 5;
+  if (opts.dryRun) {
+    const selected = selectItems(await c.getApproved(), {
+      maxChangesPerWindow,
+      instance: opts.instance,
+    });
+    const line = {
+      dry_run: true,
+      instance: opts.instance ?? null,
+      would_claim: selected.map((i) => i.id),
+    };
+    process.stdout.write(JSON.stringify(line) + '\n');
+    return;
+  }
+  const runAgent = makeAgent();
+  const wr = await c.startWindow(opts.now);
   const summary = await runWindow({
     getApproved: () => c.getApproved(),
     claim: async (id) => {
       await c.claim(id);
     },
-    runAgent: (item) => runChangeAgent(item, { client: anthropic }),
+    runAgent,
     postOutcome: async (id, body) => {
       await c.postOutcome(id, body);
     },
-    maxChangesPerWindow: Number.parseInt(process.env.MAX_CHANGES_PER_WINDOW ?? '5', 10) || 5,
+    maxChangesPerWindow,
+    instance: opts.instance,
   });
+  const md = renderWindowMarkdown(opts.now, summary);
   await c.finishWindow(wr.id, {
     status: 'done',
     considered: summary.considered,
@@ -64,16 +139,24 @@ async function doRunWindow(reportDir: string | undefined, now: string): Promise<
     failed: summary.failed,
     blocked: summary.blocked,
     skipped: summary.skipped,
-    report_md: renderWindowMarkdown(now, summary),
+    report_md: md,
   });
-  const md = renderWindowMarkdown(now, summary);
-  if (reportDir)
-    fs.writeFileSync(path.join(reportDir, `${now.slice(0, 10)}.change-window.md`), md, 'utf-8');
+  if (opts.reportDir)
+    fs.writeFileSync(
+      path.join(opts.reportDir, `${opts.now.slice(0, 10)}.change-window.md`),
+      md,
+      'utf-8',
+    );
   process.stdout.write(md + '\n');
 }
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+function anthropicAgent(): WindowDeps['runAgent'] {
+  const anthropic = new Anthropic();
+  return (item) => runChangeAgent(item, { client: anthropic });
+}
+
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const args = parseArgs(argv);
   const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
   const reportDir =
     typeof args['report-dir'] === 'string' ? (args['report-dir'] as string) : undefined;
@@ -81,7 +164,15 @@ async function main(): Promise<void> {
     if (!reportDir) throw new Error('sync requires --report-dir');
     await doSync(reportDir, now);
   } else if (args.command === 'run-window') {
-    await doRunWindow(reportDir, now);
+    // Validate every flag before client(), so a bad flag fails before any network call.
+    checkRunWindowFlags(argv);
+    const opts = {
+      reportDir,
+      now,
+      instance: parseInstance(args.instance),
+      dryRun: parseDryRun(args['dry-run']),
+    };
+    await doRunWindow(client('change-window-agent'), anthropicAgent, opts);
   } else {
     throw new Error(`unknown command: ${String(args.command)} (use sync | run-window)`);
   }
