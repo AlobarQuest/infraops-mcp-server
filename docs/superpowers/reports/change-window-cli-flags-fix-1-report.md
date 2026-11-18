@@ -30,8 +30,8 @@ D-67 C, `run-window --dry-run=true` made a real run, and an unknown flag was ign
 - `dist/` was rebuilt and committed, including the bundle. Run with no environment variables,
   `node dist/bundle/change-mgr-cli.js run-window --instance=prod`, `--dry-run=true`, and
   `--bogus` each exit 1 with the messages in the preceding list. The wrapper's exact argument
-  list gets past the check and stops at `client()` with `CHANGE_MGR_API_BASE and
-  CHANGE_MGR_M2M_TOKEN must be set`.
+  list gets past the check and stops at `client()` with this message:
+  `CHANGE_MGR_API_BASE and CHANGE_MGR_M2M_TOKEN must be set`.
 - The bundle size in the "Bundled single-file build" section now reads 1,724,012 bytes, the
   `wc -c` of the committed file at the new head. The size at `97d088b` was 1,723,527 bytes, not
   the 1,723,455 the report stated.
@@ -40,13 +40,13 @@ D-67 C, `run-window --dry-run=true` made a real run, and an unknown flag was ign
 
 All are in `tests/change-mgr-cli.test.ts`.
 
-- `main` rejects `run-window --instance=prod`, `run-window --dry-run=true`, and `run-window
-  --bogus`. Each case sets both environment variables, spies on `fetch`, and asserts the
+- `main` rejects `run-window --instance=prod`, `run-window --dry-run=true`, and
+  `run-window --bogus`. Each case sets both environment variables, spies on `fetch`, and asserts the
   rejection message and that `fetch` was never called. With the `checkRunWindowFlags` call
   commented out, all three fail with `fetch failed`, meaning the run reached the network.
-- `checkRunWindowFlags` accepts the wrapper's exact list, `run-window --report-dir /r --now
-  2026-11-18T04:00:00Z`, and `parseArgs` still reads it as `{command: "run-window",
-  "report-dir": "/r", now: "2026-11-18T04:00:00Z"}`.
+- `checkRunWindowFlags` accepts the wrapper's exact list,
+  `run-window --report-dir /r --now 2026-11-18T04:00:00Z`, and `parseArgs` still reads it as
+  `{command: "run-window", "report-dir": "/r", now: "2026-11-18T04:00:00Z"}`.
 
 ### Checks
 
@@ -56,8 +56,11 @@ All are in `tests/change-mgr-cli.test.ts`.
   - Quality, "Lint, type-check, and test", run 44412380519 (`pull_request`). Its log shows 696
     tests passed.
   - Quality, "Lint, type-check, and test", run 44412371401 (`push`).
-- New head with the fix: `a4f32c0`, a fast-forward on `97d088b`. The commit that adds this
-  section follows it and touches only `docs/superpowers/reports/`.
+- New head with the fix: `a4f32c0`, a fast-forward on `97d088b`. The report commits that follow
+  it touch only `docs/superpowers/reports/`.
+- Quality failed on report commit `d031a7d` (runs 44412905660 and 44412896404): Prettier rejected
+  inline code spans that wrapped across lines in both reports. I rewrapped them, and `make check`
+  then exited 0 with 696 tests. Build passed on that commit (run 44412906180).
 
 ### Files changed
 
