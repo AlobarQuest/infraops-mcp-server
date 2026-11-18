@@ -42,16 +42,13 @@ export declare function isRecordedRevoked(spec: CredentialSpec, state: RotationS
 /** When a credential last rotated, as far as anything knows: the date its age is measured from. */
 export declare function rotationAnchor(spec: CredentialSpec, state: RotationState): string | undefined;
 export declare function credTarget(credId: string): string;
+/** What the registry alone says, with no rotation state: the 03:00 scan's credential findings
+ *  (ADR-0059 amendment 12 item 3). The rotation triggers are the rotation proposer's to raise.
+ *  An unknown class is raised whether or not the credential has an exposure, because without
+ *  the state the scan cannot tell an open exposure from a resolved one. Pure — no I/O. */
+export declare function registryFindings(specs: CredentialSpec[]): Finding[];
 /** Findings for the current registry + state. Pure — no I/O. */
 export declare function credFindings(specs: CredentialSpec[], state: RotationState, now: string): Finding[];
-/** The findings that start a rotation. For a credential the SDS rotates, these reach only the
- *  rotation proposer; every other finding about it (a bad registry field, an unknown class) is
- *  still the scan's to report. */
-export declare const ROTATION_TRIGGER_CHECKS: ReadonlySet<string>;
-/** What the 03:00 scan posts: every finding except the rotation triggers of SDS-rotated
- *  credentials, which would otherwise become change-manager security items that offer a manual
- *  checklist for a rotation the SDS owns. */
-export declare function scanFindings(findings: Finding[], specs: CredentialSpec[]): Finding[];
 /**
  * Build the Classification for every managed credential's findings, keyed by
  * `${check}|${target}` (the lookup the taxonomy uses for cred.* checks).

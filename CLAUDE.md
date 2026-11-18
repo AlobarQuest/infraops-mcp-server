@@ -228,7 +228,8 @@ for the authoritative tier rules.
 
 ### Credential-rotation lane (WS-0.7)
 
-The 03:00 scan detects credential rotations; the orchestrator's rotation service (SDS) executes them
+`cred-findings` reports which credential rotations are due; the orchestrator's rotation proposer
+raises them and its rotation service (SDS) executes them
 (spec: `~/docs/software-delivery-system/2026-07-02-ws07-credential-rotation-spec.md`):
 
 - **Registry:** per-repo `.cred-consumers.toml` (this repo's covers the machine/ops-scope
@@ -249,14 +250,19 @@ The 03:00 scan detects credential rotations; the orchestrator's rotation service
   `revoke-no-replacement` credential is recorded revoked only when one of its registry
   exposures was resolved with a `ts` equal to its `lastRotated`; it then raises neither, and a
   `lastRotated` from an ordinary rotation before a re-classification still ages. The registry holds
-  no such row now, and nothing writes that pair any more. Merged
-  into the 3am run via `extraFindings`; classifications are pre-built per credential and
-  routed through `taxonomy.ts`'s `cred.*` branch (no plan ⇒ URGENT manual, never guessed). Every
+  no such row now, and nothing writes that pair any more. `credFindings` serves `cred-findings`.
+  The 3am run reads no rotation state: `credScan` merges only `registryFindings` via
+  `extraFindings` (`cred.invalid-rotate-requested` and `cred.unknown-class`, the latter even for a
+  credential with an exposure, plus `cred.registry-error` when the list or a registry file it
+  names can't be read), and raises none of the three rotation triggers for any credential
+  (ADR-0059 amendment 12). Classifications are pre-built per credential and routed through
+  `taxonomy.ts`'s `cred.*` branch (no plan ⇒ URGENT manual, never guessed). Every
   classification is a manual checklist; a credential flagged `rotated_by_sds` gets none.
 - **Execute:** the orchestrator's rotation service, for a credential marked `rotated_by_sds`
-  (its `docs/operations/rotation-executor.md`). This repo executes nothing. For an unflagged row the
-  scan's checklist is the plan: Devon mints and revokes at the provider console, then runs
-  `record-rotation`. Orphan creds are closed via
+  (its `docs/operations/rotation-executor.md`). This repo executes nothing. An unflagged row
+  rotates by hand: Devon mints and revokes at the provider console, then runs `record-rotation`.
+  The rotation proposer, not this scan, raises its due findings (ADR-0059 amendment 12 item 4).
+  Orphan creds are closed via
   `security-drift-cli.js resolve-exposure --cred <id> --exposure <id>`.
 - **Recording a finished rotation** (by hand, or an SDS rotation unit): after
   the new credential is verified, run
@@ -266,7 +272,7 @@ The 03:00 scan detects credential rotations; the orchestrator's rotation service
   that is not a real `YYYY-MM-DD` (UTC midnight) or is in the future; `now` records the
   current instant. It writes `lastRotated` atomically (0600, fsync, tmp+rename) and
   prints old -> new.
-  That clears `cred.rotation-age` and any `cred.rotation-requested` on the next 3am run.
+  That clears `cred.rotation-age` and any `cred.rotation-requested` from `cred-findings`.
 - **What is due, for the SDS:** `node dist/cli/security-drift-cli.js cred-findings [--now <ISO>]`
   prints the `cred.*` findings as JSON (`{"schema_version": 1, "findings": [...],
   "last_rotated": {...}}`), each finding as its check plus the values its detail embeds (`id`,
@@ -278,11 +284,8 @@ The 03:00 scan detects credential rotations; the orchestrator's rotation service
   rotation state file is missing.
 - **Handover to the SDS:** `rotated_by_sds = true` on a registry entry (a boolean; anything else
   fails the registry) hands that credential's rotation to the orchestrator's proposer. The 3am
-  scan then posts none of its rotation triggers (`cred.exposure-rotate`, `cred.rotation-age`,
-  `cred.rotation-requested`) to change-manager and builds no checklist for it; its other
-  findings still post. `cred-findings` reports `rotated_by_sds` on every finding; the proposer acts only on flagged
-  credentials. Flag a credential only when no legacy rotation of it is in flight: the next 3am
-  sync resolves its open security item and would strand a half-done reissue's quarantine copy.
+  scan builds no checklist for it; its registry findings still post. `cred-findings` reports
+  `rotated_by_sds` on every finding; the proposer acts only on flagged credentials.
 - **Never in the lane:** Coolify PG passwords (volume-recreate only), BWS machine tokens
   (console-only), brain MCP keys (claude.ai connector re-key — manual, paired reconfig).
 - **Consumer mapping:** `scripts/cred-consumer-sweep.py` — fingerprint (sha256) hash-compare

@@ -1,12 +1,13 @@
 // WS-0.7 credential-rotation detection + plan building.
 //
-// DETECT: emits `cred.exposure-rotate` (FAIL, one-shot rotate-now until the
-// exposure is recorded resolved), `cred.rotation-age` (WARN past the per-class
+// DETECT: `credFindings` emits `cred.exposure-rotate` (FAIL, one-shot rotate-now until
+// the exposure is recorded resolved), `cred.rotation-age` (WARN past the per-class
 // max age) and `cred.rotation-requested` (WARN while a registry `rotate_requested`
-// date is later than the last recorded rotation) findings, merged into the 3am
-// security-drift run via extraFindings. A revoke-no-replacement credential whose
-// revoke is recorded in state raises neither of the last two. A malformed
-// rotate_requested raises `cred.invalid-rotate-requested` for that credential only.
+// date is later than the last recorded rotation), for the `cred-findings` command the
+// rotation proposer reads. A revoke-no-replacement credential whose revoke is recorded
+// in state raises neither of the last two. A malformed rotate_requested raises
+// `cred.invalid-rotate-requested` for that credential only. The 3am security-drift run
+// reads no state: it merges only `registryFindings` via extraFindings.
 //
 // PLAN: for each managed credential, builds the Classification the taxonomy hands
 // back for its findings: a manual checklist. Nothing here executes a rotation; the
@@ -216,6 +217,42 @@ export function credTarget(credId: string): string {
   return `cred:${credId}`;
 }
 
+function invalidRotateRequestedFinding(spec: CredentialSpec): Finding {
+  return {
+    severity: 'WARN',
+    check: 'cred.invalid-rotate-requested',
+    target: credTarget(spec.id),
+    facts: { id: spec.id, class: spec.class },
+    detail: `${credTarget(spec.id)} has rotate_requested = ${spec.rotate_requested_invalid}, which is not a quoted real date ("YYYY-MM-DD") — the request is ignored; fix it in its .cred-consumers.toml`,
+  };
+}
+
+/** A class outside CLASS_POLICY has no max age, so it would never age and nothing would say
+ *  so. Reported per credential; the rest of the registry still loads. */
+function unknownClassFinding(spec: CredentialSpec): Finding {
+  return {
+    severity: 'WARN',
+    check: 'cred.unknown-class',
+    target: credTarget(spec.id),
+    facts: { id: spec.id, class: spec.class },
+    detail: `${credTarget(spec.id)} declares class '${spec.class}', which has no rotation policy — it is never aged; fix the class in its .cred-consumers.toml`,
+  };
+}
+
+/** What the registry alone says, with no rotation state: the 03:00 scan's credential findings
+ *  (ADR-0059 amendment 12 item 3). The rotation triggers are the rotation proposer's to raise.
+ *  An unknown class is raised whether or not the credential has an exposure, because without
+ *  the state the scan cannot tell an open exposure from a resolved one. Pure — no I/O. */
+export function registryFindings(specs: CredentialSpec[]): Finding[] {
+  const findings: Finding[] = [];
+  for (const spec of specs) {
+    if (spec.rotate_requested_invalid !== undefined)
+      findings.push(invalidRotateRequestedFinding(spec));
+    if (!CLASS_POLICY[spec.class]) findings.push(unknownClassFinding(spec));
+  }
+  return findings;
+}
+
 /** Findings for the current registry + state. Pure — no I/O. */
 export function credFindings(
   specs: CredentialSpec[],
@@ -225,15 +262,8 @@ export function credFindings(
   const findings: Finding[] = [];
   const nowMs = new Date(now).getTime();
   for (const spec of specs) {
-    if (spec.rotate_requested_invalid !== undefined) {
-      findings.push({
-        severity: 'WARN',
-        check: 'cred.invalid-rotate-requested',
-        target: credTarget(spec.id),
-        facts: { id: spec.id, class: spec.class },
-        detail: `${credTarget(spec.id)} has rotate_requested = ${spec.rotate_requested_invalid}, which is not a quoted real date ("YYYY-MM-DD") — the request is ignored; fix it in its .cred-consumers.toml`,
-      });
-    }
+    if (spec.rotate_requested_invalid !== undefined)
+      findings.push(invalidRotateRequestedFinding(spec));
     const openExposures = spec.exposures.filter(
       (e) => !state.resolvedExposures[`${spec.id}:${e.id}`],
     );
@@ -250,15 +280,7 @@ export function credFindings(
     }
     const policy = CLASS_POLICY[spec.class];
     if (!policy) {
-      // A class outside CLASS_POLICY has no max age, so it would never age and nothing
-      // would say so. Report it per credential; the rest of the registry still loads.
-      findings.push({
-        severity: 'WARN',
-        check: 'cred.unknown-class',
-        target: credTarget(spec.id),
-        facts: { id: spec.id, class: spec.class },
-        detail: `${credTarget(spec.id)} declares class '${spec.class}', which has no rotation policy — it is never aged; fix the class in its .cred-consumers.toml`,
-      });
+      findings.push(unknownClassFinding(spec));
       continue;
     }
     // A revoked credential has nothing left to rotate.
@@ -294,25 +316,6 @@ export function credFindings(
 }
 
 // ── Plans ────────────────────────────────────────────────────────────────────────
-
-/** The findings that start a rotation. For a credential the SDS rotates, these reach only the
- *  rotation proposer; every other finding about it (a bad registry field, an unknown class) is
- *  still the scan's to report. */
-export const ROTATION_TRIGGER_CHECKS: ReadonlySet<string> = new Set([
-  'cred.exposure-rotate',
-  'cred.rotation-age',
-  'cred.rotation-requested',
-]);
-
-/** What the 03:00 scan posts: every finding except the rotation triggers of SDS-rotated
- *  credentials, which would otherwise become change-manager security items that offer a manual
- *  checklist for a rotation the SDS owns. */
-export function scanFindings(findings: Finding[], specs: CredentialSpec[]): Finding[] {
-  const sds = new Set(specs.filter((s) => s.rotated_by_sds === true).map((s) => s.id));
-  return findings.filter(
-    (f) => !(ROTATION_TRIGGER_CHECKS.has(f.check) && sds.has(String(f.facts?.id))),
-  );
-}
 
 /** The manual checklist for a due credential: its class's landmines, then the console steps. */
 function rotationClassification(spec: CredentialSpec): Classification {

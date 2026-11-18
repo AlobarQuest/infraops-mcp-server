@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   credFindings,
-  scanFindings,
+  registryFindings,
   buildCredClassifications,
   loadRotationState,
   saveRotationState,
@@ -674,54 +674,49 @@ created = "2020-01-01"
     const findings = credFindings([spec], { resolvedExposures: {}, lastRotated: {} }, NOW);
     expect(findings.map((f) => f.check)).toEqual(['cred.exposure-rotate']);
   });
+
+  it('is raised by the registry-only scan even with an open exposure', () => {
+    // credFindings lets the open exposure suppress it (the preceding test); the scan reads no
+    // state, so it cannot tell open from resolved and raises the unknown class regardless.
+    const [spec] = parseCredConsumers(doc);
+    spec.exposures.push({ id: 'e1', date: '2026-07-01' });
+    const withResolved = credFindings(
+      [spec],
+      { resolvedExposures: { [`${spec.id}:e1`]: { ts: NOW, detail: 'd' } }, lastRotated: {} },
+      NOW,
+    );
+    expect(registryFindings([spec])).toEqual(withResolved);
+    expect(registryFindings([spec]).map((f) => f.check)).toEqual(['cred.unknown-class']);
+  });
 });
 
-describe('scanFindings — what the 03:00 scan posts', () => {
-  const specs = parseCredConsumers(`version = 1
-[[credential]]
-id = "sds-cred"
-class = "openrouter-key"
-created = "2025-01-02"
-rotate_requested = "2026-10-01"
-rotated_by_sds = true
-  [[credential.exposure]]
-  id = "e1"
-  date = "2026-09-01"
-[[credential]]
-id = "sds-odd"
-class = "mystery"
-rotated_by_sds = true
-[[credential]]
-id = "legacy-cred"
-class = "openrouter-key"
-created = "2025-01-02"
-rotate_requested = "2026-10-01"
-`);
-  const empty: RotationState = { resolvedExposures: {}, lastRotated: {} };
+describe('registryFindings — what the 03:00 scan raises from the registry alone', () => {
+  const later = '2026-10-07T12:00:00.000Z';
+  const row = (id: string, sds: boolean, extra: string) =>
+    `[[credential]]\nid = "${id}"\nclass = "openrouter-key"\n${sds ? 'rotated_by_sds = true\n' : ''}${extra}`;
+  const exposed =
+    'created = "2026-09-01"\n  [[credential.exposure]]\n  id = "e1"\n  date = "2026-09-01"\n';
+  const due = 'created = "2025-01-02"\nrotate_requested = "2026-10-01"\n';
+  const specs = parseCredConsumers(
+    'version = 1\n' +
+      row('sds-exposed', true, exposed) +
+      row('sds-due', true, due) +
+      row('legacy-exposed', false, exposed) +
+      row('legacy-due', false, due) +
+      row('legacy-bad-date', false, 'created = "2026-09-01"\nrotate_requested = 2026-10-01\n') +
+      '[[credential]]\nid = "sds-odd"\nclass = "mystery"\nrotated_by_sds = true\n',
+  );
 
-  it("drops an SDS credential's rotation triggers and keeps every other credential's", () => {
-    const all = credFindings(specs, empty, '2026-10-07T12:00:00.000Z');
-    const posted = scanFindings(all, specs).map((f) => `${f.check}:${f.facts?.id}`);
-    expect(all.some((f) => f.facts?.id === 'sds-cred')).toBe(true);
-    expect(posted.filter((p) => p.endsWith(':sds-cred'))).toEqual([]);
-    expect(posted).toContain('cred.rotation-age:legacy-cred');
-    expect(posted).toContain('cred.rotation-requested:legacy-cred');
-  });
-
-  it('still posts a finding about an SDS credential that is not a rotation trigger', () => {
-    const all = credFindings(specs, empty, '2026-10-07T12:00:00.000Z');
-    expect(scanFindings(all, specs).map((f) => `${f.check}:${f.facts?.id}`)).toContain(
+  it('raises no rotation trigger for any credential, handed over or not', () => {
+    const owed = credFindings(specs, emptyState(), later).map((f) => `${f.check}:${f.facts?.id}`);
+    for (const who of ['sds', 'legacy']) {
+      expect(owed).toContain(`cred.exposure-rotate:${who}-exposed`);
+      expect(owed).toContain(`cred.rotation-age:${who}-due`);
+      expect(owed).toContain(`cred.rotation-requested:${who}-due`);
+    }
+    expect(registryFindings(specs).map((f) => `${f.check}:${f.facts?.id}`)).toEqual([
+      'cred.invalid-rotate-requested:legacy-bad-date',
       'cred.unknown-class:sds-odd',
-    );
-  });
-
-  it('drops the age and request triggers that appear once the exposure is resolved', () => {
-    const resolved: RotationState = {
-      resolvedExposures: { 'sds-cred:e1': { ts: '2026-09-02', detail: 'x' } },
-      lastRotated: {},
-    };
-    const all = credFindings(specs, resolved, '2026-10-07T12:00:00.000Z');
-    expect(all.filter((f) => f.facts?.id === 'sds-cred').length).toBeGreaterThan(0);
-    expect(scanFindings(all, specs).filter((f) => f.facts?.id === 'sds-cred')).toEqual([]);
+    ]);
   });
 });

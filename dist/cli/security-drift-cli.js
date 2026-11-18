@@ -22,7 +22,7 @@ import { classify } from '../security-drift/taxonomy.js';
 import { buildEscalations } from '../security-drift/emit.js';
 import { scannerVersionGate, EXPECTED_SCANNER_OUTPUT_VERSION, } from '../security-drift/scanner-version.js';
 import { loadCredConsumerFiles } from '../security-drift/cred-consumers.js';
-import { buildCredClassifications, credFindings, scanFindings, loadRotationState, recordRotation, rotationAnchor, saveRotationState, } from '../security-drift/cred-rotation.js';
+import { buildCredClassifications, credFindings, registryFindings, loadRotationState, recordRotation, rotationAnchor, saveRotationState, } from '../security-drift/cred-rotation.js';
 export function parseArgs(argv) {
     const args = {};
     if (argv[0] && !argv[0].startsWith('--'))
@@ -91,7 +91,7 @@ function doResolveExposure(args) {
 }
 /** Record a verified rotation (or a no-replacement credential's confirmed revoke):
  *  sets lastRotated for a registry credential, which clears its rotation-age and
- *  rotation-requested findings on the next 3am run. */
+ *  rotation-requested findings from `cred-findings`. */
 export function doRecordRotation(args) {
     const cred = typeof args.cred === 'string' ? args.cred : '';
     const date = typeof args.date === 'string' ? args.date : '';
@@ -104,14 +104,14 @@ export function doRecordRotation(args) {
     saveRotationState(p.credRotationStateFile, state);
     process.stdout.write(`recorded: ${cred} lastRotated ${previous ?? '(none)'} -> ${recorded} in ${p.credRotationStateFile}\n`);
 }
-/** The registry's contribution to the 03:00 scan: its findings, less the rotation triggers of
- *  credentials the SDS rotates (`scanFindings`), and their pre-built classifications. */
-export function credScan(listFile, stateFile, now) {
+/** The registry's contribution to the 03:00 scan: the findings the registry alone supports
+ *  (`registryFindings`) and the pre-built classifications. It reads no rotation state: the
+ *  rotation triggers are the rotation proposer's to raise (ADR-0059 amendment 12 item 3). */
+export function credScan(listFile) {
     try {
         const specs = loadCredConsumerFiles(readList(listFile));
-        const state = loadRotationState(stateFile);
         return {
-            findings: scanFindings(credFindings(specs, state, now), specs),
+            findings: registryFindings(specs),
             classifications: buildCredClassifications(specs.filter((spec) => spec.rotated_by_sds !== true)),
         };
     }
@@ -131,14 +131,14 @@ export function credScan(listFile, stateFile, now) {
 }
 /** The credential-rotation findings as JSON, for the orchestrator's rotation proposer
  *  (ADR-0054 amendment 1). READ-ONLY: it loads the listed registries and the rotation state
- *  exactly as `run` does and writes nothing. Only `cred.*` findings that carry `facts` are
+ *  and writes nothing. Only `cred.*` findings that carry `facts` are
  *  printed, each as its check plus those fields -- never the prose detail. `last_rotated` is
  *  additive, so `schema_version` stays 1. A registry that does not parse throws, so the caller gets a non-zero exit rather than an empty list. */
 export function doCredFindings(args) {
     const now = typeof args.now === 'string' ? args.now : new Date().toISOString();
     const p = securityPaths();
-    // Fail rather than answer "nothing is due". The 03:00 scan reads an absent registry list or
-    // state file as an empty one, which suits a scan; but this command's only question is what is
+    // Fail rather than answer "nothing is due". The 03:00 scan reads an absent registry list as
+    // an empty one, which suits a scan; but this command's only question is what is
     // due, and a wrong HOME under launchd would answer "nothing" forever. A missing state file is
     // worse than empty: every resolved exposure would come back as due.
     const files = readList(p.credConsumersList);
@@ -232,9 +232,9 @@ export async function main(argv = process.argv.slice(2)) {
     // No skew: close any skew alert an earlier run opened (a no-op when none is open).
     await resolveVersionSkew(notifyDepsFromEnv());
     // --- WS-0.7 credential-rotation registry: findings + pre-built classifications.
-    // A broken registry/state is itself escalated (cred.registry-error → URGENT manual
+    // A broken list or registry file is itself escalated (cred.registry-error → URGENT manual
     // via the taxonomy's deny-by-default cred.* fallback), never silently skipped.
-    const { findings: credExtraFindings, classifications: credClassifications } = credScan(p.credConsumersList, p.credRotationStateFile, now);
+    const { findings: credExtraFindings, classifications: credClassifications } = credScan(p.credConsumersList);
     const result = await runSecurityDrift({
         scanStdout: captureScan(p.scanPath),
         now,
