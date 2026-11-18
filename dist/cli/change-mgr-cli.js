@@ -25,6 +25,25 @@ export function parseArgs(argv) {
     }
     return args;
 }
+/** The flags `run-window` reads: `main` reads `--report-dir` and `--now`, plus the two below. */
+const RUN_WINDOW_FLAGS = new Set(['report-dir', 'now', 'instance', 'dry-run']);
+/**
+ * `parseArgs` reads `--name=value` as the key `name=value` and keeps any unknown flag, so either
+ * would be silently ignored: `--instance=prod` would run both instances. Reject both. The message
+ * names only the flag, never its value.
+ */
+export function checkRunWindowFlags(argv) {
+    for (const a of argv) {
+        if (!a.startsWith('--'))
+            continue;
+        const eq = a.indexOf('=');
+        if (eq !== -1) {
+            throw new Error(`run-window flags take no "=": ${a.slice(0, eq)}=...`);
+        }
+        if (!RUN_WINDOW_FLAGS.has(a.slice(2)))
+            throw new Error(`unknown run-window flag: ${a}`);
+    }
+}
 function client(actor = 'executor') {
     const base = process.env.CHANGE_MGR_API_BASE ?? '';
     const token = process.env.CHANGE_MGR_M2M_TOKEN ?? '';
@@ -124,6 +143,7 @@ export async function main(argv = process.argv.slice(2)) {
     }
     else if (args.command === 'run-window') {
         // Validate every flag before client(), so a bad flag fails before any network call.
+        checkRunWindowFlags(argv);
         const opts = {
             reportDir,
             now,

@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import {
+  checkRunWindowFlags,
   doRunWindow,
   main,
   parseArgs,
@@ -29,6 +30,18 @@ describe('change-mgr-cli parseArgs', () => {
     expect(a.command).toBe('run-window');
     expect(a['dry-run']).toBe(true);
     expect(a.instance).toBe('prod');
+  });
+});
+
+describe('checkRunWindowFlags', () => {
+  it("accepts the Mac wrapper's exact argument list, which still parses to the same values", () => {
+    const argv = ['run-window', '--report-dir', '/r', '--now', '2026-11-18T04:00:00Z'];
+    expect(() => checkRunWindowFlags(argv)).not.toThrow();
+    expect(parseArgs(argv)).toEqual({
+      command: 'run-window',
+      'report-dir': '/r',
+      now: '2026-11-18T04:00:00Z',
+    });
   });
 });
 
@@ -159,6 +172,18 @@ describe('main', () => {
     vi.stubEnv('CHANGE_MGR_M2M_TOKEN', 't');
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     await expect(main(argv)).rejects.toThrow(/--instance needs/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [['run-window', '--instance=prod'], /take no "=": --instance=\.\.\.$/],
+    [['run-window', '--dry-run=true'], /take no "=": --dry-run=\.\.\.$/],
+    [['run-window', '--bogus'], /unknown run-window flag: --bogus/],
+  ])('rejects %j before any network call', async (argv, message) => {
+    vi.stubEnv('CHANGE_MGR_API_BASE', 'https://cm.invalid');
+    vi.stubEnv('CHANGE_MGR_M2M_TOKEN', 't');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await expect(main(argv)).rejects.toThrow(message);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

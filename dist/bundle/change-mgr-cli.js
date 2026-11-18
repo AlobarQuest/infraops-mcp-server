@@ -46788,6 +46788,17 @@ function parseArgs(argv) {
   }
   return args;
 }
+var RUN_WINDOW_FLAGS = /* @__PURE__ */ new Set(["report-dir", "now", "instance", "dry-run"]);
+function checkRunWindowFlags(argv) {
+  for (const a of argv) {
+    if (!a.startsWith("--")) continue;
+    const eq = a.indexOf("=");
+    if (eq !== -1) {
+      throw new Error(`run-window flags take no "=": ${a.slice(0, eq)}=...`);
+    }
+    if (!RUN_WINDOW_FLAGS.has(a.slice(2))) throw new Error(`unknown run-window flag: ${a}`);
+  }
+}
 function client(actor = "executor") {
   const base = process.env.CHANGE_MGR_API_BASE ?? "";
   const token = process.env.CHANGE_MGR_M2M_TOKEN ?? "";
@@ -46876,6 +46887,7 @@ async function main(argv = process.argv.slice(2)) {
     if (!reportDir) throw new Error("sync requires --report-dir");
     await doSync(reportDir, now);
   } else if (args.command === "run-window") {
+    checkRunWindowFlags(argv);
     const opts = {
       reportDir,
       now,
@@ -46894,6 +46906,7 @@ if (process.argv[1] && process.argv[1].endsWith("change-mgr-cli.js")) {
   });
 }
 export {
+  checkRunWindowFlags,
   doRunWindow,
   main,
   parseArgs,
