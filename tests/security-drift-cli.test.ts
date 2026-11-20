@@ -8,6 +8,7 @@ import {
   loadRotationState,
   saveRotationState,
 } from '../src/security-drift/cred-rotation.js';
+import { securityPaths } from '../src/security-drift/paths.js';
 
 const TOML = `version = 1
 [[credential]]
@@ -253,25 +254,66 @@ class = "mystery"
 });
 
 describe('security-drift-cli credScan — what the 03:00 run posts', () => {
-  it("leaves out an SDS credential's rotation trigger and keeps the legacy one's", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cred-scan-'));
-    const toml = path.join(dir, 'r.cred-consumers.toml');
-    fs.writeFileSync(
-      toml,
-      'version = 1\n[[credential]]\nid = "sds"\nclass = "openrouter-key"\n' +
-        'rotate_requested = "2026-10-01"\nrotated_by_sds = true\n' +
-        '[[credential]]\nid = "legacy"\nclass = "openrouter-key"\nrotate_requested = "2026-10-01"\n',
+  let dir: string;
+  let list: string;
+  const write = (name: string, body: string) => {
+    const file = path.join(dir, name);
+    fs.writeFileSync(file, body);
+    return file;
+  };
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cred-scan-'));
+    const row = (id: string, sds: boolean, extra: string) =>
+      `[[credential]]\nid = "${id}"\nclass = "openrouter-key"\n${sds ? 'rotated_by_sds = true\n' : ''}${extra}`;
+    const exposed =
+      'created = "2026-09-01"\n[[credential.exposure]]\nid = "e1"\ndate = "2026-09-01"\n';
+    const due = 'created = "2025-01-02"\nrotate_requested = "2026-10-01"\n';
+    const toml = write(
+      'r.cred-consumers.toml',
+      'version = 1\n' +
+        row('sds-exposed', true, exposed) +
+        row('sds-due', true, due) +
+        row('legacy-exposed', false, exposed) +
+        row('legacy-due', false, due) +
+        row('legacy-bad-date', false, 'rotate_requested = 2026-10-01\n') +
+        '[[credential]]\nid = "odd-exposed"\nclass = "mystery"\n' +
+        '[[credential.exposure]]\nid = "e1"\ndate = "2026-09-01"\n',
     );
-    const list = path.join(dir, 'cred-consumers.list');
-    fs.writeFileSync(list, `${toml}\n`);
-    const state = path.join(dir, 'state.json');
-    saveRotationState(state, { resolvedExposures: {}, lastRotated: {} });
-
-    const { findings } = credScan(list, state, '2026-10-07T12:00:00.000Z');
-    const ids = findings.map((f) => `${f.check}:${f.facts?.id}`);
-    expect(ids).toContain('cred.rotation-requested:legacy');
-    expect(ids).not.toContain('cred.rotation-requested:sds');
+    list = write('cred-consumers.list', `${toml}\n`);
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reads no rotation state, even one that would throw if read', () => {
+    vi.stubEnv('SECURITY_DRIFT_STATE_DIR', dir);
+    const state = path.join(dir, 'cred-rotation-state.json');
+    fs.writeFileSync(state, 'not json', { mode: 0o644 });
+    fs.chmodSync(state, 0o644);
+    expect(securityPaths().credRotationStateFile).toBe(state);
+    expect(() => loadRotationState(state)).toThrow();
+    expect(credScan(list).findings.map((f) => f.check)).not.toContain('cred.registry-error');
+  });
+
+  it('raises no rotation trigger for any credential, handed over or not', () => {
+    const { findings } = credScan(list);
+    expect(findings.map((f) => `${f.check}:${f.facts?.id}`)).toEqual([
+      'cred.invalid-rotate-requested:legacy-bad-date',
+      'cred.unknown-class:odd-exposed',
+    ]);
+  });
+
+  it('raises cred.registry-error for a registry file that does not parse', () => {
+    write('r.cred-consumers.toml', 'version = 1\n[[credential]]\nid = "x"\nclass = \n');
+    const { findings, classifications } = credScan(list);
+    expect(findings.map((f) => f.check)).toEqual(['cred.registry-error']);
+    expect(classifications).toBeUndefined();
+  });
+
+  it('raises cred.registry-error for a listed registry file that is missing', () => {
+    write('cred-consumers.list', `${path.join(dir, 'gone.cred-consumers.toml')}\n`);
+    expect(credScan(list).findings.map((f) => f.check)).toEqual(['cred.registry-error']);
   });
 });
 
@@ -392,11 +434,7 @@ describe('security-drift-cli — the SDS handover flag', () => {
   });
 
   it('the 03:00 scan builds no rotation plan for an SDS credential', () => {
-    const { classifications } = credScan(
-      path.join(dir, 'cred-consumers.list'),
-      path.join(dir, 'cred-rotation-state.json'),
-      '2026-10-07T12:00:00.000Z',
-    );
+    const { classifications } = credScan(path.join(dir, 'cred-consumers.list'));
     const keys = Object.keys(classifications ?? {});
     expect(keys.some((k) => k.endsWith('cred:legacy'))).toBe(true);
     expect(keys.some((k) => k.endsWith('cred:sds'))).toBe(false);
