@@ -73,15 +73,15 @@ $ git status --short
 
 ## Checks run
 
-| Check | Base `68c4af5` | Branch |
-|---|---|---|
-| `npx vitest run` (`npm test`) | 60 files, 698 tests passed | 60 files, 694 tests passed |
-| `npm run build` | — | clean; only the 8 expected `dist/` files changed |
-| `npx tsc --noEmit` | — | clean |
-| `npx eslint` on the three changed TS files | — | clean |
-| `npx prettier --check` on the three changed TS files | — | clean |
-| `shellcheck scripts/drift-audit.sh` | — | exit 0 |
-| `bash -n scripts/drift-audit.sh` | — | ok |
+| Check                                                | Base `68c4af5`             | Branch                                           |
+| ---------------------------------------------------- | -------------------------- | ------------------------------------------------ |
+| `npx vitest run` (`npm test`)                        | 60 files, 698 tests passed | 60 files, 694 tests passed                       |
+| `npm run build`                                      | —                          | clean; only the 8 expected `dist/` files changed |
+| `npx tsc --noEmit`                                   | —                          | clean                                            |
+| `npx eslint` on the three changed TS files           | —                          | clean                                            |
+| `npx prettier --check` on the three changed TS files | —                          | clean                                            |
+| `shellcheck scripts/drift-audit.sh`                  | —                          | exit 0                                           |
+| `bash -n scripts/drift-audit.sh`                     | —                          | ok                                               |
 
 The drop of 4 tests is exactly the 4 removed mint tests; the file count is unchanged because
 `tests/orchestrator-cli.test.ts` keeps its observe tests.
