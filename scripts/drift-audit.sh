@@ -149,36 +149,6 @@ else
   log "WARN: orchestrator observation failed (non-fatal)"
 fi
 
-# ── Best-effort: run one follow-up minting pass (non-fatal) ────────────────────
-# WS-P2.8. Mints the work units whose package-declared follow-up reviews have come due. Uses the
-# orchestrator-system credential, NOT the drift-reporter one above: that identity is
-# observe-and-propose, and minting is canonical mutation attributed to an agent_id forever.
-# Deliberately outside RC/RC_REMEDIATE, like the observation step: the drift loop is never
-# hostage to the orchestrator being reachable, but a failure is always logged, never silent.
-#
-# This one secret is fetched with a DIFFERENT BWS identity from every other secret in this
-# script. The orchestrator SYSTEM bearer moved into the `SDS Operator` project on 2026-07-30
-# and is readable only by the read-only `sds-operator` machine account (Keychain account
-# BWS_ACCESS_TOKEN_SDS); the BWS_ACCESS_TOKEN_INFRA_DRIFT identity this script bootstraps with
-# can no longer read it. Overriding inside the command substitution keeps the override local:
-# every later get_secret_by_id call still uses the drift identity, including the
-# drift-reporter observation secret above.
-#
-# Failing to override does not surface as an error: get_secret_by_id swallows failures and
-# returns "", so the mint step would run with an empty bearer, 401, and log a non-fatal WARN.
-export ORCHESTRATOR_MINT_TOKEN="$(
-  BWS_ACCESS_TOKEN="$(/usr/bin/security find-generic-password \
-      -s 'Claude' -a 'BWS_ACCESS_TOKEN_SDS' -w 2>/dev/null)"
-  export BWS_ACCESS_TOKEN
-  get_secret_by_id "${BWS_ORCHESTRATOR_SYSTEM_SECRET_ID:-221a48d5-3f29-4898-b300-b4820140c880}"
-)"
-export ORCHESTRATOR_MINT_CREDENTIAL_KEY_ID="${ORCHESTRATOR_MINT_CREDENTIAL_KEY_ID:-orchestrator-system}"
-if node "$REPO/dist/cli/orchestrator-cli.js" mint-follow-ups >>"$LOG_FILE" 2>&1; then
-  log "follow-up mint ok"
-else
-  log "WARN: follow-up mint failed (non-fatal)"
-fi
-
 # ── Best-effort: machine security-posture drift → change manager (non-fatal) ─────
 # Runs security-scan.sh, auto-fixes the narrow set (guarded chmod), posts the rest
 # to the CM (source=security), and sends NEW urgent items to alert-hub immediately. Reuses the
