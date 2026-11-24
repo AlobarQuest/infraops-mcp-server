@@ -74,7 +74,7 @@ Nothing does, so the removal is a plain data change:
   stopped at "tsc not found"; `npm ci` in the worktree fixed it.)
 - `code-standards risk --repo .`: `normal`, so no vendor review.
 - `npx prettier --check` on this report: passes.
-- CI: `gh pr checks 177 --watch`, recorded after this commit in the PR.
+- CI: green on `18c18c6` (`gh pr checks 177 --watch`): both "Lint, type-check, and test" runs and `build` passed. This report-only commit follows it.
 
 ## Files changed
 
