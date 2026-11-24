@@ -220,7 +220,7 @@ rotated_by_sds = true
   kind = "keychain"
   service = "Claude"
   account = "BWS_ACCESS_TOKEN_VPS_BACKUP"
-  note = "the keeper: most readers read this item, among them the activation sweep's sds-deadman.sh on the Mac and localops' tool-installer, so it is written first. Read each run by vps-backup's bws-token.sh and observe-run.sh, factory-events-nightly.sh, portfolio-scan.sh, email-capture's imap_capture.py (launchd every 600 s), and on demand by email-capture's triage scripts and work_backfill.py and FacelessTT's youtube_reauth.sh. sync-gdrive.sh, verify-backup.sh, hetzner-snapshot.sh and imap_capture.py have no Healthchecks check and are verified by read-back alone (Devon, 2026-10-23). veritok's run-poller.sh and run-web.sh (launchd com.devon.veritok-poller and com.devon.veritok-web, KeepAlive) read it once at start: before the revoke, the person restarts both agents with launchctl kickstart -k (Devon, 2026-10-23)"
+  note = "the keeper: most readers read this item, among them the activation sweep's sds-deadman.sh on the Mac and localops' installers and fork-sync onboard, run interactively, so it is written first. Read each run by vps-backup's bws-token.sh and observe-run.sh, factory-events-nightly.sh, portfolio-scan.sh, email-capture's imap_capture.py (launchd every 600 s), and on demand by email-capture's triage scripts and work_backfill.py and FacelessTT's youtube_reauth.sh. sync-gdrive.sh, verify-backup.sh, hetzner-snapshot.sh and imap_capture.py have no Healthchecks check and are verified by read-back alone (Devon, 2026-10-23). veritok's run-poller.sh and run-web.sh (launchd com.devon.veritok-poller and com.devon.veritok-web, KeepAlive) read it once at start: before the revoke, the person restarts both agents with launchctl kickstart -k (Devon, 2026-10-23)"
 
   [[credential.consumer]]
   kind = "runtime-fetch"
@@ -274,13 +274,6 @@ rotated_by_sds = true
   ref = "scripts/run-activation-sweep.sh"
   healthchecks_check = "sds-activation-sweep"
   note = "sds-deadman.sh reads BWS_ACCESS_TOKEN_VPS_BACKUP each run to find its check, so without a working token the check isn't pinged"
-
-  [[credential.consumer]]
-  kind = "runtime-fetch"
-  repo = "localops"
-  ref = "scripts/run-tool-installer.sh"
-  healthchecks_check = "sds-tool-installer"
-  note = "launchd com.devon.tool-installer 03:15 on the Mac; localops' sds-deadman.sh reads Keychain Claude/BWS_ACCESS_TOKEN_VPS_BACKUP each armed run to find its check by name (a --dry-run pass doesn't arm), so without a working token the check isn't pinged"
 
 # tok-content-mini — the same account's other token, VideoCreator only. Never exposed;
 # deliberately not rotated in WS-P2.13. Created 2026-06-12 (vps-backup
