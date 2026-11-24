@@ -2,8 +2,8 @@ Outcome: done
 
 # Report: 3k item 5, drop the moved lanes' ops-mini consumer rows
 
-- PR: #PR_NUMBER
-- Head SHA: HEAD_SHA (the commit before this report's PR-number update; see the PR for the final head)
+- PR: #176 (https://github.com/AlobarQuest/infraops-mcp-server/pull/176)
+- Head SHA: `6f9a287` carries the change; the follow-up commit fills in this report's PR number and CI result
 - Base: `origin/main` `bbe7d93`
 - Orchestrator read at `origin/main` `ef463b44`; intent-packages read at `origin/main` `00b32ef`
 
@@ -99,7 +99,7 @@ Line 75 names `repo="orchestrator" ref="scripts/run-tool-installer.sh"`; the reg
   only `ok` lines. The first run stopped on `tsc not found`; `npm ci` fixed it.
 - `code-standards risk --repo .`: `normal`, so no vendor review.
 - `npx prettier --check` on this report: passes.
-- CI `Quality` on the PR head: CI_RESULT.
+- CI `Quality` on the PR head: passed on `6f9a287` (runs 45427182898 and 45427133196, collecting 694 tests in 60 files); `Build` passed (run 45427182775).
 - No `src/` change, so `dist/` is unchanged.
 
 ## Files changed
