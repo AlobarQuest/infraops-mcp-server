@@ -33,7 +33,7 @@ All citations are at localops `origin/main` `4360c0c`, read with `git show`:
   - Lines 126-129: the UUID path applies only when `SDS_DEADMAN_PING_URL_UUID` is set. Nothing in
     localops outside `sds-deadman.sh` sets it.
   - Lines 130-131: otherwise it reads `BWS_ACCESS_TOKEN_BROAD`, or Keychain `-s 'Claude' -a
-    'BWS_ACCESS_TOKEN_VPS_BACKUP'`.
+'BWS_ACCESS_TOKEN_VPS_BACKUP'`.
   - Lines 137-165: it uses that token to read the Healthchecks API key (UUID line 75), lists the
     checks, and matches the exact name.
 - `scripts/com.devon.tool-installer.plist` lines 25-40: label `com.devon.tool-installer`, arguments
@@ -69,18 +69,18 @@ missing. The other 11 exist.
 
 I also read each launcher's container guard. Ten rows under this credential name moved lanes:
 
-| Row (registry lines) | Launcher guard line | Dead-man line |
-|---|---|---|
-| bump-proposer (277-282) | 170 | 189-190 (`sds_outcome_begin`) |
-| change-proposer (284-289) | 84 | 100-101 (`sds_outcome_begin`) |
-| deploy-watcher (291-296) | 56 | 65 |
-| estate-landing (298-303) | 109 | 120 |
-| inert-landing (305-310) | 114 | 124 |
-| landing-ledger (312-317) | 42 | 51 |
-| pin-watcher (319-324) | 53 | 63 |
-| revision-watcher (326-331) | 60 | 71 |
-| rotation-proposer (333-338) | 113 | 122 |
-| work-carrier (347-352) | 147 | 164-165 (`sds_outcome_begin`) |
+| Row (registry lines)        | Launcher guard line | Dead-man line                 |
+| --------------------------- | ------------------- | ----------------------------- |
+| bump-proposer (277-282)     | 170                 | 189-190 (`sds_outcome_begin`) |
+| change-proposer (284-289)   | 84                  | 100-101 (`sds_outcome_begin`) |
+| deploy-watcher (291-296)    | 56                  | 65                            |
+| estate-landing (298-303)    | 109                 | 120                           |
+| inert-landing (305-310)     | 114                 | 124                           |
+| landing-ledger (312-317)    | 42                  | 51                            |
+| pin-watcher (319-324)       | 53                  | 63                            |
+| revision-watcher (326-331)  | 60                  | 71                            |
+| rotation-proposer (333-338) | 113                 | 122                           |
+| work-carrier (347-352)      | 147                 | 164-165 (`sds_outcome_begin`) |
 
 Each guard refuses outside the lane's container ("FATAL: no BWS_ACCESS_TOKEN: the <lane> lane runs
 only in its container, through lane-run"). In its container, a lane resolves its ping URL through
