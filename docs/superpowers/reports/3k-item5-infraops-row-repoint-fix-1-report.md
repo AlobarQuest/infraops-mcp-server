@@ -53,7 +53,8 @@ changed. `.cred-consumers.toml` and every other file are untouched.
 - The Prettier rewrite leaves one continuation line inside a wrapped inline code span at column 0
   (the original report's line 36, `'BWS_ACCESS_TOKEN_VPS_BACKUP'`). It renders the same, but reads
   oddly in source. I kept it, since the handoff allows only the Prettier change.
-- I didn't wait for the CI `Quality` run on the pushed head; HQ needs to confirm it is green.
+- None about CI: on head `0c8e17e` (the report commit), `Lint, type-check, and test` and `build`
+  both passed (runs 45425325911, 45425350478, and 45425350432).
 
 ## Standards followed
 
