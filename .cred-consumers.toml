@@ -339,10 +339,10 @@ rotated_by_sds = true
 
   [[credential.consumer]]
   kind = "runtime-fetch"
-  repo = "orchestrator"
+  repo = "localops"
   ref = "scripts/run-tool-installer.sh"
   healthchecks_check = "sds-tool-installer"
-  note = "sds-deadman.sh reads BWS_ACCESS_TOKEN_VPS_BACKUP each run to find its check, so without a working token the check isn't pinged"
+  note = "launchd com.devon.tool-installer 03:15 on the Mac; localops' sds-deadman.sh reads Keychain Claude/BWS_ACCESS_TOKEN_VPS_BACKUP each armed run to find its check by name (a --dry-run pass doesn't arm), so without a working token the check isn't pinged"
 
   [[credential.consumer]]
   kind = "runtime-fetch"
