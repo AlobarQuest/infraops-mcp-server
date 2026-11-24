@@ -2,7 +2,7 @@ Outcome: done
 
 # 3k item 7: infraops registry drops localops' tool-installer ops-mini read
 
-PR: PR_PLACEHOLDER. Head SHA: HEAD_PLACEHOLDER. Branch `hq/3k-item7-infraops-registry`, based on
+PR: #177. Registry commit: `8a131c1`; the head is the report commit that follows it (see the PR). Branch `hq/3k-item7-infraops-registry`, based on
 `origin/main` `6d1a451`.
 
 ## What I built
@@ -31,8 +31,7 @@ reads (#19)") with `git show` only.
 - The install-time scripts do read the same Keychain item, so I kept localops in the keeper note,
   named as interactive readers:
   - `scripts/sds-install.sh` lines 44-45 (`sds_upsert_check`) read `Claude` /
-    `BWS_ACCESS_TOKEN_VPS_BACKUP` as the broad identity, then fetch the Healthchecks API key at line
-    52. `scripts/install-fork-sync-watch-launchd.sh` line 53 calls it.
+    `BWS_ACCESS_TOKEN_VPS_BACKUP` as the broad identity, then fetch the Healthchecks API key at line 52. `scripts/install-fork-sync-watch-launchd.sh` line 53 calls it.
   - `scripts/install-fork-harden-launchd.sh` lines 55-56 read the same item for its own check.
   - `src/fork_sync/bws.py` lines 25-26 and 40-54 read the same item for `fork-sync onboard`
     (`src/fork_sync/cli.py` line 36). No script or plist under `scripts/` invokes `onboard`, so it
@@ -75,7 +74,7 @@ Nothing does, so the removal is a plain data change:
   stopped at "tsc not found"; `npm ci` in the worktree fixed it.)
 - `code-standards risk --repo .`: `normal`, so no vendor review.
 - `npx prettier --check` on this report: passes.
-- CI: CI_PLACEHOLDER
+- CI: `gh pr checks 177 --watch`, recorded after this commit in the PR.
 
 ## Files changed
 
