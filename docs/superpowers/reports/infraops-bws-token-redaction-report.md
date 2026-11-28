@@ -7,7 +7,7 @@ PR: https://github.com/AlobarQuest/infraops-mcp-server/pull/178 (branch `hq/infr
 ## What I built
 
 - `src/utils/redaction.ts`: added the BWS access-token shape to `VALUE_SHAPES`. The pattern is character-for-character identical to `BWS_TOKEN_REGEX` in `~/Projects/security-standards/src/security_scan/token_shapes.py` line 15. A comment names that file as the source to change along with this one. Like the other shapes, the whole match is replaced with `***`. Because `deepRedact` applies `redactText` to every string, a token is masked under any field name, including `docker_compose`.
-- `tests/redaction.test.ts`: added five tests. The fixtures (`UUID`, `BWS_TOKEN`) are assembled from parts at runtime with `join`, so no tracked file holds the full token shape.
+- `tests/redaction.test.ts`: added four tests (the file went from 15 to 19). The fixtures (`UUID`, `BWS_TOKEN`) are assembled from parts at runtime with `join`, so no tracked file holds the full token shape.
   - `redactText` masks a whole token.
   - In a rendered compose (`BWS_SECRET_FOR_LANE: <token>` plus six other lines), only the token is masked and every other line is unchanged.
   - A bare UUID, `0.` plus a UUID with no secret part, and `0.` plus a UUID plus a 19-character secret all come through unmasked.
@@ -35,7 +35,7 @@ PR: https://github.com/AlobarQuest/infraops-mcp-server/pull/178 (branch `hq/infr
 
 ## Self-review
 
-- Truncation and output shape are unaffected. Redaction runs before truncation, and the regex only replaces a matched substring with `***`, the same as the other shapes. Neither a tool's output structure nor the truncation logic changed, so the handoff's stop point didn't apply.
+- Truncation and output shape are unaffected. `src/utils/register-sanitized.ts` line 49-50 redacts first and then calls `truncateToLimit`, and the regex only replaces a matched substring with `***`, the same as the other shapes. Neither a tool's output structure nor the truncation logic changed, so the handoff's stop point didn't apply.
 - Build hygiene: the worktree started with nearly no `node_modules`, so my first `npm run build` resolved packages from the main checkout. That rewrote the whole `dist/bundle/change-mgr-cli.js` with `../../node_modules` paths. I discarded that output, ran `npm ci` in the worktree, and rebuilt. The final `dist/` diff is only the redaction files. I didn't touch the main checkout.
 - I didn't call any infraops tool against a live resource. The verification used fixtures only.
 
@@ -44,7 +44,7 @@ PR: https://github.com/AlobarQuest/infraops-mcp-server/pull/178 (branch `hq/infr
 The review raised three nits. I left all of them unfixed, because the handoff asked for the canonical pattern and the two copies are meant to stay identical. Any change belongs in security-standards first, and then in `bws-write-guard.sh` and this file.
 
 1. The pattern has no left boundary. In a string like `10.<uuid>.<secret>`, it masks from the `0.` and leaves the `1`. The token is still fully masked.
-2. The UUID part is lowercase hex only. A token whose UUID was uppercased somewhere along the way would not be masked. BWS issues lowercase UUIDs, but HQ may want security-standards to decide whether the canonical shape needs `[0-9a-fA-F-]`.
+2. The UUID part is lowercase hex only. A token whose UUID was uppercased somewhere along the way would not be masked. The canonical pattern matches lowercase only. I didn't verify whether that covers every token BWS issues, so security-standards needs to decide whether its shape needs `[0-9a-fA-F-]`.
 3. The secret class includes `/`, `=`, and `:`, so a token followed by `/path` masks the path too. That over-masks, which is the safe direction.
 
 The infraops copy is kept in sync with security-standards only by a comment, and no test pins the two together, because CI can't read the other repo. A shared source of truth, or a portfolio lint, would close that gap.
