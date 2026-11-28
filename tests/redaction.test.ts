@@ -4,6 +4,10 @@ import { isSecretName, redactText, deepRedact } from '../src/utils/redaction.js'
 const PEM =
   '-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXk\n-----END OPENSSH PRIVATE KEY-----';
 
+// BWS token fixtures are assembled at runtime so no tracked file holds the full shape.
+const UUID = ['1b2c3d4e', '5f60', '4a7b', '8c9d', '0e1f2a3b4c5d'].join('-');
+const BWS_TOKEN = ['0', UUID, 'Ab1+/=:_-'.repeat(4)].join('.');
+
 describe('isSecretName', () => {
   it('flags secret-bearing names', () => {
     for (const k of [
@@ -78,6 +82,30 @@ describe('redactText (value-shape)', () => {
     expect(out).toContain('postgres://app:***@db-host:5432/mydb');
     expect(out).not.toContain('s3cr3tPw');
   });
+  it('masks a whole BWS access token', () => {
+    expect(redactText(`token is ${BWS_TOKEN} here`)).toBe('token is *** here');
+  });
+  it('masks a BWS token in a rendered compose and leaves the other lines unchanged', () => {
+    const lines = [
+      'services:',
+      '  lane:',
+      '    image: ghcr.io/alobarquest/lane:1.2.3',
+      '    environment:',
+      '      LANE_NAME: lane-a',
+      `      BWS_SECRET_FOR_LANE: ${BWS_TOKEN}`,
+      '      PORT: 8000',
+    ];
+    const out = redactText(lines.join('\n')).split('\n');
+    expect(out[5]).toBe('      BWS_SECRET_FOR_LANE: ***');
+    expect(out.filter((_, i) => i !== 5)).toEqual(lines.filter((_, i) => i !== 5));
+  });
+  it('leaves a bare UUID and a 0.-prefixed UUID with no secret part alone', () => {
+    expect(redactText(UUID)).toBe(UUID);
+    const noSecret = ['0', UUID].join('.');
+    expect(redactText(noSecret)).toBe(noSecret);
+    const shortSecret = ['0', UUID, 'A'.repeat(19)].join('.');
+    expect(redactText(shortSecret)).toBe(shortSecret);
+  });
   it('leaves ssh public keys and ordinary text alone', () => {
     const pub = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID example@host';
     expect(redactText(pub)).toBe(pub);
@@ -144,6 +172,11 @@ describe('deepRedact', () => {
     const out: any = deepRedact({ note: `cloned with ${PEM}`, api_key: 'eyJhbGciOi.eyJ.sig-_1' });
     expect(out.note).not.toContain('BEGIN OPENSSH PRIVATE KEY');
     expect(out.api_key).toBe('***');
+  });
+  it('value-shape masks a BWS token under a non-secret-named field', () => {
+    const out: any = deepRedact({ docker_compose: `env: ${BWS_TOKEN}`, note: BWS_TOKEN });
+    expect(out.docker_compose).toBe('env: ***');
+    expect(out.note).toBe('***');
   });
   it('is non-mutating', () => {
     const input = { private_key: 'x' };

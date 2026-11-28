@@ -33,6 +33,9 @@ const VALUE_SHAPES: RegExp[] = [
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
   // OpenAI / Anthropic.
   /\bsk-(?:ant-)?[A-Za-z0-9-]{20,}\b/g,
+  // BWS access token. Kept identical to BWS_TOKEN_REGEX in
+  // security-standards/src/security_scan/token_shapes.py; change both together.
+  /0\.[0-9a-f-]{36}\.[A-Za-z0-9+/=:_-]{20,}/g,
 ];
 
 // Connection-string password: keep scheme/user/host, mask the password segment only.

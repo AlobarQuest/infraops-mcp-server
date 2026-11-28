@@ -98,6 +98,9 @@ For each `content[].text` item:
      end-of-string** (so a truncated key head is still redacted).
    - JWT: three base64url segments `xxxxx.yyyyy.zzzzz` (catches Supabase anon/service_role keys).
    - Known token prefixes: `ghp_`, `github_pat_`, `gho_`, `sk-`, `sk-ant-`, and similar.
+   - BWS access token: `0.`, a 36-character UUID, `.`, and a secret of 20 or more characters
+     (the `BWS_TOKEN_REGEX` in security-standards `token_shapes.py`). The whole token is masked,
+     including inside a rendered `docker_compose`.
    - Connection-string passwords: `scheme://user:PASSWORD@host` → redact the password segment.
    - **Guard:** SSH _public_ material (`ssh-ed25519 AAAA…`, `ssh-rsa AAAA…`) is NOT redacted —
      value-shape keys on `BEGIN…PRIVATE KEY`, and the name guard protects `public_key`. (Critical:
