@@ -22,6 +22,7 @@ PR: https://github.com/AlobarQuest/infraops-mcp-server/pull/178 (branch `hq/infr
 - `npm test`: 60 test files, **698 tests passed**.
 - `npm run build`: succeeded. `git diff --stat dist/` shows only the three `dist/utils/redaction.*` files.
 - `make check`: exit 0, which covers lint, type-check, shell tests, and vitest.
+- PR #178 CI on the final head: `build` (the `dist/` freshness gate) and both "Lint, type-check, and test" jobs passed.
 - `code-standards risk --repo .`: verdict `normal`, so no vendor review was needed.
 - `/code-review` (medium): three nits, all about the canonical pattern itself. See "Concerns".
 
